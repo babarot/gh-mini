@@ -53,6 +53,19 @@ func (inlineMathParser) Trigger() []byte { return []byte{'$'} }
 
 func (inlineMathParser) Parse(parent ast.Node, block text.Reader, pc parser.Context) ast.Node {
 	line, seg := block.PeekLine()
+	// $$x$$ in a line is math too; without its closing $$ it is text,
+	// and the second $ must not start math either
+	if block.PrecendingCharacter() == '$' {
+		return nil
+	}
+	if len(line) > 2 && line[1] == '$' {
+		end := bytes.Index(line[2:], []byte("$$"))
+		if end <= 0 {
+			return nil
+		}
+		block.Advance(2 + end + 2)
+		return &inlineMath{Value: text.NewSegment(seg.Start+2, seg.Start+2+end)}
+	}
 	if len(line) > 1 && line[1] == '`' {
 		end := bytes.Index(line[2:], []byte("`$"))
 		if end < 0 {

@@ -7,13 +7,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// frontMatter is a file's YAML front matter: a mapping, or the text and
+// the error of YAML that does not parse.
+type frontMatter struct {
+	node *yaml.Node
+	raw  []byte
+	err  error
+}
+
 // splitFrontMatter splits off YAML front matter: a mapping between a first
-// line of --- and the next line of ---.
-func splitFrontMatter(src []byte) (fm *yaml.Node, body []byte, ok bool) {
+// line of --- and the next line of ---. YAML that does not parse is front
+// matter still, shown with its error as GitHub does, rather than a rule
+// and a heading.
+func splitFrontMatter(src []byte) (fm frontMatter, body []byte, ok bool) {
 	rest, found := bytes.CutPrefix(src, []byte("---\n"))
 	if !found {
 		if rest, found = bytes.CutPrefix(src, []byte("---\r\n")); !found {
-			return nil, src, false
+			return fm, src, false
 		}
 	}
 	for i := 0; i < len(rest); {
@@ -23,21 +33,31 @@ func splitFrontMatter(src []byte) (fm *yaml.Node, body []byte, ok bool) {
 		}
 		if string(bytes.TrimRight(rest[i:end], "\r\n")) == "---" {
 			var doc yaml.Node
-			if yaml.Unmarshal(rest[:i], &doc) != nil || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
-				return nil, src, false
+			if err := yaml.Unmarshal(rest[:i], &doc); err != nil {
+				return frontMatter{raw: rest[:i], err: err}, rest[end:], true
 			}
-			return doc.Content[0], rest[end:], true
+			if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+				return fm, src, false
+			}
+			return frontMatter{node: doc.Content[0]}, rest[end:], true
 		}
 		i = end
 	}
-	return nil, src, false
+	return fm, src, false
 }
 
 // renderFrontMatter writes front matter as GitHub shows it: a table whose
 // head is the keys, with a table for a value that holds more than one.
-func renderFrontMatter(buf *bytes.Buffer, n *yaml.Node) {
+func renderFrontMatter(buf *bytes.Buffer, fm frontMatter) {
+	if fm.err != nil {
+		buf.WriteString(`<div class="markdown-alert markdown-alert-caution">` + "\n")
+		buf.WriteString(`<p class="markdown-alert-title">` + alertIcons["caution"] + "Error in user YAML</p>\n")
+		buf.WriteString("<p>" + html.EscapeString(fm.err.Error()) + "</p>\n</div>\n")
+		buf.WriteString("<pre><code>" + html.EscapeString(string(fm.raw)) + "</code></pre>\n")
+		return
+	}
 	buf.WriteString("<table>\n")
-	writeYAML(buf, n)
+	writeYAML(buf, fm.node)
 	buf.WriteString("</table>\n")
 }
 

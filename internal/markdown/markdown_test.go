@@ -154,10 +154,18 @@ func TestRender(t *testing.T) {
 			},
 		},
 		{
-			name:   "a thematic break is not front matter",
+			// As on GitHub, YAML that does not parse is front matter with an
+			// error, not a rule and a heading
+			name:   "broken front matter shows its error",
 			src:    "---\nnot: [yaml\n---\n",
+			want:   []string{"Error in user YAML", "<pre><code>not: [yaml\n</code></pre>"},
+			reject: []string{"<hr>", "<table>"},
+		},
+		{
+			name:   "a rule around a line that is no mapping is not front matter",
+			src:    "---\nJust text\n---\n",
 			want:   []string{"<hr>"},
-			reject: []string{"<table>"},
+			reject: []string{"Error in user YAML", "<table>"},
 		},
 	}
 	for _, tt := range tests {
@@ -246,5 +254,31 @@ func TestIssueRefsNotInRawHTML(t *testing.T) {
 	}
 	if !strings.Contains(html, "issues/15") {
 		t.Errorf("#15 not linked: %s", html)
+	}
+}
+
+func TestBrokenFrontMatter(t *testing.T) {
+	out, _ := render(t, "", "---\ntitle: [unclosed\ndate: x\n---\n# Body\n")
+	html := string(out)
+	for _, want := range []string{"Error in user YAML", "<pre><code>title: [unclosed\ndate: x\n</code></pre>", `<h1 id="body">Body</h1>`} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %q in %s", want, html)
+		}
+	}
+	if strings.Contains(html, "<hr>") {
+		t.Errorf("front matter became a rule: %s", html)
+	}
+}
+
+func TestInlineDoubleDollarMath(t *testing.T) {
+	for src, want := range map[string]string{
+		"$$x$$ inline start\n":    `<span class="math-inline">\(x\)</span> inline start`,
+		"It costs $$10 or so\n":   "It costs $$10 or so",
+		"a $$y^2$$ b and $z$ c\n": `a <span class="math-inline">\(y^2\)</span> b and <span class="math-inline">\(z\)</span> c`,
+	} {
+		out, _ := render(t, "", src)
+		if !strings.Contains(string(out), want) {
+			t.Errorf("%q: got %s, want %q", src, out, want)
+		}
 	}
 }
