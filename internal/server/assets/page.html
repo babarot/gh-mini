@@ -21,8 +21,8 @@
 <link rel="stylesheet" href="{{.Static}}/assets/app.css">
 <link rel="stylesheet" id="theme" href="/_mini/theme/{{.Settings.theme}}.css">
 {{- if .Features.Math}}
-<script>MathJax = { options: { a11y: { backgroundOpacity: 0 }, enableMenu: false } };</script>
-<script src="{{.Static}}/assets/vendor/tex-mml-chtml.js" defer></script>
+<script>MathJax = { options: { a11y: { backgroundOpacity: 0 }, enableMenu: false }, output: { fontPath: "[mathjax]/../mathjax-newcm-font" } };</script>
+<script src="{{.Static}}/assets/vendor/mathjax/tex-mml-chtml.js" defer></script>
 {{- end}}
 {{- if .Features.Mermaid}}
 <script src="{{.Static}}/assets/vendor/mermaid.min.js" defer></script>

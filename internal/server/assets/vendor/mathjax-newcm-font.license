@@ -1,0 +1,3 @@
+mathjax-newcm-font/ holds the chtml directory of @mathjax/mathjax-newcm-font
+4.1.3 from npm, which its package.json licenses under the Apache License,
+Version 2.0. The text of the license is in mathjax.license.

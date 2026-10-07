@@ -467,7 +467,14 @@ func TestHandlerStaticFiles(t *testing.T) {
 		t.Fatal("the page does not link a versioned app.css")
 	}
 	prefix := m[1]
-	for _, p := range []string{"/assets/app.css", "/assets/js/main.js", "/assets/js/util.js", "/assets/js/mermaid.js", "/assets/vendor/mermaid.min.js", "/chroma.css"} {
+	for _, p := range []string{
+		"/assets/app.css", "/assets/js/main.js", "/assets/js/util.js", "/assets/js/mermaid.js", "/assets/vendor/mermaid.min.js", "/chroma.css",
+		// What MathJax loads by itself, relative to its script and fontPath
+		"/assets/vendor/mathjax/input/tex/extensions/boldsymbol.js",
+		"/assets/vendor/mathjax/sre/speech-worker.js",
+		"/assets/vendor/mathjax-newcm-font/chtml/woff2/mjx-ncm-ab.woff2",
+		"/assets/vendor/mathjax-newcm-font/chtml/dynamic/double-struck.js",
+	} {
 		r := get(t, h, prefix+p)
 		if r.code != http.StatusOK || r.body == "" {
 			t.Errorf("%s: status %d, %d bytes", p, r.code, len(r.body))
