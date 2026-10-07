@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -44,7 +45,10 @@ type Watcher struct {
 	ws        *Workspace
 	gitDir    string
 	themesDir string
-	done      chan struct{}
+	// themesOn is set while themesDir is watched; it may be created or
+	// removed while the server runs
+	themesOn atomic.Bool
+	done     chan struct{}
 
 	// mu guards the sets below, and the fsnotify calls that change them.
 	// It is never held while building a snapshot.
@@ -99,11 +103,8 @@ func Watch(ws *Workspace, themesDir string, handlers ...func(Event)) (*Watcher, 
 			w.gitDir = gitDir
 		}
 	}
-	if themesDir != "" {
-		if _, err := os.Stat(themesDir); err == nil && fw.Add(themesDir) == nil {
-			w.themesDir = themesDir
-		}
-	}
+	w.themesDir = themesDir
+	w.WatchThemes()
 	go w.loop(handlers)
 	return w, nil
 }
@@ -116,6 +117,26 @@ func (w *Watcher) Close() error {
 	err := w.fw.Close()
 	<-w.done
 	return err
+}
+
+// WatchThemes watches the themes directory if it exists and is not watched
+// yet. The server calls it on every page, so a directory created after
+// starting is followed from the next page on.
+func (w *Watcher) WatchThemes() {
+	if w.themesDir == "" || w.themesOn.Load() {
+		return
+	}
+	if fi, err := os.Stat(w.themesDir); err != nil || !fi.IsDir() {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.closed || w.themesOn.Load() {
+		return
+	}
+	if err := w.fw.Add(w.themesDir); err == nil {
+		w.themesOn.Store(true)
+	}
 }
 
 // rel returns a path under the root relative to it, slash-separated, or
@@ -268,6 +289,13 @@ func (w *Watcher) loop(handlers []func(Event)) {
 				return
 			}
 			if e.Has(fsnotify.Chmod) && !e.Has(fsnotify.Write) {
+				continue
+			}
+			if e.Name == w.themesDir {
+				// fsnotify stops watching a removed directory
+				if e.Has(fsnotify.Remove) || e.Has(fsnotify.Rename) {
+					w.themesOn.Store(false)
+				}
 				continue
 			}
 			dir := filepath.Dir(e.Name)

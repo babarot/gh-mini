@@ -267,3 +267,37 @@ func TestWatchDirAfterClose(t *testing.T) {
 	w.Close()
 	w.WatchDir("build")
 }
+
+func TestWatchThemesCreatedLater(t *testing.T) {
+	dir := newRepo(t, "")
+	themes := filepath.Join(t.TempDir(), "themes")
+	ws, err := Open(Options{Root: dir, Name: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws.Close()
+	events := make(chan Event, 16)
+	w, err := Watch(ws, themes, func(e Event) { events <- e })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+
+	write(t, filepath.Join(themes, "a.css"), ":root {}\n")
+	w.WatchThemes()
+	write(t, filepath.Join(themes, "a.css"), ":root { --x: 1; }\n")
+	next(t, events, func(e Event) bool { return e.Theme })
+
+	// Removed and created again, it is watched again
+	if err := os.RemoveAll(themes); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(300 * time.Millisecond)
+	write(t, filepath.Join(themes, "b.css"), ":root {}\n")
+	w.WatchThemes()
+	for len(events) > 0 {
+		<-events
+	}
+	write(t, filepath.Join(themes, "b.css"), ":root { --y: 1; }\n")
+	next(t, events, func(e Event) bool { return e.Theme })
+}

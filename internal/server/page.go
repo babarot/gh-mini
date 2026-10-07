@@ -52,6 +52,9 @@ type layout struct {
 }
 
 func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind string) *page {
+	if s.watcher != nil {
+		s.watcher.WatchThemes()
+	}
 	p := &page{Kind: kind, layout: layout{
 		Name:   s.opts.Name,
 		Branch: snap.Branch,
