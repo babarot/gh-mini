@@ -3,15 +3,15 @@
  * mode, Day in light mode.
  */
 :root[data-mode="light"] {
-  --bgColor-default: #e1e2e7;
-  --bgColor-muted: #d5d6db;
-  --bgColor-neutral-muted: #c4c8da;
-  --borderColor-default: #a8aecb;
-  --borderColor-muted: #c4c8da;
-  --fgColor-default: #3760bf;
-  --fgColor-muted: #6172b0;
-  --fgColor-accent: #2e7de9;
-  --focus-outlineColor: #2e7de9;
+  --bgColor-default: #e6e7ed;
+  --bgColor-muted: #dcdee5;
+  --bgColor-neutral-muted: #cdd0db;
+  --borderColor-default: #c1c4d2;
+  --borderColor-muted: #d3d5de;
+  --fgColor-default: #343b58;
+  --fgColor-muted: #5c6070;
+  --fgColor-accent: #1e5fc4;
+  --focus-outlineColor: #1e5fc4;
   --fgColor-success: #587539;
   --fgColor-attention: #8c6c3e;
   --fgColor-danger: #f52a65;
@@ -21,12 +21,12 @@
   --syntax-keyword: #9854f1;
   --syntax-string: #587539;
   --syntax-number: #b15c00;
-  --syntax-function: #2e7de9;
+  --syntax-function: #1e5fc4;
   --syntax-type: #188092;
   --syntax-constant: #007197;
   --syntax-tag: #f52a65;
   --syntax-operator: #006a83;
-  --syntax-variable: #3760bf;
+  --syntax-variable: #343b58;
   --syntax-inserted: #587539;
   --syntax-deleted: #c64343;
   --syntax-inserted-bg: #58753926;
@@ -40,7 +40,7 @@
   --borderColor-default: #3b4261;
   --borderColor-muted: #292e42;
   --fgColor-default: #c0caf5;
-  --fgColor-muted: #a9b1d6;
+  --fgColor-muted: #7d83a8;
   --fgColor-accent: #7aa2f7;
   --focus-outlineColor: #7aa2f7;
   --fgColor-success: #9ece6a;

@@ -9,9 +9,9 @@
   --borderColor-default: #d8dee9;
   --borderColor-muted: #e0e5ed;
   --fgColor-default: #2e3440;
-  --fgColor-muted: #4c566a;
-  --fgColor-accent: #5e81ac;
-  --focus-outlineColor: #5e81ac;
+  --fgColor-muted: #5c6579;
+  --fgColor-accent: #2e6aa8;
+  --focus-outlineColor: #2e6aa8;
   --fgColor-success: #6e8a55;
   --fgColor-attention: #a07a2c;
   --fgColor-danger: #bf616a;
@@ -40,7 +40,7 @@
   --borderColor-default: #4c566a;
   --borderColor-muted: #434c5e;
   --fgColor-default: #eceff4;
-  --fgColor-muted: #d8dee9;
+  --fgColor-muted: #959fb2;
   --fgColor-accent: #88c0d0;
   --focus-outlineColor: #88c0d0;
   --fgColor-success: #a3be8c;
