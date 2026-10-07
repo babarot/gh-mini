@@ -31,6 +31,9 @@ type Options struct {
 	ThemesDir string
 	// Reload makes pages reload when the files they show change.
 	Reload bool
+	// PreviewPort is the port PreviewHandler is served on, on the same
+	// host; zero turns HTML previews off.
+	PreviewPort int
 }
 
 // Server serves one directory.
@@ -43,6 +46,8 @@ type Server struct {
 	hub     *hub
 	static  *staticFiles
 	renders *renderCache
+	// previewToken is the value of the preview cookie
+	previewToken string
 }
 
 // New opens the root and, when reloading is on, starts watching it.
@@ -74,6 +79,9 @@ func New(opts Options) (*Server, error) {
 		hub:     &hub{subs: map[*subscriber]struct{}{}},
 		static:  newStaticFiles(),
 		renders: newRenderCache(maxRenderCache),
+	}
+	if opts.PreviewPort != 0 {
+		s.previewToken = newPreviewToken()
 	}
 	if opts.Reload {
 		s.watcher, err = workspace.Watch(ws, opts.ThemesDir, s.notify)

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/babarot/gh-mini/internal/server"
@@ -48,14 +49,15 @@ func main() {
 
 // config is what the command line asks for.
 type config struct {
-	port      int
-	host      string
-	noOpen    bool
-	noReload  bool
-	theme     string
-	skip      []string
-	themesDir string
-	version   bool
+	port        int
+	previewPort int
+	host        string
+	noOpen      bool
+	noReload    bool
+	theme       string
+	skip        []string
+	themesDir   string
+	version     bool
 	// target is the directory or file to serve, "" for the current
 	// directory.
 	target string
@@ -75,6 +77,7 @@ func parseArgs(args []string, stderr io.Writer) (config, error) {
 	fs.IntVar(&c.port, "p", 6419, "")
 	fs.IntVar(&c.port, "port", 6419, "port to listen on; the next free one is used when it is taken")
 	fs.StringVar(&c.host, "host", "localhost", "address to listen on")
+	fs.IntVar(&c.previewPort, "preview-port", 0, "port for HTML previews; 0 picks a free one")
 	fs.BoolVar(&c.noOpen, "no-open", false, "do not open the browser")
 	fs.BoolVar(&c.noReload, "no-reload", false, "do not reload pages when files change")
 	fs.StringVar(&c.theme, "theme", os.Getenv("GH_MINI_THEME"), "theme to use until one is picked in the page ($GH_MINI_THEME)")
@@ -131,24 +134,46 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 
-	srv, err := server.New(server.Options{
+	ln, err := listen(c.host, c.port)
+	if err != nil {
+		return err
+	}
+	// HTML previews come from a second port, another origin; without it
+	// they are shown as code
+	pln, err := net.Listen("tcp", net.JoinHostPort(c.host, strconv.Itoa(c.previewPort)))
+	if err != nil {
+		fmt.Fprintln(stderr, "gh-mini: HTML previews are off:", err)
+		pln = nil
+	}
+
+	opts := server.Options{
 		Root:      root,
 		Name:      filepath.Base(root),
 		Skip:      c.skip,
 		Theme:     c.theme,
 		ThemesDir: c.themesDir,
 		Reload:    !c.noReload,
-	})
+	}
+	if pln != nil {
+		opts.PreviewPort = pln.Addr().(*net.TCPAddr).Port
+	}
+	srv, err := server.New(opts)
 	if err != nil {
 		return err
+	}
+	if pln != nil {
+		go func() {
+			if err := http.Serve(pln, srv.PreviewHandler()); err != nil {
+				fmt.Fprintln(stderr, "gh-mini: HTML previews stopped:", err)
+			}
+		}()
 	}
 
-	ln, err := listen(c.host, c.port)
-	if err != nil {
-		return err
-	}
 	url := fmt.Sprintf("http://%s%s", ln.Addr().String(), open)
 	fmt.Fprintf(stdout, "gh-mini: serving %s at %s\n", root, url)
+	if pln != nil {
+		fmt.Fprintf(stdout, "gh-mini: HTML previews on port %d\n", opts.PreviewPort)
+	}
 	if !c.noOpen {
 		openBrowser(url)
 	}
