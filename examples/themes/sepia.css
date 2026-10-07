@@ -1,6 +1,6 @@
 /*
  * A warm, paper-like theme. Copy it to ~/.config/gh-mini/themes/ and pick
- * "sepia" in the page.
+ * "sepia" in the settings.
  *
  * Themes set the variables from internal/server/assets/markdown.css and
  * app.css. Use :root[data-mode="light"] and :root[data-mode="dark"] for
