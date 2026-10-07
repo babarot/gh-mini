@@ -57,7 +57,7 @@ Colors are CSS variables, so a theme usually only sets them. Set them under `:ro
 }
 ```
 
-The main variables are `--bgColor-default`, `--bgColor-muted`, `--fgColor-default`, `--fgColor-muted`, `--fgColor-accent` and `--borderColor-default`; the full list is at the top of [markdown.css](internal/server/assets/markdown.css), and the layout ones (`--mini-sidebar-width`, `--mini-content-width`, ...) at the top of [app.css](internal/server/assets/app.css). See [examples/themes/sepia.css](examples/themes/sepia.css).
+The main variables are `--bgColor-default`, `--bgColor-muted`, `--fgColor-default`, `--fgColor-muted`, `--fgColor-accent`, `--focus-outlineColor` (the ring around a focused or linked-to element) and `--borderColor-default`; the full list is at the top of [markdown.css](internal/server/assets/markdown.css), and the layout ones (`--mini-sidebar-width`, `--mini-content-width`, ...) at the top of [app.css](internal/server/assets/app.css). See [examples/themes/sepia.css](examples/themes/sepia.css).
 
 ## Development
 

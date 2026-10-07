@@ -15,7 +15,7 @@
   --fgColor-default: #3b3227;
   --fgColor-muted: #7a6c58;
   --fgColor-accent: #a0522d;
-  --fgColor-accent-2: #a0522d;
+  --focus-outlineColor: #a0522d;
 }
 
 :root[data-mode="dark"] {
@@ -27,7 +27,7 @@
   --fgColor-default: #e8dcc8;
   --fgColor-muted: #a89a84;
   --fgColor-accent: #e0a46f;
-  --fgColor-accent-2: #e0a46f;
+  --focus-outlineColor: #e0a46f;
 }
 
 .markdown-body {

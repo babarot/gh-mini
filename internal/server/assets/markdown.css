@@ -4,15 +4,13 @@
   color-scheme: light;
   --bgColor-default: #ffffff;
   --bgColor-muted: #f6f8fa;
-  --bgColor-muted-2: #f6f8fa;
   --bgColor-neutral-muted: #818b981f;
   --borderColor-default: #d1d9e0;
-  --borderColor-default-2: #d1d9e0;
   --borderColor-muted: #d1d9e0b3;
   --fgColor-accent: #0969da;
-  --fgColor-accent-2: #0969da;
   --fgColor-default: #1f2328;
   --fgColor-muted: #59636e;
+  --focus-outlineColor: #0969da;
   --md-0550ae: #0550ae;
   --md-0550ae-2: #0550ae;
   --md-0550ae-3: #0550ae;
@@ -39,7 +37,9 @@
   --md-cf222e-2: #cf222e;
   --md-cf222e-3: #cf222e;
   --md-d1242f: #d1242f;
+  --md-d1d9e0: #d1d9e0;
   --md-dafbe1: #dafbe1;
+  --md-f6f8fa: #f6f8fa;
   --md-ffd8b5: #ffd8b5;
   --md-ffebe9: #ffebe9;
   --md-fff8c5: #fff8c5;
@@ -49,15 +49,13 @@
   color-scheme: dark;
   --bgColor-default: #0d1117;
   --bgColor-muted: #151b23;
-  --bgColor-muted-2: #f0f6fc;
   --bgColor-neutral-muted: #656c7633;
   --borderColor-default: #3d444d;
-  --borderColor-default-2: #f0f6fc;
   --borderColor-muted: #3d444db3;
   --fgColor-accent: #4493f8;
-  --fgColor-accent-2: #1f6feb;
   --fgColor-default: #f0f6fc;
   --fgColor-muted: #9198a1;
+  --focus-outlineColor: #1f6feb;
   --md-0550ae: #79c0ff;
   --md-0550ae-2: #7ee787;
   --md-0550ae-3: #1f6feb;
@@ -84,7 +82,9 @@
   --md-cf222e-2: #b62324;
   --md-cf222e-3: #da3633;
   --md-d1242f: #f85149;
+  --md-d1d9e0: #f0f6fc;
   --md-dafbe1: #033a16;
+  --md-f6f8fa: #f0f6fc;
   --md-ffd8b5: #5a1e02;
   --md-ffebe9: #67060c;
   --md-fff8c5: #bb800926;
@@ -308,7 +308,7 @@
 .markdown-body [role=button]:focus,
 .markdown-body input[type=radio]:focus,
 .markdown-body input[type=checkbox]:focus {
-  outline: 2px solid var(--fgColor-accent-2);
+  outline: 2px solid var(--focus-outlineColor);
   outline-offset: -2px;
   box-shadow: none;
 }
@@ -324,7 +324,7 @@
 .markdown-body [role=button]:focus-visible,
 .markdown-body input[type=radio]:focus-visible,
 .markdown-body input[type=checkbox]:focus-visible {
-  outline: 2px solid var(--fgColor-accent-2);
+  outline: 2px solid var(--focus-outlineColor);
   outline-offset: -2px;
   box-shadow: none;
 }
@@ -911,7 +911,7 @@
   left: calc(1.5rem*-1);
   pointer-events: none;
   content: "";
-  border: 2px solid var(--fgColor-accent-2);
+  border: 2px solid var(--focus-outlineColor);
   border-radius: 6px;
 }
 
@@ -974,12 +974,12 @@
 }
 
 .markdown-body .pl-ii {
-  color: var(--bgColor-muted-2);
+  color: var(--md-f6f8fa);
   background-color: var(--md-82071e-2);
 }
 
 .markdown-body .pl-c2 {
-  color: var(--bgColor-muted-2);
+  color: var(--md-f6f8fa);
   background-color: var(--md-cf222e-2);
 }
 
@@ -1025,7 +1025,7 @@
 }
 
 .markdown-body .pl-mi2 {
-  color: var(--borderColor-default-2);
+  color: var(--md-d1d9e0);
   background-color: var(--md-0550ae-4);
 }
 
@@ -1146,7 +1146,7 @@
 }
 
 .markdown-body .markdown-alert.markdown-alert-note {
-  border-left-color: var(--fgColor-accent-2);
+  border-left-color: var(--focus-outlineColor);
 }
 
 .markdown-body .markdown-alert.markdown-alert-note .markdown-alert-title {

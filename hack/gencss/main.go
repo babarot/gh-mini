@@ -19,17 +19,20 @@ import (
 
 var colorRe = regexp.MustCompile(`#[0-9a-fA-F]{3,8}\b`)
 
-// Names for the colors a theme is most likely to change. The rest are named
-// after their light value.
-var names = map[string]string{
-	"#1f2328":   "fgColor-default",
-	"#ffffff":   "bgColor-default",
-	"#f6f8fa":   "bgColor-muted",
-	"#59636e":   "fgColor-muted",
-	"#0969da":   "fgColor-accent",
-	"#d1d9e0":   "borderColor-default",
-	"#d1d9e0b3": "borderColor-muted",
-	"#818b981f": "bgColor-neutral-muted",
+// Names for the colors a theme is most likely to change, by their light and
+// dark values: the same light color can stand for different things, such as
+// #f6f8fa for the muted background and for a syntax color. The rest are
+// named after their light value.
+var names = map[[2]string]string{
+	{"#1f2328", "#f0f6fc"}:     "fgColor-default",
+	{"#ffffff", "#0d1117"}:     "bgColor-default",
+	{"#f6f8fa", "#151b23"}:     "bgColor-muted",
+	{"#59636e", "#9198a1"}:     "fgColor-muted",
+	{"#0969da", "#4493f8"}:     "fgColor-accent",
+	{"#0969da", "#1f6feb"}:     "focus-outlineColor",
+	{"#d1d9e0", "#3d444d"}:     "borderColor-default",
+	{"#d1d9e0b3", "#3d444db3"}: "borderColor-muted",
+	{"#818b981f", "#656c7633"}: "bgColor-neutral-muted",
 }
 
 func main() {
@@ -52,7 +55,7 @@ func main() {
 	// gets one variable per pair
 	vars := map[string][2]string{}
 	varFor := func(l, d string) string {
-		base, ok := names[strings.ToLower(l)]
+		base, ok := names[[2]string{strings.ToLower(l), strings.ToLower(d)}]
 		if !ok {
 			base = "md-" + strings.TrimPrefix(strings.ToLower(l), "#")
 		}
