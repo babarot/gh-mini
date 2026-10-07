@@ -1,12 +1,11 @@
 // Heading anchors and the table of contents of a Markdown page.
 
-import { esc, ICON_LINK } from "./util.js";
+import { ICON_LINK } from "./util.js";
 
 export function initToc() {
   const article = document.querySelector(".markdown-body");
   if (!article) return;
-  const heads = Array.from(article.querySelectorAll("h1[id], h2[id], h3[id], h4[id]"));
-  heads.forEach((h) => {
+  article.querySelectorAll("h1[id], h2[id], h3[id], h4[id]").forEach((h) => {
     const a = document.createElement("a");
     a.className = "anchor";
     a.href = "#" + h.id;
@@ -14,18 +13,25 @@ export function initToc() {
     a.innerHTML = ICON_LINK;
     h.insertBefore(a, h.firstChild);
   });
-  if (heads.length < 2) return;
+  // The server renders the table of contents, so that the page does not
+  // shift when it appears; each entry is matched to its heading by id
   const toc = document.getElementById("mini.toc");
-  toc.innerHTML = "<h2>On this page</h2>" + heads.map((h) =>
-    '<a class="l' + h.tagName.slice(1) + '" href="#' + esc(h.id) + '">' + esc(h.textContent) + "</a>"
-  ).join("");
-  toc.hidden = false;
-  const links = Array.from(toc.querySelectorAll("a"));
+  if (!toc) return;
+  const links = [];
+  const heads = [];
+  toc.querySelectorAll("a").forEach((a) => {
+    const h = document.getElementById(decodeFragment(a.getAttribute("href")));
+    if (h) {
+      links.push(a);
+      heads.push(h);
+    }
+  });
+  if (!heads.length) return;
   // Headings near the end of a page never reach the top of the window,
   // because the page stops scrolling first. At the bottom, the heading
   // the reader jumped to stays active while it is in view; otherwise the
   // last heading is.
-  let jumped = heads.findIndex((h) => "#" + h.id === decodedHash());
+  let jumped = heads.findIndex((h) => h.id === decodeFragment(location.hash));
   toc.addEventListener("click", (e) => {
     const a = e.target.closest("a");
     if (a) jumped = links.indexOf(a);
@@ -55,12 +61,13 @@ export function initToc() {
   spy();
 }
 
-// decodedHash is the URL's fragment, decoded when it can be: a malformed
-// one is compared as it is.
-function decodedHash() {
+// decodeFragment turns "#id" into the id it names, decoded when it can be:
+// a malformed one is taken as it is.
+function decodeFragment(hash) {
+  const raw = (hash || "").replace(/^#/, "");
   try {
-    return decodeURIComponent(location.hash);
+    return decodeURIComponent(raw);
   } catch (e) {
-    return location.hash;
+    return raw;
   }
 }

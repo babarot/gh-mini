@@ -19,7 +19,7 @@
 {{- end}}
 <script type="module" src="{{.Static}}/assets/js/main.js"></script>
 </head>
-<body data-path="{{.Path}}" data-kind="{{.Kind}}" data-name="{{.Name}}"{{if .Reload}} data-reload="1"{{end}}>
+<body data-path="{{.Path}}" data-kind="{{.Kind}}" data-name="{{.Name}}"{{if .Reload}} data-reload="1"{{end}}{{if .SidebarHidden}} class="sidebar-hidden"{{end}}>
 
 <header class="topbar">
   <button class="icon-btn" id="mini.sidebar-toggle" title="Toggle file tree" aria-label="Toggle file tree">
@@ -177,7 +177,14 @@
     {{- end}}
   </main>
 
-  <aside class="toc" id="mini.toc" hidden></aside>
+  {{- if gt (len .Features.Headings) 1}}
+  <aside class="toc" id="mini.toc">
+    <h2>On this page</h2>
+    {{- range .Features.Headings}}
+    <a class="l{{.Level}}" href="#{{.ID}}">{{.Text}}</a>
+    {{- end}}
+  </aside>
+  {{- end}}
 </div>
 </body>
 </html>

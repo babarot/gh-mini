@@ -635,3 +635,24 @@ func TestHandlerBOM(t *testing.T) {
 		t.Error("raw lost the byte order mark")
 	}
 }
+
+func TestTableOfContents(t *testing.T) {
+	h := newTestServer(t)
+	get(t, h, "/docs/guide.md").expect(t, http.StatusOK,
+		`<aside class="toc" id="mini.toc">`, `<a class="l1" href="#guide">Guide</a>`, `<a class="l2" href="#install">Install</a>`)
+	// One heading is no table of contents
+	if r := get(t, h, "/docs/a%20b.md"); strings.Contains(r.body, `id="mini.toc"`) {
+		t.Error("a table of contents for one heading")
+	}
+}
+
+func TestSidebarCookie(t *testing.T) {
+	h := newTestServer(t)
+	if r := get(t, h, "/"); strings.Contains(r.body, `class="sidebar-hidden"`) {
+		t.Error("hidden without the cookie")
+	}
+	get(t, h, "/", withCookie("gh-mini-sidebar", "hidden")).expect(t, http.StatusOK, `class="sidebar-hidden"`)
+	if r := get(t, h, "/", withCookie("gh-mini-sidebar", "shown")); strings.Contains(r.body, `class="sidebar-hidden"`) {
+		t.Error("hidden with the cookie saying shown")
+	}
+}

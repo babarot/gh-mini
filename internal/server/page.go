@@ -55,6 +55,9 @@ type layout struct {
 	Reload       bool
 	// Static is the URL of the server's own files.
 	Static string
+	// SidebarHidden closes the file tree from the first paint, as the
+	// viewer left it.
+	SidebarHidden bool
 }
 
 func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind string) *page {
@@ -71,6 +74,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 	}}
 	p.Title = s.opts.Name
 	p.SettingAttrs = settingAttrs(p.Settings)
+	p.SidebarHidden = cookie(r, sidebarCookie) == "hidden"
 	p.SettingViews = s.settingViews(p.Settings)
 	if rel != "." {
 		p.Title = rel + " · " + s.opts.Name
@@ -107,3 +111,8 @@ func href(rel string) string {
 	}
 	return (&url.URL{Path: "/" + rel}).EscapedPath()
 }
+
+// sidebarCookie keeps the file tree closed from page to page. A cookie
+// rather than localStorage, so that the page is rendered closed instead
+// of closing after it shows.
+const sidebarCookie = "gh-mini-sidebar"

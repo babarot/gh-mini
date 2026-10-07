@@ -195,7 +195,7 @@ func TestFeatures(t *testing.T) {
 		"```math\nx\n```\n":                {Math: true},
 		"$$\nx\n$$\n":                      {Math: true},
 	} {
-		if _, got := render(t, "", src); got != want {
+		if _, got := render(t, "", src); got.Mermaid != want.Mermaid || got.Math != want.Math {
 			t.Errorf("%q: features = %+v, want %+v", src, got, want)
 		}
 	}
@@ -213,6 +213,24 @@ func TestRenderBOM(t *testing.T) {
 		}
 		if !strings.Contains(string(out), tt.want) || strings.Contains(string(out), "\xef\xbb\xbf") {
 			t.Errorf("%s: %s", name, out)
+		}
+	}
+}
+
+func TestHeadings(t *testing.T) {
+	_, f := render(t, "", "# Title :tada:\n\n## Use `go test` and [links](x.md)\n\n##### Too deep\n\n## Title :tada:\n\n### <b>raw</b> text\n")
+	want := []Heading{
+		{1, "title-tada", "Title 🎉"},
+		{2, "use-go-test-and-linksxmd", "Use go test and links"},
+		{2, "title-tada-1", "Title 🎉"},
+		{3, "brawb-text", "raw text"}, // ids come from the source for now
+	}
+	if len(f.Headings) != len(want) {
+		t.Fatalf("headings = %+v", f.Headings)
+	}
+	for i, h := range f.Headings {
+		if h != want[i] {
+			t.Errorf("heading %d = %+v, want %+v", i, h, want[i])
 		}
 	}
 }

@@ -20,6 +20,8 @@ import (
 type Features struct {
 	Mermaid bool
 	Math    bool
+	// Headings are the headings for the table of contents, in order.
+	Headings []Heading
 }
 
 // Renderer renders Markdown. It is safe for concurrent use.
@@ -94,6 +96,10 @@ func (r *Renderer) Render(src []byte) ([]byte, Features, error) {
 				f.Mermaid = f.Mermaid || language(n, src) == "mermaid"
 			case kindMathBlock, kindInlineMath:
 				f.Math = true
+			case ast.KindHeading:
+				if h, ok := headingOf(n, src); ok {
+					f.Headings = append(f.Headings, h)
+				}
 			}
 		}
 		return ast.WalkContinue, nil

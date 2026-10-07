@@ -1,6 +1,6 @@
 // The file tree in the sidebar, its filter and its toggle.
 
-import { page, load, save, href, dirname, isMarkdown, esc, ICON_DIR, ICON_FILE, ICON_CHEVRON } from "./util.js";
+import { page, load, save, href, dirname, isMarkdown, esc, ICON_DIR, ICON_FILE, ICON_CHEVRON, setCookie } from "./util.js";
 
 const body = document.body;
 const treeEl = document.getElementById("mini.tree");
@@ -158,15 +158,21 @@ export function initTree() {
     }
   });
 
+  // The server renders the tree closed from a cookie. It was kept in
+  // localStorage before: move it over once
   const toggle = document.getElementById("mini.sidebar-toggle");
-  if (load("sidebarHidden", false)) body.classList.add("sidebar-hidden");
+  if (!document.cookie.split("; ").some((c) => c.startsWith("gh-mini-sidebar=")) && load("sidebarHidden", false)) {
+    setCookie("gh-mini-sidebar", "hidden");
+    body.classList.add("sidebar-hidden");
+  }
   toggle.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 767px)").matches) {
       body.classList.toggle("sidebar-shown");
       return;
     }
-    body.classList.toggle("sidebar-hidden");
-    save("sidebarHidden", body.classList.contains("sidebar-hidden"));
+    const hidden = body.classList.toggle("sidebar-hidden");
+    setCookie("gh-mini-sidebar", hidden ? "hidden" : "shown");
+    save("sidebarHidden", hidden);
   });
 
   window.addEventListener("pagehide", keepScroll);
