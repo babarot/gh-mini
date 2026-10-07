@@ -93,3 +93,37 @@ func TestSnapshotUnwatchedMaxAge(t *testing.T) {
 		t.Errorf("tree after MaxAge = %v, want a.md", got)
 	}
 }
+
+// A directory git ignores is a lazy leaf of the tree, and Subtree reads it.
+func TestLazyIgnoredDir(t *testing.T) {
+	dir := newRepo(t, "build/\n", "build/a.txt", "build/sub/b.txt", "src/c.go")
+	w, err := Open(Options{Root: dir, Name: "x", Skip: []string{".git"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	var build *Node
+	for _, n := range w.Snapshot().Tree.Children {
+		if n.Name == "build" {
+			build = n
+		}
+	}
+	if build == nil || !build.Lazy || !build.Ignored || build.Children != nil {
+		t.Fatalf("build = %+v", build)
+	}
+	sub, err := w.Subtree("build")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(sub); len(got) != 2 || got[0] != "sub" || got[1] != "a.txt" {
+		t.Errorf("build's entries = %v", got)
+	}
+	if !sub.Children[0].Lazy || !sub.Children[0].Ignored || sub.Children[0].Path != "build/sub" {
+		t.Errorf("build/sub = %+v", sub.Children[0])
+	}
+	for _, bad := range []string{".", "..", "../x", "/etc", "nope", "src/c.go"} {
+		if _, err := w.Subtree(bad); err == nil {
+			t.Errorf("Subtree(%q) gave no error", bad)
+		}
+	}
+}

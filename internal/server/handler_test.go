@@ -656,3 +656,15 @@ func TestSidebarCookie(t *testing.T) {
 		t.Error("hidden with the cookie saying shown")
 	}
 }
+
+func TestTreeOfIgnoredDir(t *testing.T) {
+	h := newTestServer(t)
+	r := get(t, h, "/_mini/api/tree")
+	if strings.Contains(r.body, "local-only/note.md") || !strings.Contains(r.body, `"path":"local-only","dir":true,"ignored":true,"lazy":true`) {
+		t.Errorf("tree: %s", r.body)
+	}
+	get(t, h, "/_mini/api/tree?path=local-only").expect(t, http.StatusOK, `"path":"local-only/note.md"`)
+	for _, bad := range []string{"..", "nope", "../outside"} {
+		get(t, h, "/_mini/api/tree?path="+bad).expect(t, http.StatusNotFound)
+	}
+}

@@ -33,14 +33,16 @@ function restore() {
   } catch (e) {}
 }
 
-// initReload listens for changes. onTheme runs when a theme was saved, and
-// onStructure when files were added or removed.
-export function initReload({ onTheme, onStructure }) {
+// initReload listens for changes. onTheme runs when a theme was saved,
+// onStructure when files were added or removed, and onFiles with the
+// changed paths otherwise.
+export function initReload({ onTheme, onStructure, onFiles }) {
   restore();
   if (!page.reload) return;
   subscribe((c) => {
     if (c.theme) onTheme();
     if (c.structure || c.resync) onStructure();
+    else onFiles(c.paths, c.dirs);
     if (c.resync) {
       reload();
       return;

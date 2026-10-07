@@ -366,8 +366,11 @@ func (w *Watcher) flush(b burst) {
 func (w *Watcher) structureChanged(snap *Snapshot, paths []string) bool {
 	dirs := map[string]bool{}
 	for _, rel := range paths {
-		dirs[path.Dir(rel)] = true
-		if fi, err := os.Lstat(filepath.Join(w.ws.opts.Root, filepath.FromSlash(rel))); err == nil && fi.IsDir() {
+		// The tree lists no entries of an ignored directory
+		if parent := path.Dir(rel); parent == "." || !snap.Ignored(parent) {
+			dirs[parent] = true
+		}
+		if fi, err := os.Lstat(filepath.Join(w.ws.opts.Root, filepath.FromSlash(rel))); err == nil && fi.IsDir() && !snap.Ignored(rel) {
 			dirs[rel] = true
 		}
 	}

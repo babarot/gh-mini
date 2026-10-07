@@ -1,4 +1,4 @@
-import { initTree, fetchTree } from "./tree.js";
+import { initTree, fetchTree, refresh } from "./tree.js";
 import { initSettings, refreshTheme } from "./settings.js";
 import { initLangs } from "./langs.js";
 import { initToc } from "./toc.js";
@@ -14,7 +14,7 @@ for (const init of [
   initToc,
   initCopy,
   initMermaid,
-  () => initReload({ onTheme: refreshTheme, onStructure: fetchTree }),
+  () => initReload({ onTheme: refreshTheme, onStructure: fetchTree, onFiles: refresh }),
 ]) {
   try {
     init();

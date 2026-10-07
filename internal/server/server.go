@@ -5,6 +5,7 @@ package server
 
 import (
 	"embed"
+	"encoding/json"
 	"html/template"
 	"net/http"
 	"path"
@@ -115,6 +116,19 @@ func (s *Server) Handler() http.Handler {
 // serveTree serves the tree as JSON. The browser asks again on every page,
 // and gets 304 while the tree is the same.
 func (s *Server) serveTree(w http.ResponseWriter, r *http.Request) {
+	// ?path= gives the entries of one directory, for those the tree
+	// leaves out
+	if r.URL.Query().Has("path") {
+		n, err := s.ws.Subtree(r.URL.Query().Get("path"))
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(n)
+		return
+	}
 	snap := s.ws.Snapshot()
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("ETag", snap.TreeETag)

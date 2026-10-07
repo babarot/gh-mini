@@ -10,10 +10,14 @@ import (
 
 // Node is a file or directory in the tree.
 type Node struct {
-	Name     string  `json:"name"`
-	Path     string  `json:"path"`
-	Dir      bool    `json:"dir,omitempty"`
-	Ignored  bool    `json:"ignored,omitempty"`
+	Name    string `json:"name"`
+	Path    string `json:"path"`
+	Dir     bool   `json:"dir,omitempty"`
+	Ignored bool   `json:"ignored,omitempty"`
+	// Lazy is set on a directory git ignores: its entries are left out,
+	// as such directories are often a build's output or a tool's state
+	// with many files, and Subtree gives them when it is opened.
+	Lazy     bool    `json:"lazy,omitempty"`
 	Children []*Node `json:"children,omitempty"`
 }
 
@@ -41,6 +45,10 @@ func (w *Workspace) buildTree(ignored map[string]bool) (*Node, map[string]*Node)
 		}
 		n := &Node{Name: d.Name(), Path: p, Dir: d.IsDir(), Ignored: snap.Ignored(p)}
 		parent.Children = append(parent.Children, n)
+		if d.IsDir() && n.Ignored {
+			n.Lazy = true
+			return fs.SkipDir
+		}
 		if d.IsDir() {
 			nodes[p] = n
 		}
@@ -63,4 +71,31 @@ func sortTree(n *Node) {
 	for _, c := range n.Children {
 		sortTree(c)
 	}
+}
+
+// Subtree returns a directory under the root with its entries, but not
+// theirs: a directory among them is Lazy. It is how the entries of a
+// directory left out of the tree are read.
+func (w *Workspace) Subtree(rel string) (*Node, error) {
+	rel = path.Clean(rel)
+	if rel == "." || !fs.ValidPath(rel) {
+		return nil, fs.ErrNotExist
+	}
+	entries, err := fs.ReadDir(w.root.FS(), rel)
+	if err != nil {
+		return nil, err
+	}
+	snap := w.Snapshot()
+	n := &Node{Name: path.Base(rel), Path: rel, Dir: true, Ignored: snap.Ignored(rel)}
+	for _, e := range entries {
+		if w.Skipped(e.Name()) {
+			continue
+		}
+		p := path.Join(rel, e.Name())
+		n.Children = append(n.Children, &Node{
+			Name: e.Name(), Path: p, Dir: e.IsDir(), Ignored: snap.Ignored(p), Lazy: e.IsDir(),
+		})
+	}
+	sortTree(n)
+	return n, nil
 }
