@@ -242,7 +242,30 @@ func TestHandlerImageAndRaw(t *testing.T) {
 			t.Errorf("raw image: status %d, %d bytes", r.code, len(r.body))
 		}
 	}
-	get(t, h, "/bin.dat").expect(t, http.StatusOK, `data-kind="binary"`)
+	get(t, h, "/bin.dat").expect(t, http.StatusOK, `data-kind="binary"`, "This file is binary or too large to show.", "3 Bytes")
+	if r := get(t, h, "/bin.dat?raw"); r.code != http.StatusOK || r.body != "a\x00b" {
+		t.Errorf("raw binary: status %d, body %q", r.code, r.body)
+	}
+}
+
+// A text file too large to render gets only a raw link, as a binary file
+// does.
+func TestHandlerTooLarge(t *testing.T) {
+	root, _ := newTestRepo(t)
+	big := bytes.Repeat([]byte("# x\n"), maxRender/4+1)
+	writeFile(t, filepath.Join(root, "big.md"), big)
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { srv.Close() })
+	h := srv.Handler()
+	r := get(t, h, "/big.md")
+	r.expect(t, http.StatusOK, `data-kind="binary"`, "This file is binary or too large to show.", "2.0 MB")
+	r.reject(t, `<h1 id="x">`)
+	if r := get(t, h, "/big.md?raw"); r.code != http.StatusOK || len(r.body) != len(big) {
+		t.Errorf("raw: status %d, %d bytes, want %d", r.code, len(r.body), len(big))
+	}
 }
 
 func TestHandlerNotFound(t *testing.T) {
