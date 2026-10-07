@@ -13,9 +13,13 @@ import (
 // change is what the browser is told after files change. Pages reload only
 // for changes that affect them; Structure refreshes the sidebar.
 type change struct {
-	Paths     []string `json:"paths"`
+	Paths []string `json:"paths"`
+	// Dirs are directories where changes were too many to list
+	Dirs      []string `json:"dirs,omitempty"`
 	Structure bool     `json:"structure"`
 	Theme     bool     `json:"theme"`
+	// Resync tells that changes may have been missed: read everything
+	Resync bool `json:"resync,omitempty"`
 }
 
 type hub struct {
@@ -69,8 +73,15 @@ func (sub *subscriber) add(c change) {
 			sub.pending.Paths = append(sub.pending.Paths, p)
 		}
 	}
+	for _, d := range c.Dirs {
+		if !sub.seen["dir:"+d] {
+			sub.seen["dir:"+d] = true
+			sub.pending.Dirs = append(sub.pending.Dirs, d)
+		}
+	}
 	sub.pending.Structure = sub.pending.Structure || c.Structure
 	sub.pending.Theme = sub.pending.Theme || c.Theme
+	sub.pending.Resync = sub.pending.Resync || c.Resync
 	select {
 	case sub.ready <- struct{}{}:
 	default:
@@ -125,8 +136,8 @@ func (s *Server) serveEvents(w http.ResponseWriter, r *http.Request) {
 // notify tells the browsers what changed. HEAD moving alone changes
 // nothing they show but the branch, which the next page load picks up.
 func (s *Server) notify(e workspace.Event) {
-	if len(e.Paths) == 0 && !e.Structure && !e.Theme {
+	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.Theme && !e.Resync {
 		return
 	}
-	s.hub.publish(change{Paths: e.Paths, Structure: e.Structure, Theme: e.Theme})
+	s.hub.publish(change{Paths: e.Paths, Dirs: e.Dirs, Structure: e.Structure, Theme: e.Theme, Resync: e.Resync})
 }

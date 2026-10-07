@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -77,6 +78,12 @@ func startWatcher(t *testing.T, dir string) (*Workspace, *Watcher, <-chan Event)
 		w.Close()
 		ws.Close()
 	})
+	// FSEvents can deliver what happened just before the watch started,
+	// such as the repository's commit: let it pass
+	time.Sleep(400 * time.Millisecond)
+	for len(events) > 0 {
+		<-events
+	}
 	return ws, w, events
 }
 
@@ -134,10 +141,7 @@ func TestWatchFileChanges(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "new.md"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	e := next(t, events, func(e Event) bool { return e.Structure })
-	if len(e.Paths) != 1 || e.Paths[0] != "new.md" {
-		t.Errorf("paths = %v", e.Paths)
-	}
+	next(t, events, func(e Event) bool { return e.Structure && hasPath("new.md")(e) })
 	// The handler runs after the snapshot was invalidated
 	if got := names(ws.Snapshot().Tree); len(got) != 2 {
 		t.Errorf("tree after the event = %v", got)
@@ -146,9 +150,10 @@ func TestWatchFileChanges(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("# y\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	next(t, events, func(e Event) bool {
-		return len(e.Paths) == 1 && e.Paths[0] == "README.md" && !e.Structure
-	})
+	e := next(t, events, hasPath("README.md"))
+	if e.Structure {
+		t.Error("a write is a change of structure")
+	}
 }
 
 func TestWatchGitHead(t *testing.T) {
@@ -200,6 +205,7 @@ func TestWatcherCloseStopsGoroutines(t *testing.T) {
 }
 
 func TestWatchIgnoredDirOnlyWhenViewed(t *testing.T) {
+	perDirectory(t)
 	dir := newRepo(t, "build/\n", "build/out.md")
 	_, w, events := startWatcher(t, dir)
 
@@ -212,6 +218,7 @@ func TestWatchIgnoredDirOnlyWhenViewed(t *testing.T) {
 }
 
 func TestWatchDirEvictsLeastRecentlyViewed(t *testing.T) {
+	perDirectory(t)
 	dir := newRepo(t, "build/\n", "build/a/1.md", "build/b/1.md", "build/c/1.md")
 	_, w, events := startWatcher(t, dir)
 	w.mu.Lock()
@@ -300,4 +307,155 @@ func TestWatchThemesCreatedLater(t *testing.T) {
 	}
 	write(t, filepath.Join(themes, "b.css"), ":root { --y: 1; }\n")
 	next(t, events, func(e Event) bool { return e.Theme })
+}
+
+// On macOS one recursive watch covers ignored directories too.
+func TestWatchIgnoredDirRecursive(t *testing.T) {
+	if !recursiveWatch {
+		t.Skip("only macOS watches everything")
+	}
+	dir := newRepo(t, "build/\n", "build/out.md")
+	_, events := startWatch(t, dir)
+	write(t, filepath.Join(dir, "build", "out.md"), "2\n")
+	e := next(t, events, hasPath("build/out.md"))
+	if e.Structure {
+		t.Error("a write in an ignored directory is a change of structure")
+	}
+}
+
+// An editor that saves to a new file and renames it over the old one
+// changes no structure.
+func TestWatchAtomicSave(t *testing.T) {
+	dir := newRepo(t, "")
+	_, events := startWatch(t, dir)
+	tmp := filepath.Join(dir, ".README.md.swp")
+	write(t, tmp, "# saved\n")
+	if err := os.Rename(tmp, filepath.Join(dir, "README.md")); err != nil {
+		t.Fatal(err)
+	}
+	e := next(t, events, hasPath("README.md"))
+	if e.Structure {
+		t.Errorf("an atomic save is a change of structure: %+v", e)
+	}
+}
+
+// A new symlink is a change of structure, though its event may come as
+// one of its target.
+func TestWatchSymlink(t *testing.T) {
+	dir := newRepo(t, "")
+	ws, events := startWatch(t, dir)
+	if err := os.Symlink("README.md", filepath.Join(dir, "link.md")); err != nil {
+		t.Fatal(err)
+	}
+	next(t, events, func(e Event) bool { return e.Structure })
+	if got := names(ws.Snapshot().Tree); len(got) != 2 {
+		t.Errorf("tree = %v, want README.md and link.md", got)
+	}
+}
+
+// A dangling symlink must not hide files made after it (fsnotify's kqueue
+// stopped at the first entry it could not open).
+func TestWatchPastDanglingSymlink(t *testing.T) {
+	dir := newRepo(t, "")
+	if err := os.Symlink("nowhere", filepath.Join(dir, "dangling")); err != nil {
+		t.Fatal(err)
+	}
+	ws, events := startWatch(t, dir)
+	write(t, filepath.Join(dir, "probe.txt"), "x\n")
+	next(t, events, func(e Event) bool { return e.Structure && hasPath("probe.txt")(e) })
+	found := false
+	for _, n := range ws.Snapshot().Tree.Children {
+		found = found || n.Name == "probe.txt"
+	}
+	if !found {
+		t.Error("probe.txt is not in the tree")
+	}
+}
+
+// Writes that never stop, as a build's, do not hold back other changes.
+func TestWatchMaxWait(t *testing.T) {
+	dir := newRepo(t, "build/\n", "build/out.txt")
+	_, events := startWatch(t, dir)
+	stop := make(chan struct{})
+	defer close(stop)
+	go func() {
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			case <-time.After(20 * time.Millisecond):
+				_ = os.WriteFile(filepath.Join(dir, "build", "out.txt"), []byte(strconv.Itoa(i)), 0o644)
+			}
+		}
+	}()
+	time.Sleep(200 * time.Millisecond)
+	start := time.Now()
+	write(t, filepath.Join(dir, "README.md"), "# changed\n")
+	next(t, events, hasPath("README.md"))
+	if d := time.Since(start); d > 2*time.Second {
+		t.Errorf("README.md came after %v", d)
+	}
+}
+
+// Changes that may have been missed read everything again.
+func TestWatchResync(t *testing.T) {
+	dir := newRepo(t, "")
+	ws, w, events := startWatcher(t, dir)
+	write(t, filepath.Join(dir, "unseen.md"), "x\n")
+	// As if the event for it had been dropped
+	for len(events) > 0 {
+		<-events
+	}
+	w.markResync()
+	next(t, events, func(e Event) bool { return e.Resync && e.Structure })
+	found := false
+	for _, n := range ws.Snapshot().Tree.Children {
+		found = found || n.Name == "unseen.md"
+	}
+	if !found {
+		t.Error("unseen.md is not in the tree")
+	}
+}
+
+func TestLimitPaths(t *testing.T) {
+	snap := &Snapshot{ignored: map[string]bool{"build": true}}
+	var paths []string
+	for i := 0; i < maxIgnoredPaths+3; i++ {
+		paths = append(paths, "build/"+strconv.Itoa(i))
+	}
+	paths = append(paths, "README.md", "build/sub/x")
+	kept, dirs := limitPaths(snap, paths)
+	if len(kept) != maxIgnoredPaths+1 || kept[len(kept)-1] != "README.md" {
+		t.Errorf("kept %d paths, last %q", len(kept), kept[len(kept)-1])
+	}
+	if len(dirs) != 2 || dirs[0] != "build" || dirs[1] != "build/sub" {
+		t.Errorf("dirs = %v", dirs)
+	}
+}
+
+// perDirectory watches directory by directory for the test, as on systems
+// other than macOS.
+func perDirectory(t *testing.T) {
+	t.Helper()
+	saved := recursiveWatch
+	recursiveWatch = false
+	t.Cleanup(func() { recursiveWatch = saved })
+}
+
+// The tests of changes run the per-directory way too.
+func TestWatchPerDirectory(t *testing.T) {
+	perDirectory(t)
+	for name, test := range map[string]func(*testing.T){
+		"file changes":         TestWatchFileChanges,
+		"git head":             TestWatchGitHead,
+		"git internals":        TestWatchIgnoresGitInternals,
+		"no longer ignored":    TestWatchFollowsDirsNoLongerIgnored,
+		"new dir":              TestWatchNewDir,
+		"atomic save":          TestWatchAtomicSave,
+		"symlink":              TestWatchSymlink,
+		"past dangling":        TestWatchPastDanglingSymlink,
+		"themes created later": TestWatchThemesCreatedLater,
+	} {
+		t.Run(name, test)
+	}
 }

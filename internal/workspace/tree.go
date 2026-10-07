@@ -17,7 +17,8 @@ type Node struct {
 	Children []*Node `json:"children,omitempty"`
 }
 
-func (w *Workspace) buildTree(ignored map[string]bool) *Node {
+// buildTree returns the tree and its directories by path.
+func (w *Workspace) buildTree(ignored map[string]bool) (*Node, map[string]*Node) {
 	snap := &Snapshot{ignored: ignored}
 	root := &Node{Name: w.opts.Name, Dir: true}
 	nodes := map[string]*Node{".": root}
@@ -46,7 +47,7 @@ func (w *Workspace) buildTree(ignored map[string]bool) *Node {
 		return nil
 	})
 	sortTree(root)
-	return root
+	return root, nodes
 }
 
 // sortTree orders directories first, then by name ignoring case, as GitHub

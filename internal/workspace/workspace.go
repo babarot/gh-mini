@@ -71,7 +71,9 @@ type Snapshot struct {
 	// "" when there is none.
 	Repo    string
 	ignored map[string]bool
-	built   time.Time
+	// dirs are the tree's directories by path, "." for the root
+	dirs  map[string]*Node
+	built time.Time
 }
 
 // Open opens the directory.
@@ -155,7 +157,7 @@ func (w *Workspace) Snapshot() *Snapshot {
 	next.built = time.Now()
 	if prev == nil || bits&dirtyStructure != 0 {
 		next.ignored = gitIgnored(w.opts.Root)
-		next.Tree = w.buildTree(next.ignored)
+		next.Tree, next.dirs = w.buildTree(next.ignored)
 		next.TreeJSON, _ = json.Marshal(next.Tree)
 		sum := sha256.Sum256(next.TreeJSON)
 		next.TreeETag = `"` + hex.EncodeToString(sum[:8]) + `"`
@@ -176,4 +178,18 @@ func (s *Snapshot) Ignored(rel string) bool {
 		}
 	}
 	return false
+}
+
+// childNames returns the names in a directory of the tree, and false when
+// the tree has no such directory.
+func (s *Snapshot) childNames(rel string) (map[string]bool, bool) {
+	n, ok := s.dirs[rel]
+	if !ok {
+		return nil, false
+	}
+	names := make(map[string]bool, len(n.Children))
+	for _, c := range n.Children {
+		names[c.Name] = true
+	}
+	return names, true
 }

@@ -40,9 +40,17 @@ export function initReload({ onTheme, onStructure }) {
   if (!page.reload) return;
   subscribe((c) => {
     if (c.theme) onTheme();
-    if (c.structure) onStructure();
+    if (c.structure || c.resync) onStructure();
+    if (c.resync) {
+      reload();
+      return;
+    }
     const paths = c.paths || [];
-    const hit = paths.some((p) => p === page.path || (page.kind === "dir" && dirname(p) === page.path) ||
+    // dirs stand for changes too many to list: any file directly in them
+    const dirs = c.dirs || [];
+    const inDirs = dirs.some((d) => d === page.path || d === dirname(page.path) ||
+      (page.kind === "html" && underDir(d + "/x")));
+    const hit = inDirs || paths.some((p) => p === page.path || (page.kind === "dir" && dirname(p) === page.path) ||
       (page.kind === "html" && underDir(p)));
     if (hit || (page.kind === "notfound" && c.structure)) reload();
   });
