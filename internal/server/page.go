@@ -44,9 +44,11 @@ type layout struct {
 	Crumbs  []crumb
 	Ignored bool
 	Themes  []string
-	Theme   string
-	Mode    string
-	Reload  bool
+	// Settings holds the value of every setting, by key.
+	Settings map[string]string
+	// SettingAttrs are the settings set on <html> for CSS.
+	SettingAttrs template.HTMLAttr
+	Reload       bool
 	// Static is the URL of the server's own files.
 	Static string
 }
@@ -56,19 +58,16 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 		s.watcher.WatchThemes()
 	}
 	p := &page{Kind: kind, layout: layout{
-		Name:   s.opts.Name,
-		Branch: snap.Branch,
-		Path:   rel,
-		Themes: s.themes(),
-		Theme:  s.currentTheme(r),
-		Mode:   cookie(r, "gh-mini-mode"),
-		Reload: s.opts.Reload,
-		Static: s.static.prefix(),
+		Name:     s.opts.Name,
+		Branch:   snap.Branch,
+		Path:     rel,
+		Themes:   s.themes(),
+		Settings: s.settings(r),
+		Reload:   s.opts.Reload,
+		Static:   s.static.prefix(),
 	}}
-	if p.Mode != "light" && p.Mode != "dark" {
-		p.Mode = ""
-	}
 	p.Title = s.opts.Name
+	p.SettingAttrs = settingAttrs(p.Settings)
 	if rel != "." {
 		p.Title = rel + " · " + s.opts.Name
 		parts := strings.Split(rel, "/")

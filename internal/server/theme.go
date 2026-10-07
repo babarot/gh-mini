@@ -44,17 +44,3 @@ func (s *Server) serveTheme(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Write(b)
 }
-
-func (s *Server) currentTheme(r *http.Request) string {
-	if c, err := r.Cookie("gh-mini-theme"); err == nil {
-		for _, t := range s.themes() {
-			if t == c.Value {
-				return t
-			}
-		}
-	}
-	if s.opts.Theme != "" {
-		return s.opts.Theme
-	}
-	return builtinTheme
-}

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"{{if .Mode}} data-mode="{{.Mode}}"{{end}}>
+<html lang="en"{{with .Settings.mode}} data-mode="{{.}}"{{end}}{{.SettingAttrs}}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -21,7 +21,7 @@
 <link rel="stylesheet" href="{{.Static}}/grip/css/github-clipboard.css">
 <link rel="stylesheet" href="{{.Static}}/grip/css/github-mermaid.css">
 <link rel="stylesheet" href="{{.Static}}/assets/app.css">
-<link rel="stylesheet" id="theme" href="/_mini/theme/{{.Theme}}.css">
+<link rel="stylesheet" id="theme" href="/_mini/theme/{{.Settings.theme}}.css">
 <script src="{{.Static}}/grip/js/clipboard-copy.js" defer></script>
 {{- if .Features.Math}}
 <script src="{{.Static}}/grip/js/mathjax-options.js"></script>
@@ -55,16 +55,16 @@
     <span>Theme</span>
     <select id="theme-select">
       {{- range .Themes}}
-      <option value="{{.}}"{{if eq . $.Theme}} selected{{end}}>{{.}}</option>
+      <option value="{{.}}"{{if eq . $.Settings.theme}} selected{{end}}>{{.}}</option>
       {{- end}}
     </select>
   </label>
   <label class="picker" title="Color mode">
     <span>Mode</span>
     <select id="mode-select">
-      <option value=""{{if not .Mode}} selected{{end}}>Auto</option>
-      <option value="light"{{if eq .Mode "light"}} selected{{end}}>Light</option>
-      <option value="dark"{{if eq .Mode "dark"}} selected{{end}}>Dark</option>
+      <option value=""{{if not .Settings.mode}} selected{{end}}>Auto</option>
+      <option value="light"{{if eq .Settings.mode "light"}} selected{{end}}>Light</option>
+      <option value="dark"{{if eq .Settings.mode "dark"}} selected{{end}}>Dark</option>
     </select>
   </label>
 </header>
