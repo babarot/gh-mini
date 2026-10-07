@@ -15,9 +15,9 @@ type langTab struct {
 }
 
 var (
-	readmeRe = regexp.MustCompile(`(?i)^readme(\.[a-z]{2}(-[a-z]{2})?)?\.(md|markdown)$`)
+	readmeRe = regexp.MustCompile(`(?i)^readme(\.[a-z]{2}(-[a-z]{2})?)?\.(md|markdown|mdx)$`)
 	// name.<lang>.md, such as README.ja.md or guide.zh-TW.md
-	langRe = regexp.MustCompile(`(?i)^(.+?)(?:\.([a-z]{2}(?:-[a-z]{2})?))?\.(md|markdown)$`)
+	langRe = regexp.MustCompile(`(?i)^(.+?)(?:\.([a-z]{2}(?:-[a-z]{2})?))?\.(md|markdown|mdx)$`)
 )
 
 // langOf returns the language of a translated Markdown file, or "" for the
