@@ -5,6 +5,8 @@ import (
 	"html/template"
 	"io/fs"
 	"sync"
+
+	"github.com/babarot/gh-mini/internal/markdown"
 )
 
 // maxRenderCache bounds the rendered Markdown kept, in bytes of HTML.
@@ -30,7 +32,7 @@ type renderKey struct {
 type rendered struct {
 	key  renderKey
 	html template.HTML
-	f    features
+	f    markdown.Features
 }
 
 func newRenderCache(max int) *renderCache {
@@ -71,7 +73,7 @@ func (c *renderCache) put(r *rendered) {
 
 // renderMarkdownFile renders the Markdown file at rel, whose contents are
 // src, reusing what was rendered while the file is unchanged.
-func (s *Server) renderMarkdownFile(rel string, info fs.FileInfo, src []byte) (template.HTML, features, error) {
+func (s *Server) renderMarkdownFile(rel string, info fs.FileInfo, src []byte) (template.HTML, markdown.Features, error) {
 	k := renderKey{path: rel, mod: info.ModTime().UnixNano(), size: info.Size()}
 	if r, ok := s.renders.get(k); ok {
 		return r.html, r.f, nil

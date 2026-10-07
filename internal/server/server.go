@@ -10,8 +10,8 @@ import (
 	"path"
 	"time"
 
+	"github.com/babarot/gh-mini/internal/markdown"
 	"github.com/babarot/gh-mini/internal/workspace"
-	"github.com/yuin/goldmark"
 )
 
 //go:embed assets
@@ -38,7 +38,7 @@ type Server struct {
 	opts    Options
 	ws      *workspace.Workspace
 	watcher *workspace.Watcher
-	md      goldmark.Markdown
+	md      *markdown.Renderer
 	tmpl    *template.Template
 	hub     *hub
 	static  *staticFiles
@@ -69,7 +69,7 @@ func New(opts Options) (*Server, error) {
 	s := &Server{
 		opts:    opts,
 		ws:      ws,
-		md:      newMarkdown(ws.Repo()),
+		md:      markdown.New(ws.Repo()),
 		tmpl:    tmpl,
 		hub:     &hub{subs: map[*subscriber]struct{}{}},
 		static:  newStaticFiles(),

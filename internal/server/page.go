@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/babarot/gh-mini/internal/markdown"
 	"github.com/babarot/gh-mini/internal/workspace"
 )
 
@@ -32,7 +33,7 @@ type page struct {
 	Dir  *dirView
 	File *fileView
 	// Features loads the scripts the page's Markdown needs.
-	Features features
+	Features markdown.Features
 }
 
 // layout is what every page shows around its content.
