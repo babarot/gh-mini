@@ -187,3 +187,11 @@ func TestMarkdownCSSNamedColors(t *testing.T) {
 		t.Error("markdown.css has unnamed --md-* colors")
 	}
 }
+
+func TestCountLines(t *testing.T) {
+	for in, want := range map[string]int{"": 0, "a": 1, "a\n": 1, "a\nb": 2, "a\nb\n": 2, "\n": 1} {
+		if got := countLines([]byte(in)); got != want {
+			t.Errorf("countLines(%q) = %d, want %d", in, got, want)
+		}
+	}
+}

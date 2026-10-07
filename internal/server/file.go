@@ -143,7 +143,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 		// Shown without a byte order mark, which has no place on screen;
 		// raw keeps the file as it is
 		b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
-		v.Lines = strings.Count(string(b), "\n")
+		v.Lines = countLines(b)
 		if isMarkdown(rel) && !plain {
 			p.Kind = "markdown"
 			v.Content, p.Features, err = s.renderMarkdownFile(rel, info, b)
@@ -209,4 +209,14 @@ func humanSize(n int64) string {
 	default:
 		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
 	}
+}
+
+// countLines counts lines as GitHub does: a last line without a newline
+// counts too.
+func countLines(b []byte) int {
+	n := bytes.Count(b, []byte("\n"))
+	if len(b) > 0 && b[len(b)-1] != '\n' {
+		n++
+	}
+	return n
 }
