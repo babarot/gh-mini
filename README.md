@@ -17,7 +17,7 @@ It opens `http://localhost:6419/` with:
 - every file on disk, including what git ignores; those are marked `local`
 - translations side by side: `guide.md` and `guide.ja.md` get a language switch, and a language picked on a README stays picked
 - themes you write as CSS, switched in the page
-- live reload of the page you are reading when its file changes
+- live reload of the page you are reading when its file changes. Directories git ignores are watched only while you look at a page in them, so files added there show in the tree later
 
 Rendering uses the goldmark extensions of [go-grip](https://github.com/chrishrb/go-grip) and the stylesheet of [github-markdown-css](https://github.com/sindresorhus/github-markdown-css).
 
