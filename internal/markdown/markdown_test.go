@@ -137,9 +137,10 @@ func TestRender(t *testing.T) {
 			reject: []string{"highlight"},
 		},
 		{
-			name: "raw HTML is kept whole",
-			src:  "<details>\n<summary>More</summary>\n\nHidden\n\n</details>\n\n<!-- a\nb -->\n",
-			want: []string{"<details>\n<summary>More</summary>\n<p>Hidden</p>\n</details>\n", "<!-- a\nb -->"},
+			name:   "raw HTML is kept as GitHub keeps it",
+			src:    "<details>\n<summary>More</summary>\n\nHidden\n\n</details>\n\n<!-- a\nb -->\n",
+			want:   []string{"<details>\n<summary>More</summary>\n<p>Hidden</p>\n</details>\n"},
+			reject: []string{"<!--", "--&gt;", "-->"},
 		},
 		{
 			name: "front matter",

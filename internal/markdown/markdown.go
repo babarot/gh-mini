@@ -12,7 +12,6 @@ import (
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer"
-	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
 )
@@ -59,8 +58,11 @@ func New(repo string) *Renderer {
 			),
 		),
 		goldmark.WithRendererOptions(
-			html.WithUnsafe(),
+			// Not html.WithUnsafe: HTML in a file goes through
+			// rawHTMLRenderer, and links to javascript: and the like are
+			// dropped
 			renderer.WithNodeRenderers(
+				util.Prioritized(rawHTMLRenderer{}, 100),
 				util.Prioritized(codeRenderer{}, 100),
 				util.Prioritized(alertRenderer{}, 100),
 				util.Prioritized(taskCheckBoxRenderer{}, 100),
