@@ -172,3 +172,22 @@ func settingAttrs(values map[string]string) template.HTMLAttr {
 	}
 	return template.HTMLAttr(b.String())
 }
+
+// settingView is a setting as the dialog shows it, with its current value.
+type settingView struct {
+	setting
+	Value   string
+	Options []choice
+}
+
+func (s *Server) settingViews(values map[string]string) []settingView {
+	out := make([]settingView, 0, len(settingDefs))
+	for _, d := range settingDefs {
+		v := settingView{setting: d, Value: values[d.Key]}
+		if d.Choices != nil {
+			v.Options = d.Choices(s)
+		}
+		out = append(out, v)
+	}
+	return out
+}

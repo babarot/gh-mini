@@ -43,9 +43,10 @@ type layout struct {
 	Path    string
 	Crumbs  []crumb
 	Ignored bool
-	Themes  []string
-	// Settings holds the value of every setting, by key.
-	Settings map[string]string
+	// Settings holds the value of every setting, by key, and SettingViews
+	// what the settings dialog shows.
+	Settings     map[string]string
+	SettingViews []settingView
 	// SettingAttrs are the settings set on <html> for CSS.
 	SettingAttrs template.HTMLAttr
 	Reload       bool
@@ -61,13 +62,13 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 		Name:     s.opts.Name,
 		Branch:   snap.Branch,
 		Path:     rel,
-		Themes:   s.themes(),
 		Settings: s.settings(r),
 		Reload:   s.opts.Reload,
 		Static:   s.static.prefix(),
 	}}
 	p.Title = s.opts.Name
 	p.SettingAttrs = settingAttrs(p.Settings)
+	p.SettingViews = s.settingViews(p.Settings)
 	if rel != "." {
 		p.Title = rel + " · " + s.opts.Name
 		parts := strings.Split(rel, "/")

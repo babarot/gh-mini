@@ -69,3 +69,18 @@ func TestSettingsAttr(t *testing.T) {
 	get(t, h, "/", withSettings(`{"wide":true}`)).expect(t, http.StatusOK, ` data-wide="true">`)
 	get(t, h, "/", withSettings(`{"wide":"yes"}`)).expect(t, http.StatusOK, ` data-wide="false">`)
 }
+
+func TestSettingsDialog(t *testing.T) {
+	h := newTestServer(t)
+	r := get(t, h, "/", withSettings(`{"theme":"sepia","mode":"dark"}`))
+	r.expect(t, http.StatusOK,
+		`id="settings-open"`,
+		`<dialog class="settings" id="settings"`,
+		`<select data-setting="theme"`,
+		`<option value="sepia" selected>sepia</option>`,
+		`data-setting="mode" data-value="dark" aria-checked="true" class="selected">Dark</button>`,
+		`data-setting="mode" data-value="" aria-checked="false">Auto</button>`,
+		`<script type="application/json" id="settings-data">{"mode":"dark","theme":"sepia"}</script>`,
+	)
+	r.reject(t, `id="theme-select"`, `id="mode-select"`)
+}
