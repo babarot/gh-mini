@@ -20,10 +20,32 @@ export function initToc() {
     '<a class="l' + h.tagName.slice(1) + '" href="#' + esc(h.id) + '">' + esc(h.textContent) + "</a>"
   ).join("");
   toc.hidden = false;
-  const links = toc.querySelectorAll("a");
+  const links = Array.from(toc.querySelectorAll("a"));
+  // Headings near the end of a page never reach the top of the window,
+  // because the page stops scrolling first. At the bottom, the heading
+  // the reader jumped to stays active while it is in view; otherwise the
+  // last heading is.
+  let jumped = heads.findIndex((h) => "#" + h.id === decodeURIComponent(location.hash));
+  toc.addEventListener("click", (e) => {
+    const a = e.target.closest("a");
+    if (a) jumped = links.indexOf(a);
+    // A jump that needs no scrolling fires no scroll event.
+    requestAnimationFrame(spy);
+  });
+  // Scrolling by hand ends the jump.
+  ["wheel", "touchmove", "keydown"].forEach((type) => {
+    window.addEventListener(type, () => { jumped = -1; }, { passive: true });
+  });
   const spy = () => {
+    const root = document.documentElement;
+    const atBottom = window.innerHeight + window.scrollY >= root.scrollHeight - 2;
     let idx = 0;
-    heads.forEach((h, i) => { if (h.getBoundingClientRect().top < 120) idx = i; });
+    if (atBottom) {
+      const top = jumped >= 0 ? heads[jumped].getBoundingClientRect().top : -1;
+      idx = top >= 0 && top < window.innerHeight ? jumped : heads.length - 1;
+    } else {
+      heads.forEach((h, i) => { if (h.getBoundingClientRect().top < 120) idx = i; });
+    }
     links.forEach((a, i) => { a.classList.toggle("active", i === idx); });
   };
   document.addEventListener("scroll", spy, { passive: true });
