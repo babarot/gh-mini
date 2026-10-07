@@ -11,6 +11,7 @@ import (
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	_ "github.com/babarot/gh-mini/internal/lexers"
 	"github.com/babarot/gh-mini/internal/markdown"
 )
 
@@ -86,6 +87,9 @@ func themeColors(css string) string {
 			return cssColors.ReplaceAllString(line, "")
 		case isPlainText(t):
 			return cssColor.ReplaceAllString(line, "${1}color: var(--fgColor-default)")
+		case t == chroma.GenericPrompt, t == chroma.GenericOutput:
+			// A shell session's prompt and output, apart from its commands
+			return cssColor.ReplaceAllString(line, "${1}color: var(--fgColor-muted)")
 		}
 		if name := syntaxVar(t); name != "" {
 			line = cssColor.ReplaceAllString(line, "${1}color: var(--syntax-"+name+", $2)")
