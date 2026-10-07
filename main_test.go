@@ -293,3 +293,18 @@ func TestBrowserAddr(t *testing.T) {
 		}
 	}
 }
+
+// From the home directory, a file is served with its own directory, not
+// the whole home.
+func TestResolveFromHome(t *testing.T) {
+	home := mkdirs(t)
+	t.Setenv("HOME", home)
+	t.Chdir(home)
+	root, open, err := resolve("a/b/c.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(home, "a", "b"); root != want || open != "/c.md" {
+		t.Errorf("got %q, %q, want %q, /c.md", root, open, want)
+	}
+}

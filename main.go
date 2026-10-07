@@ -27,8 +27,8 @@ Files git ignores are shown too, marked "local".
 Usage:
   gh-mini [flags] [DIR | FILE]
 
-With a FILE, the current directory is served when it holds the file, and
-the file is opened.
+With a FILE, the current directory is served when it holds the file,
+unless it is your home directory or /, and the file is opened.
 
 Themes are CSS files in %s.
 
@@ -203,7 +203,7 @@ func resolve(arg string) (string, string, error) {
 	}
 	root := filepath.Dir(abs)
 	if cwd, err := os.Getwd(); err == nil {
-		if cwd, err = filepath.EvalSymlinks(cwd); err == nil {
+		if cwd, err = filepath.EvalSymlinks(cwd); err == nil && !tooWide(cwd) {
 			if rel, err := filepath.Rel(cwd, abs); err == nil && !strings.HasPrefix(rel, "..") {
 				root = cwd
 			}
@@ -269,4 +269,20 @@ func browserAddr(a net.Addr) string {
 		return a.String()
 	}
 	return net.JoinHostPort("localhost", strconv.Itoa(tcp.Port))
+}
+
+// tooWide tells a current directory too wide to serve for a file in it:
+// the home directory or /, which a file there does not mean to walk.
+func tooWide(dir string) bool {
+	if dir == string(filepath.Separator) {
+		return true
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return false
+	}
+	if real, err := filepath.EvalSymlinks(home); err == nil {
+		home = real
+	}
+	return dir == home
 }
