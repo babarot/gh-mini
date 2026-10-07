@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func names(n *Node) []string {
@@ -70,5 +71,25 @@ func TestSnapshotUnwatchedIsAlwaysFresh(t *testing.T) {
 	}
 	if got := names(w.Snapshot().Tree); len(got) != 1 {
 		t.Errorf("tree = %v, want a.md", got)
+	}
+}
+
+func TestSnapshotUnwatchedMaxAge(t *testing.T) {
+	dir := t.TempDir()
+	w, err := Open(Options{Root: dir, Name: "x", MaxAge: 200 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	s1 := w.Snapshot()
+	if err := os.WriteFile(filepath.Join(dir, "a.md"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if w.Snapshot() != s1 {
+		t.Error("rebuilt before MaxAge")
+	}
+	time.Sleep(250 * time.Millisecond)
+	if got := names(w.Snapshot().Tree); len(got) != 1 {
+		t.Errorf("tree after MaxAge = %v, want a.md", got)
 	}
 }

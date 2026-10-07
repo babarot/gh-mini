@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"net/http"
 	"path"
+	"time"
 
 	"github.com/babarot/gh-mini/internal/workspace"
 	"github.com/yuin/goldmark"
@@ -45,11 +46,12 @@ type Server struct {
 
 // New opens the root and, when reloading is on, starts watching it.
 func New(opts Options) (*Server, error) {
-	ws, err := workspace.Open(workspace.Options{
-		Root: opts.Root,
-		Name: opts.Name,
-		Skip: opts.Skip,
-	})
+	wsOpts := workspace.Options{Root: opts.Root, Name: opts.Name, Skip: opts.Skip}
+	if !opts.Reload {
+		// Nothing tells when files change, so look again now and then
+		wsOpts.MaxAge = 2 * time.Second
+	}
+	ws, err := workspace.Open(wsOpts)
 	if err != nil {
 		return nil, err
 	}

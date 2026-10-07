@@ -11,6 +11,7 @@ import (
 	"path"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // Options configures a Workspace.
@@ -21,6 +22,9 @@ type Options struct {
 	Name string
 	// Skip lists file and directory names left out of the tree.
 	Skip []string
+	// MaxAge is how long a snapshot is used when no Watcher invalidates
+	// it. Zero rebuilds it every time.
+	MaxAge time.Duration
 }
 
 // Change tells which parts of a snapshot are out of date.
@@ -67,6 +71,7 @@ type Snapshot struct {
 	// "" when there is none.
 	Repo    string
 	ignored map[string]bool
+	built   time.Time
 }
 
 // Open opens the directory.
@@ -127,7 +132,9 @@ func (w *Workspace) Invalidate(c Change) {
 // Snapshot returns the current state, rebuilding the parts that changed.
 func (w *Workspace) Snapshot() *Snapshot {
 	if !w.watched.Load() {
-		w.dirty.Store(dirtyAll)
+		if s := w.snap.Load(); s == nil || time.Since(s.built) >= w.opts.MaxAge {
+			w.dirty.Store(dirtyAll)
+		}
 	}
 	if s := w.snap.Load(); s != nil && w.dirty.Load() == 0 {
 		return s
@@ -145,6 +152,7 @@ func (w *Workspace) Snapshot() *Snapshot {
 		*next = *prev
 	}
 	next.Version++
+	next.built = time.Now()
 	if prev == nil || bits&dirtyStructure != 0 {
 		next.ignored = gitIgnored(w.opts.Root)
 		next.Tree = w.buildTree(next.ignored)
