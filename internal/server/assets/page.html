@@ -92,10 +92,10 @@
       {{- end}}
     </div>
 
-    {{- if eq .Kind "dir"}}
+    {{- with .Dir}}
     <div class="box">
       <table class="files">
-        {{- if ne .Path "."}}
+        {{- if ne $.Path "."}}
         <tr><td colspan="2"><a class="up" href="..">..</a></td></tr>
         {{- end}}
         {{- range .Entries}}
@@ -120,24 +120,26 @@
     <div class="box readme">
       <div class="box-header">
         <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"></path></svg>
-        <a href="{{href (join .Path .Readme)}}">{{.Readme}}</a>
+        <a href="{{href (join $.Path .Readme)}}">{{.Readme}}</a>
         <span class="spacer"></span>
         {{template "langs" .Langs}}
       </div>
       <article class="markdown-body">{{.Content}}</article>
     </div>
     {{- end}}
+    {{- end}}
 
-    {{- else if eq .Kind "notfound"}}
+    {{- if eq .Kind "notfound"}}
     <div class="box empty">
       <h2>404</h2>
       <p>Nothing at <code>{{.Path}}</code>.</p>
     </div>
+    {{- end}}
 
-    {{- else}}
+    {{- with .File}}
     <div class="box">
       <div class="box-header">
-        {{- if or (eq .Kind "markdown") (and .Plain (isMarkdown .Path))}}
+        {{- if or (eq $.Kind "markdown") (and .Plain (isMarkdown $.Path))}}
         <div class="segmented">
           <a href="?"{{if not .Plain}} class="selected"{{end}}>Preview</a>
           <a href="?plain=1"{{if .Plain}} class="selected"{{end}}>Code</a>
@@ -149,12 +151,12 @@
         {{template "langs" .Langs}}
         <a class="btn" href="?raw">Raw</a>
       </div>
-      {{- if eq .Kind "markdown"}}
+      {{- if eq $.Kind "markdown"}}
       <article class="markdown-body">{{.Content}}</article>
-      {{- else if eq .Kind "code"}}
+      {{- else if eq $.Kind "code"}}
       <div class="code">{{.Content}}</div>
-      {{- else if eq .Kind "image"}}
-      <div class="image"><img src="?raw" alt="{{.Path}}"></div>
+      {{- else if eq $.Kind "image"}}
+      <div class="image"><img src="?raw" alt="{{$.Path}}"></div>
       {{- else}}
       <div class="empty"><p>This file is binary or too large to show. <a href="?raw">View raw</a></p></div>
       {{- end}}
