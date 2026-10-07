@@ -615,3 +615,23 @@ func TestHeadingIDsApartFromPage(t *testing.T) {
 		seen[m[1]] = true
 	}
 }
+
+// A byte order mark is left out of the page, not out of the raw file.
+func TestHandlerBOM(t *testing.T) {
+	root, _ := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "bom.md"), []byte("\xef\xbb\xbf# BOM\n"))
+	writeFile(t, filepath.Join(root, "bom.txt"), []byte("\xef\xbb\xbfline\n"))
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+	get(t, h, "/bom.md").expect(t, http.StatusOK, `<h1 id="bom">`)
+	if r := get(t, h, "/bom.txt"); strings.Contains(r.body, "\xef\xbb\xbf") {
+		t.Error("the code view shows the byte order mark")
+	}
+	if r := get(t, h, "/bom.txt?raw"); !strings.HasPrefix(r.body, "\xef\xbb\xbf") {
+		t.Error("raw lost the byte order mark")
+	}
+}

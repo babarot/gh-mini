@@ -76,6 +76,9 @@ func New(repo string) *Renderer {
 
 // Render renders src, showing its YAML front matter as a table.
 func (r *Renderer) Render(src []byte) ([]byte, Features, error) {
+	// A byte order mark would keep the first line from being a heading or
+	// the start of front matter
+	src = bytes.TrimPrefix(src, utf8BOM)
 	var buf bytes.Buffer
 	if fm, body, ok := splitFrontMatter(src); ok {
 		renderFrontMatter(&buf, fm)
@@ -100,3 +103,5 @@ func (r *Renderer) Render(src []byte) ([]byte, Features, error) {
 	}
 	return buf.Bytes(), f, nil
 }
+
+var utf8BOM = []byte("\xef\xbb\xbf")

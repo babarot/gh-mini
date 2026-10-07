@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -139,6 +140,9 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 			p.Kind = "binary"
 			break
 		}
+		// Shown without a byte order mark, which has no place on screen;
+		// raw keeps the file as it is
+		b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
 		v.Lines = strings.Count(string(b), "\n")
 		if isMarkdown(rel) && !plain {
 			p.Kind = "markdown"

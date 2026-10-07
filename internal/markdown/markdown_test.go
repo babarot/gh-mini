@@ -200,3 +200,19 @@ func TestFeatures(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderBOM(t *testing.T) {
+	r := New("")
+	for name, tt := range map[string]struct{ src, want string }{
+		"heading":      {"\xef\xbb\xbf# Title\n", `<h1 id="title">Title</h1>`},
+		"front matter": {"\xef\xbb\xbf---\ntitle: x\n---\n# Body\n", "<th>title</th>"},
+	} {
+		out, _, err := r.Render([]byte(tt.src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(out), tt.want) || strings.Contains(string(out), "\xef\xbb\xbf") {
+			t.Errorf("%s: %s", name, out)
+		}
+	}
+}
