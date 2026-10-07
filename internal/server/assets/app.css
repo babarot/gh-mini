@@ -287,7 +287,7 @@ body[data-kind="html"] .main > .box {
 .files .name > div { display: flex; align-items: center; gap: 10px; }
 .files .name .octicon { color: var(--fgColor-muted); }
 .files .name .octicon.dir { color: var(--mini-folder-color); }
-.files .name a { color: var(--fgColor-default); }
+.files .name a { color: var(--fgColor-default); min-width: 0; overflow-wrap: anywhere; }
 .files .ignored .name a { color: var(--fgColor-muted); }
 .files .ago { color: var(--fgColor-muted); text-align: right; white-space: nowrap; }
 
@@ -392,4 +392,12 @@ body[data-kind="html"] .main > .box {
   }
   .main { padding: 16px; }
   .markdown-body { padding: 16px; }
+  /* As on GitHub, a narrow list drops the dates for the names */
+  .files .ago { display: none; }
+}
+
+/* Images marked for one color mode, as GitHub's README logos are */
+:root[data-mode="light"] .markdown-body img[src$="#gh-dark-mode-only"],
+:root[data-mode="dark"] .markdown-body img[src$="#gh-light-mode-only"] {
+  display: none;
 }
