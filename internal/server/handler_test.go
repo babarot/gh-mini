@@ -697,3 +697,28 @@ func TestNoLanguageForExtensions(t *testing.T) {
 		t.Error("api.md and api.go.md shown as translations")
 	}
 }
+
+func TestHandlerPermissionDenied(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("root reads everything")
+	}
+	root, _ := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "secret.txt"), []byte("x\n"))
+	writeFile(t, filepath.Join(root, "locked", "f.md"), []byte("# f\n"))
+	for _, p := range []string{"secret.txt", "locked"} {
+		if err := os.Chmod(filepath.Join(root, p), 0); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { os.Chmod(filepath.Join(root, p), 0o755) })
+	}
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+	for _, target := range []string{"/secret.txt", "/locked/", "/locked/f.md"} {
+		get(t, h, target).expect(t, http.StatusForbidden, `data-kind="error"`, "permission")
+	}
+	get(t, h, "/nope.md").expect(t, http.StatusNotFound, `data-kind="notfound"`)
+}

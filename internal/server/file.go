@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -45,9 +46,12 @@ func (s *Server) servePath(w http.ResponseWriter, r *http.Request) {
 	snap := s.ws.Snapshot()
 	info, err := s.ws.FS().Stat(rel)
 	switch {
-	case err != nil:
+	case err != nil && !errors.Is(err, fs.ErrPermission):
+		// Missing, or out of the root through a symlink
 		w.WriteHeader(http.StatusNotFound)
 		s.render(w, s.newPage(r, snap, rel, "notfound"))
+	case err != nil:
+		s.serveError(w, r, snap, rel, err)
 	case info.IsDir() && !strings.HasSuffix(r.URL.Path, "/"):
 		http.Redirect(w, r, withQuery(dirHref(rel), r), http.StatusMovedPermanently)
 	case !info.IsDir() && strings.HasSuffix(r.URL.Path, "/"):
@@ -137,7 +141,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 	default:
 		b, err := s.ws.FS().ReadFile(rel)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.serveError(w, r, snap, rel, err)
 			return
 		}
 		if !isText(b) {
@@ -156,7 +160,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 			v.Content, err = renderCode(path.Base(rel), b)
 		}
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			s.serveError(w, r, snap, rel, err)
 			return
 		}
 	}

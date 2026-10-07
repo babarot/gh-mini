@@ -37,7 +37,7 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 	p.Dir = v
 	dirents, err := fs.ReadDir(s.ws.FS().FS(), rel)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		s.serveError(w, r, snap, rel, err)
 		return
 	}
 	var readmes []string

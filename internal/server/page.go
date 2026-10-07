@@ -1,8 +1,10 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"net/url"
 	"strings"
@@ -27,8 +29,10 @@ type crumb struct {
 // of its kind.
 type page struct {
 	layout
-	// Kind is dir, markdown, code, image, binary or notfound.
+	// Kind is dir, markdown, code, image, binary, notfound or error.
 	Kind string
+	// Error tells why a page of kind error could not be shown.
+	Error string
 	// Dir is set for a directory, File for the other kinds but notfound.
 	Dir  *dirView
 	File *fileView
@@ -116,3 +120,23 @@ func href(rel string) string {
 // rather than localStorage, so that the page is rendered closed instead
 // of closing after it shows.
 const sidebarCookie = "gh-mini-sidebar"
+
+// serveError shows why a path could not be read, in the page's layout:
+// not allowed, not found, or anything else.
+func (s *Server) serveError(w http.ResponseWriter, r *http.Request, snap *workspace.Snapshot, rel string, err error) {
+	switch {
+	case errors.Is(err, fs.ErrPermission):
+		p := s.newPage(r, snap, rel, "error")
+		p.Error = "You do not have permission to read this."
+		w.WriteHeader(http.StatusForbidden)
+		s.render(w, p)
+	case errors.Is(err, fs.ErrNotExist):
+		w.WriteHeader(http.StatusNotFound)
+		s.render(w, s.newPage(r, snap, rel, "notfound"))
+	default:
+		p := s.newPage(r, snap, rel, "error")
+		p.Error = err.Error()
+		w.WriteHeader(http.StatusInternalServerError)
+		s.render(w, p)
+	}
+}
