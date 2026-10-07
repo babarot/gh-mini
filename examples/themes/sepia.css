@@ -1,0 +1,37 @@
+/*
+ * A warm, paper-like theme. Copy it to ~/.config/gh-mini/themes/ and pick
+ * "sepia" in the page.
+ *
+ * Themes set the variables from internal/server/assets/markdown.css and
+ * app.css. Use :root[data-mode="light"] and :root[data-mode="dark"] for
+ * colors that differ by mode, or :root[data-mode] for both.
+ */
+:root[data-mode="light"] {
+  --bgColor-default: #fbf6ec;
+  --bgColor-muted: #f3ebdb;
+  --bgColor-neutral-muted: #e8dcc4;
+  --borderColor-default: #e2d5bc;
+  --borderColor-muted: #e9dfcc;
+  --fgColor-default: #3b3227;
+  --fgColor-muted: #7a6c58;
+  --fgColor-accent: #a0522d;
+  --fgColor-accent-2: #a0522d;
+}
+
+:root[data-mode="dark"] {
+  --bgColor-default: #1f1b16;
+  --bgColor-muted: #29241d;
+  --bgColor-neutral-muted: #3a332a;
+  --borderColor-default: #3d362c;
+  --borderColor-muted: #332d25;
+  --fgColor-default: #e8dcc8;
+  --fgColor-muted: #a89a84;
+  --fgColor-accent: #e0a46f;
+  --fgColor-accent-2: #e0a46f;
+}
+
+.markdown-body {
+  font-family: "Iowan Old Style", "Hiragino Mincho ProN", Georgia, serif;
+  font-size: 17px;
+  line-height: 1.75;
+}

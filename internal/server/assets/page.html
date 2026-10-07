@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en"{{if .Mode}} data-mode="{{.Mode}}"{{end}}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<link rel="icon" href="/_mini/grip/images/favicon.ico">
+<script>
+  // Follow the OS until a mode is picked, before anything is painted
+  (function () {
+    var root = document.documentElement;
+    if (root.dataset.mode) return;
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    var apply = function () { root.dataset.auto = "1"; root.dataset.mode = mq.matches ? "dark" : "light"; };
+    apply();
+    mq.addEventListener("change", function () { if (root.dataset.auto) apply(); });
+  })();
+</script>
+<link rel="stylesheet" href="/_mini/assets/markdown.css">
+<link rel="stylesheet" href="/_mini/chroma.css">
+<link rel="stylesheet" href="/_mini/grip/css/github-clipboard.css">
+<link rel="stylesheet" href="/_mini/grip/css/github-mermaid.css">
+<link rel="stylesheet" href="/_mini/assets/app.css">
+<link rel="stylesheet" id="theme" href="/_mini/theme/{{.Theme}}.css">
+<script src="/_mini/grip/js/clipboard-copy.js" defer></script>
+{{- if .Markdown}}
+<script src="/_mini/grip/js/mathjax-options.js"></script>
+<script src="/_mini/grip/js/tex-mml-chtml.js" defer></script>
+<script src="/_mini/grip/js/mermaid.min.js" defer></script>
+<script src="/_mini/grip/js/mermaid-init.js" defer></script>
+{{- end}}
+<script src="/_mini/assets/app.js" defer></script>
+</head>
+<body data-path="{{.Path}}" data-kind="{{.Kind}}" data-name="{{.Name}}"{{if .Reload}} data-reload="1"{{end}}>
+<script>document.body.dataset.theme = document.documentElement.dataset.mode;</script>
+
+<header class="topbar">
+  <button class="icon-btn" id="sidebar-toggle" title="Toggle file tree" aria-label="Toggle file tree">
+    <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"></path></svg>
+  </button>
+  <a class="repo" href="/">
+    <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"></path></svg>
+    <span>{{.Name}}</span>
+  </a>
+  {{- if .Branch}}
+  <span class="branch" title="Current branch">
+    <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"></path></svg>
+    {{.Branch}}
+  </span>
+  {{- end}}
+  <span class="spacer"></span>
+  <label class="picker" title="Theme">
+    <span>Theme</span>
+    <select id="theme-select">
+      {{- range .Themes}}
+      <option value="{{.}}"{{if eq . $.Theme}} selected{{end}}>{{.}}</option>
+      {{- end}}
+    </select>
+  </label>
+  <label class="picker" title="Color mode">
+    <span>Mode</span>
+    <select id="mode-select">
+      <option value=""{{if not .Mode}} selected{{end}}>Auto</option>
+      <option value="light"{{if eq .Mode "light"}} selected{{end}}>Light</option>
+      <option value="dark"{{if eq .Mode "dark"}} selected{{end}}>Dark</option>
+    </select>
+  </label>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-tools">
+      <input type="search" id="tree-filter" placeholder="Go to file  (t)" autocomplete="off" spellcheck="false">
+      <label class="md-only"><input type="checkbox" id="md-only"> Markdown only</label>
+    </div>
+    <nav id="tree" class="tree" aria-label="Files"></nav>
+  </aside>
+
+  <main class="main">
+    <div class="crumbs">
+      <a href="/">{{.Name}}</a>
+      {{- range $i, $c := .Crumbs}}
+      <span class="sep">/</span>
+      {{- if eq (len $.Crumbs) (inc $i)}}
+      <strong>{{$c.Name}}</strong>
+      {{- else}}
+      <a href="{{$c.Href}}">{{$c.Name}}</a>
+      {{- end}}
+      {{- end}}
+      {{- if .Ignored}}
+      <span class="badge" title="Ignored by git: only on this machine">local</span>
+      {{- end}}
+    </div>
+
+    {{- if eq .Kind "dir"}}
+    <div class="box">
+      <table class="files">
+        {{- if ne .Path "."}}
+        <tr><td colspan="2"><a class="up" href="..">..</a></td></tr>
+        {{- end}}
+        {{- range .Entries}}
+        <tr{{if .Ignored}} class="ignored"{{end}}>
+          <td class="name"><div>
+            {{- if .Dir}}
+            <svg class="octicon dir" viewBox="0 0 16 16" width="16" height="16"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"></path></svg>
+            {{- else}}
+            <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z"></path></svg>
+            {{- end}}
+            <a href="{{.Href}}">{{.Name}}</a>
+            {{- if .Link}}<span class="hint">symlink</span>{{end}}
+            {{- if .Ignored}}<span class="badge">local</span>{{end}}
+          </div>
+          </td>
+          <td class="ago">{{.Ago}}</td>
+        </tr>
+        {{- end}}
+      </table>
+    </div>
+    {{- if .Readme}}
+    <div class="box readme">
+      <div class="box-header">
+        <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"></path></svg>
+        <a href="{{href (join .Path .Readme)}}">{{.Readme}}</a>
+        <span class="spacer"></span>
+        {{template "langs" .Langs}}
+      </div>
+      <article class="markdown-body">{{.Content}}</article>
+    </div>
+    {{- end}}
+
+    {{- else if eq .Kind "notfound"}}
+    <div class="box empty">
+      <h2>404</h2>
+      <p>Nothing at <code>{{.Path}}</code>.</p>
+    </div>
+
+    {{- else}}
+    <div class="box">
+      <div class="box-header">
+        {{- if or (eq .Kind "markdown") (and .Plain (isMarkdown .Path))}}
+        <div class="segmented">
+          <a href="?"{{if not .Plain}} class="selected"{{end}}>Preview</a>
+          <a href="?plain=1"{{if .Plain}} class="selected"{{end}}>Code</a>
+        </div>
+        {{- end}}
+        {{- if .Lines}}<span class="meta">{{.Lines}} lines</span>{{end}}
+        <span class="meta">{{.Size}}</span>
+        <span class="spacer"></span>
+        {{template "langs" .Langs}}
+        <a class="btn" href="?raw">Raw</a>
+      </div>
+      {{- if eq .Kind "markdown"}}
+      <article class="markdown-body">{{.Content}}</article>
+      {{- else if eq .Kind "code"}}
+      <div class="code">{{.Content}}</div>
+      {{- else if eq .Kind "image"}}
+      <div class="image"><img src="?raw" alt="{{.Path}}"></div>
+      {{- else}}
+      <div class="empty"><p>This file is binary or too large to show. <a href="?raw">View raw</a></p></div>
+      {{- end}}
+    </div>
+    {{- end}}
+  </main>
+
+  <aside class="toc" id="toc" hidden></aside>
+</div>
+</body>
+</html>
+
+{{define "langs"}}
+{{- if .}}
+<div class="segmented langs" title="Translations">
+  {{- range .}}
+  <a href="{{.Href}}" data-lang="{{.Label}}"{{if .Current}} class="selected"{{end}}>{{.Label}}</a>
+  {{- end}}
+</div>
+{{- end}}
+{{end}}
