@@ -18,7 +18,7 @@ It opens `http://localhost:6419/` with:
 - every file on disk, including what git ignores; those are marked `local`
 - translations side by side: `guide.md` and `guide.ja.md` get a language switch, and a language picked on a README stays picked
 - settings behind the gear button (or press `,`): built-in `github`, `nord` and `tokyo-night` themes or ones you write as CSS, a light, dark or automatic mode, and whether HTML files open as a preview. They are kept per browser
-- live reload of the page you are reading when its file changes. Directories git ignores are watched only while you look at a page in them, so files added there show in the tree later
+- live reload of the page you are reading when its file changes, and of the tree when files are added or removed. Directories git ignores, such as a `.venv`, show in the tree without their files until you open them. On macOS the whole directory is watched through FSEvents; elsewhere directories git ignores are watched only while you look at a page in them. A new symlink shows in the tree only when its directory changes otherwise too, if it points to another directory
 
 Rendering uses [goldmark](https://github.com/yuin/goldmark) and the stylesheet of [github-markdown-css](https://github.com/sindresorhus/github-markdown-css).
 
