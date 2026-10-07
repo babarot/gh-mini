@@ -19,7 +19,7 @@ It opens `http://localhost:6419/` with:
 - settings behind the gear button (or press `,`): themes you write as CSS, and a light, dark or automatic mode. They are kept per browser
 - live reload of the page you are reading when its file changes. Directories git ignores are watched only while you look at a page in them, so files added there show in the tree later
 
-Rendering uses the goldmark extensions of [go-grip](https://github.com/chrishrb/go-grip) and the stylesheet of [github-markdown-css](https://github.com/sindresorhus/github-markdown-css).
+Rendering uses [goldmark](https://github.com/yuin/goldmark) and the stylesheet of [github-markdown-css](https://github.com/sindresorhus/github-markdown-css).
 
 ## Install
 
