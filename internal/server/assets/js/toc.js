@@ -56,6 +56,12 @@ export function initToc() {
       heads.forEach((h, i) => { if (h.getBoundingClientRect().top < reached) idx = i; });
     }
     links.forEach((a, i) => { a.classList.toggle("active", i === idx); });
+    // Keep the entry in sight in a long table of contents. Its own
+    // scrollTop, not scrollIntoView, which would scroll the page too
+    const t = toc.getBoundingClientRect();
+    const r = links[idx].getBoundingClientRect();
+    if (r.top < t.top + 32) toc.scrollTop -= t.top + 32 - r.top;
+    else if (r.bottom > t.bottom - 16) toc.scrollTop += r.bottom - t.bottom + 16;
   };
   document.addEventListener("scroll", spy, { passive: true });
   spy();
