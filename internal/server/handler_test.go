@@ -1,0 +1,315 @@
+package server
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// A 1x1 PNG
+var pngBytes = []byte{
+	0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+	0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+	0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00,
+	0x0d, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+	0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49,
+	0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+}
+
+// isolateGit keeps the machine's git configuration, such as commit signing
+// or a global excludes file, out of the tests. The server's own git
+// commands inherit the environment too.
+func isolateGit(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not found")
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+}
+
+func git(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %s: %v\n%s", strings.Join(args, " "), err, out)
+	}
+}
+
+func writeFile(t *testing.T, path string, b []byte) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// newTestRepo makes a committed git repository with ignored translations,
+// an ignored directory, a skipped directory and a symlink out of the root,
+// and returns its path and a themes directory with a sepia theme.
+func newTestRepo(t *testing.T) (root, themes string) {
+	t.Helper()
+	isolateGit(t)
+	base, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	root = filepath.Join(base, "repo")
+	themes = filepath.Join(base, "themes")
+	outside := filepath.Join(base, "outside")
+
+	files := map[string]string{
+		".gitignore":         "*.ja.md\nlocal-only/\n",
+		"README.md":          "# Repo\n\nSee #1.\n",
+		"README.ja.md":       "# リポジトリ\n",
+		"docs/guide.md":      "# Guide\n\n## Install\n",
+		"docs/guide.ja.md":   "# ガイド\n",
+		"docs/a b.md":        "# Spaces\n",
+		"local-only/note.md": "# Note\n",
+		"main.go":            "package main\n\nfunc main() {}\n",
+		"bin.dat":            "a\x00b",
+		"node_modules/x.js":  "x\n",
+	}
+	for name, body := range files {
+		writeFile(t, filepath.Join(root, name), []byte(body))
+	}
+	writeFile(t, filepath.Join(root, "img.png"), pngBytes)
+	writeFile(t, filepath.Join(outside, "secret.txt"), []byte("secret\n"))
+	if err := os.Symlink(outside, filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(themes, "sepia.css"), []byte(":root { --sepia: 1; }\n"))
+
+	git(t, root, "init", "-q", "-b", "main")
+	git(t, root, "remote", "add", "origin", "https://github.com/example/repo.git")
+	git(t, root, "add", "-A")
+	git(t, root, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "init")
+	return root, themes
+}
+
+func newTestServer(t *testing.T) http.Handler {
+	t.Helper()
+	root, themes := newTestRepo(t)
+	srv, err := New(Options{
+		Root:      root,
+		Name:      "repo",
+		Skip:      []string{".git", "node_modules", ".DS_Store"},
+		ThemesDir: themes,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return srv.Handler()
+}
+
+type response struct {
+	code   int
+	header http.Header
+	body   string
+}
+
+func get(t *testing.T, h http.Handler, target string, edit ...func(*http.Request)) response {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	for _, f := range edit {
+		f(req)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	b, _ := io.ReadAll(rec.Result().Body)
+	return response{code: rec.Code, header: rec.Header(), body: string(b)}
+}
+
+func withCookie(name, value string) func(*http.Request) {
+	return func(r *http.Request) { r.AddCookie(&http.Cookie{Name: name, Value: value}) }
+}
+
+func withHeader(name, value string) func(*http.Request) {
+	return func(r *http.Request) { r.Header.Set(name, value) }
+}
+
+func (r response) expect(t *testing.T, code int, contains ...string) {
+	t.Helper()
+	if r.code != code {
+		t.Errorf("status = %d, want %d", r.code, code)
+	}
+	for _, s := range contains {
+		if !strings.Contains(r.body, s) {
+			t.Errorf("body does not contain %q", s)
+		}
+	}
+}
+
+func (r response) reject(t *testing.T, absent ...string) {
+	t.Helper()
+	for _, s := range absent {
+		if strings.Contains(r.body, s) {
+			t.Errorf("body contains %q", s)
+		}
+	}
+}
+
+// row returns the directory listing's row for a name.
+func (r response) row(t *testing.T, name string) string {
+	t.Helper()
+	i := strings.Index(r.body, ">"+name+"</a>")
+	if i < 0 {
+		t.Fatalf("no row for %q", name)
+	}
+	start := strings.LastIndex(r.body[:i], "<tr")
+	end := strings.Index(r.body[i:], "</tr>")
+	return r.body[start : i+end]
+}
+
+func TestHandlerRootDir(t *testing.T) {
+	r := get(t, newTestServer(t), "/")
+	r.expect(t, http.StatusOK,
+		`data-kind="dir"`,
+		`<h1 id="repo">Repo</h1>`,
+		`https://github.com/example/repo/issues/1`,
+		`>README.md</a>`,
+		"main\n",
+	)
+	r.reject(t, "node_modules")
+	if row := r.row(t, "local-only"); !strings.Contains(row, `class="ignored"`) {
+		t.Errorf("local-only is not marked ignored: %s", row)
+	}
+	if row := r.row(t, "docs"); strings.Contains(row, `class="ignored"`) {
+		t.Errorf("docs is marked ignored: %s", row)
+	}
+}
+
+func TestHandlerReadmeLanguage(t *testing.T) {
+	h := newTestServer(t)
+	get(t, h, "/?lang=ja").expect(t, http.StatusOK, `>リポジトリ</h1>`, `class="segmented langs"`, `>JA</a>`)
+	get(t, h, "/", withCookie("gh-mini-lang", "ja")).expect(t, http.StatusOK, `>リポジトリ</h1>`)
+	get(t, h, "/?lang=default", withCookie("gh-mini-lang", "ja")).expect(t, http.StatusOK, `<h1 id="repo">Repo</h1>`)
+}
+
+func TestHandlerDirRedirect(t *testing.T) {
+	r := get(t, newTestServer(t), "/docs")
+	if r.code != http.StatusMovedPermanently || r.header.Get("Location") != "/docs/" {
+		t.Errorf("got %d to %q, want 301 to /docs/", r.code, r.header.Get("Location"))
+	}
+}
+
+func TestHandlerMarkdown(t *testing.T) {
+	h := newTestServer(t)
+	get(t, h, "/docs/guide.md").expect(t, http.StatusOK,
+		`data-kind="markdown"`,
+		`<h2 id="install">Install</h2>`,
+		`>Preview</a>`, `>Code</a>`,
+		`href="/docs/guide.ja.md"`, `>JA</a>`,
+	)
+	get(t, h, "/docs/guide.md?plain=1").expect(t, http.StatusOK,
+		`data-kind="code"`,
+		`>Preview</a>`, `>Code</a>`,
+	)
+	get(t, h, "/docs/guide.ja.md").expect(t, http.StatusOK, `data-kind="markdown"`, `>ガイド</h1>`)
+	get(t, h, "/docs/a%20b.md").expect(t, http.StatusOK, `data-kind="markdown"`, `>Spaces</h1>`)
+}
+
+func TestHandlerCode(t *testing.T) {
+	get(t, newTestServer(t), "/main.go").expect(t, http.StatusOK, `data-kind="code"`, `href="#L1"`, "3 lines")
+}
+
+func TestHandlerImageAndRaw(t *testing.T) {
+	h := newTestServer(t)
+	get(t, h, "/img.png").expect(t, http.StatusOK, `data-kind="image"`, `<img src="?raw"`)
+	for _, r := range []response{
+		get(t, h, "/img.png", withHeader("Sec-Fetch-Dest", "image")),
+		get(t, h, "/img.png?raw"),
+	} {
+		if r.code != http.StatusOK || !bytes.Equal([]byte(r.body), pngBytes) {
+			t.Errorf("raw image: status %d, %d bytes", r.code, len(r.body))
+		}
+	}
+	get(t, h, "/bin.dat").expect(t, http.StatusOK, `data-kind="binary"`)
+}
+
+func TestHandlerNotFound(t *testing.T) {
+	get(t, newTestServer(t), "/nope").expect(t, http.StatusNotFound, `data-kind="notfound"`)
+}
+
+func TestHandlerSymlinkOutOfRoot(t *testing.T) {
+	h := newTestServer(t)
+	for _, target := range []string{"/link/", "/link/secret.txt", "/link/secret.txt?raw"} {
+		r := get(t, h, target)
+		if r.code == http.StatusOK || strings.Contains(r.body, "secret\n") {
+			t.Errorf("%s shows what is outside the root (status %d)", target, r.code)
+		}
+	}
+}
+
+func TestHandlerTree(t *testing.T) {
+	r := get(t, newTestServer(t), "/_mini/api/tree")
+	var root Node
+	if err := json.Unmarshal([]byte(r.body), &root); err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, c := range root.Children {
+		names = append(names, c.Name)
+		if c.Name == "node_modules" {
+			t.Error("node_modules is in the tree")
+		}
+	}
+	// Directories first, then files, ignoring case. A symlink is listed as
+	// a file, since the walk does not follow it
+	want := "docs,local-only,.gitignore,bin.dat,img.png,link,main.go,README.ja.md,README.md"
+	if got := strings.Join(names, ","); got != want {
+		t.Errorf("root children = %s, want %s", got, want)
+	}
+	find := func(p string) *Node {
+		var walk func(n *Node) *Node
+		walk = func(n *Node) *Node {
+			if n.Path == p {
+				return n
+			}
+			for _, c := range n.Children {
+				if f := walk(c); f != nil {
+					return f
+				}
+			}
+			return nil
+		}
+		return walk(&root)
+	}
+	for p, ignored := range map[string]bool{
+		"local-only":       true,
+		"README.ja.md":     true,
+		"docs/guide.ja.md": true,
+		"README.md":        false,
+		"docs/guide.md":    false,
+	} {
+		n := find(p)
+		if n == nil {
+			t.Errorf("%s is not in the tree", p)
+		} else if n.Ignored != ignored {
+			t.Errorf("%s ignored = %v, want %v", p, n.Ignored, ignored)
+		}
+	}
+}
+
+func TestHandlerThemes(t *testing.T) {
+	h := newTestServer(t)
+	if r := get(t, h, "/_mini/theme/github.css"); r.code != http.StatusOK || r.body != "" {
+		t.Errorf("github theme: %d %q", r.code, r.body)
+	}
+	get(t, h, "/_mini/theme/sepia.css").expect(t, http.StatusOK, "--sepia: 1")
+	get(t, h, "/_mini/theme/nope.css").expect(t, http.StatusNotFound)
+	get(t, h, "/", withCookie("gh-mini-theme", "sepia")).expect(t, http.StatusOK,
+		`href="/_mini/theme/sepia.css"`, `<option value="sepia" selected>`)
+	get(t, h, "/", withCookie("gh-mini-theme", "unknown")).expect(t, http.StatusOK,
+		`href="/_mini/theme/github.css"`)
+	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark">`)
+}
