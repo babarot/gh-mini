@@ -421,7 +421,7 @@ func TestHandlerStaticFiles(t *testing.T) {
 		t.Fatal("the page does not link a versioned app.css")
 	}
 	prefix := m[1]
-	for _, p := range []string{"/assets/app.css", "/assets/js/main.js", "/assets/js/util.js", "/grip/js/mermaid-init.js", "/chroma.css"} {
+	for _, p := range []string{"/assets/app.css", "/assets/js/main.js", "/assets/js/util.js", "/assets/js/mermaid.js", "/assets/vendor/mermaid.min.js", "/chroma.css"} {
 		r := get(t, h, prefix+p)
 		if r.code != http.StatusOK || r.body == "" {
 			t.Errorf("%s: status %d, %d bytes", p, r.code, len(r.body))

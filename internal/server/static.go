@@ -7,8 +7,6 @@ import (
 	"io/fs"
 	"net/http"
 	"strings"
-
-	"github.com/chrishrb/go-grip/defaults"
 )
 
 // staticFiles serves the server's own files under /_mini/static/<version>/,
@@ -19,36 +17,31 @@ import (
 type staticFiles struct {
 	version string
 	assets  http.Handler
-	grip    http.Handler
 	chroma  string
 }
 
 func newStaticFiles() *staticFiles {
 	assetsFS, _ := fs.Sub(assets, "assets")
-	gripFS, _ := fs.Sub(defaults.StaticFiles, "static")
 	chroma := chromaCSS()
 
 	h := sha256.New()
-	for _, fsys := range []fs.FS{assetsFS, gripFS} {
-		_ = fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return nil
-			}
-			b, err := fs.ReadFile(fsys, p)
-			if err != nil {
-				return nil
-			}
-			io.WriteString(h, p)
-			h.Write(b)
+	_ = fs.WalkDir(assetsFS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
 			return nil
-		})
-	}
+		}
+		b, err := fs.ReadFile(assetsFS, p)
+		if err != nil {
+			return nil
+		}
+		io.WriteString(h, p)
+		h.Write(b)
+		return nil
+	})
 	io.WriteString(h, chroma)
 
 	return &staticFiles{
 		version: hex.EncodeToString(h.Sum(nil))[:12],
 		assets:  http.FileServer(http.FS(assetsFS)),
-		grip:    http.FileServer(http.FS(gripFS)),
 		chroma:  chroma,
 	}
 }
@@ -72,8 +65,6 @@ func (st *staticFiles) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case kind == "assets":
 		serveSub(st.assets, w, r, file)
-	case kind == "grip":
-		serveSub(st.grip, w, r, file)
 	case rest == "chroma.css":
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		io.WriteString(w, st.chroma)

@@ -262,6 +262,56 @@ body.sidebar-hidden .sidebar { display: none; }
 .markdown-body .anchor { float: left; margin-left: -20px; padding-right: 4px; line-height: 1; }
 .markdown-body .chroma, .markdown-body pre .bg { background: transparent; }
 
+/* Copy buttons on code blocks */
+.markdown-body .highlight { position: relative; }
+.copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--fgColor-muted);
+  background: var(--bgColor-muted);
+  border: 1px solid var(--borderColor-default);
+  border-radius: var(--mini-radius);
+  cursor: pointer;
+  opacity: 0;
+}
+.markdown-body .highlight:hover .copy-btn, .copy-btn:focus-visible, .copy-btn.copied { opacity: 1; }
+.copy-btn:hover { color: var(--fgColor-default); }
+.copy-btn.copied { color: var(--md-1a7f37-2); }
+
+/* Mermaid diagrams, shown once drawn */
+.markdown-body .mermaid { position: relative; opacity: 0; transition: opacity .15s ease-in; }
+.markdown-body .mermaid.rendered { opacity: 1; }
+.markdown-body .mermaid.mermaid-error { color: var(--md-d1242f); white-space: pre-wrap; }
+.mermaid-viewport { overflow: hidden; }
+.mermaid-viewport svg { display: block; margin: 0 auto; }
+.mermaid-controls {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  gap: 4px;
+  opacity: 0;
+}
+.markdown-body .mermaid:hover .mermaid-controls, .mermaid-controls:focus-within { opacity: 1; }
+.mermaid-controls .icon-btn { width: 28px; height: 28px; background: var(--bgColor-default); }
+.mermaid-controls .zoomIn { grid-area: 1 / 3; }
+.mermaid-controls .zoomOut { grid-area: 3 / 3; }
+.mermaid-controls .reset { grid-area: 2 / 2; }
+.mermaid-controls .up { grid-area: 1 / 2; }
+.mermaid-controls .down { grid-area: 3 / 2; }
+.mermaid-controls .left { grid-area: 2 / 1; }
+.mermaid-controls .right { grid-area: 2 / 3; }
+
+@media print { .copy-btn, .mermaid-controls { display: none; } }
+
 .empty { padding: 32px; text-align: center; color: var(--fgColor-muted); }
 .image { padding: 32px; text-align: center; background: var(--bgColor-muted); }
 .image img { max-width: 100%; }

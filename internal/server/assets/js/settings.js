@@ -4,7 +4,6 @@
 // at once.
 
 import { setCookie } from "./util.js";
-import { reload } from "./reload.js";
 
 const COOKIE = "gh-mini-settings";
 const root = document.documentElement;
@@ -65,7 +64,7 @@ function migrate() {
 
 // appliers apply a setting to this page. A setting without one is set as
 // <html data-<key>>, which is what settings marked Attr need. A setting
-// that changes what the server renders can call reload().
+// that changes what the server renders can call reload() from reload.js.
 const appliers = {
   theme(value) {
     themeLink.href = "/_mini/theme/" + encodeURIComponent(value) + ".css";
@@ -78,9 +77,6 @@ const appliers = {
       root.dataset.auto = "1";
       root.dataset.mode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
-    document.body.dataset.theme = root.dataset.mode;
-    // Mermaid picks its colors when it draws
-    if (document.querySelector(".mermaid")) reload();
   },
 };
 
