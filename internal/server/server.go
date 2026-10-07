@@ -71,7 +71,7 @@ func New(opts Options) (*Server, error) {
 		ws:      ws,
 		md:      newMarkdown(ws.Repo()),
 		tmpl:    tmpl,
-		hub:     &hub{subs: map[chan change]struct{}{}},
+		hub:     &hub{subs: map[*subscriber]struct{}{}},
 		static:  newStaticFiles(),
 		renders: newRenderCache(maxRenderCache),
 	}

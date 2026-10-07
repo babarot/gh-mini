@@ -20,32 +20,73 @@ type change struct {
 
 type hub struct {
 	mu   sync.Mutex
-	subs map[chan change]struct{}
+	subs map[*subscriber]struct{}
 }
 
-func (h *hub) subscribe() chan change {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	ch := make(chan change, 4)
-	h.subs[ch] = struct{}{}
-	return ch
+// subscriber is one browser's stream. Changes that come while it is still
+// writing an earlier one are merged into one pending change rather than
+// queued, so none is lost however slow the browser is.
+type subscriber struct {
+	mu      sync.Mutex
+	pending *change
+	seen    map[string]bool
+	// ready has a value while pending is set
+	ready chan struct{}
 }
 
-func (h *hub) unsubscribe(ch chan change) {
+func (h *hub) subscribe() *subscriber {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	delete(h.subs, ch)
+	sub := &subscriber{ready: make(chan struct{}, 1)}
+	h.subs[sub] = struct{}{}
+	return sub
+}
+
+func (h *hub) unsubscribe(sub *subscriber) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.subs, sub)
 }
 
 func (h *hub) publish(c change) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for ch := range h.subs {
-		select {
-		case ch <- c:
-		default:
+	for sub := range h.subs {
+		sub.add(c)
+	}
+}
+
+func (sub *subscriber) add(c change) {
+	sub.mu.Lock()
+	defer sub.mu.Unlock()
+	if sub.pending == nil {
+		sub.pending = &change{}
+		sub.seen = map[string]bool{}
+	}
+	for _, p := range c.Paths {
+		if !sub.seen[p] {
+			sub.seen[p] = true
+			sub.pending.Paths = append(sub.pending.Paths, p)
 		}
 	}
+	sub.pending.Structure = sub.pending.Structure || c.Structure
+	sub.pending.Theme = sub.pending.Theme || c.Theme
+	select {
+	case sub.ready <- struct{}{}:
+	default:
+	}
+}
+
+// take returns the pending change and clears it.
+func (sub *subscriber) take() (change, bool) {
+	sub.mu.Lock()
+	defer sub.mu.Unlock()
+	if sub.pending == nil {
+		return change{}, false
+	}
+	c := *sub.pending
+	sub.pending = nil
+	return c, true
 }
 
 func (s *Server) serveEvents(w http.ResponseWriter, r *http.Request) {
@@ -56,8 +97,8 @@ func (s *Server) serveEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
-	ch := s.hub.subscribe()
-	defer s.hub.unsubscribe(ch)
+	sub := s.hub.subscribe()
+	defer s.hub.unsubscribe(sub)
 	fmt.Fprint(w, ": connected\n\n")
 	flusher.Flush()
 	tick := time.NewTicker(30 * time.Second)
@@ -69,7 +110,11 @@ func (s *Server) serveEvents(w http.ResponseWriter, r *http.Request) {
 		case <-tick.C:
 			fmt.Fprint(w, ": ping\n\n")
 			flusher.Flush()
-		case c := <-ch:
+		case <-sub.ready:
+			c, ok := sub.take()
+			if !ok {
+				continue
+			}
 			b, _ := json.Marshal(c)
 			fmt.Fprintf(w, "data: %s\n\n", b)
 			flusher.Flush()
