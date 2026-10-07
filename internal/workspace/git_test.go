@@ -12,6 +12,9 @@ func TestParseGitHubRepo(t *testing.T) {
 		"https://user@github.com/owner/name.git":      "owner/name",
 		"https://github.com/owner/name/tree/main.git": "owner/name",
 		"https://gitlab.com/owner/name.git":           "",
+		"https://github.company.com/owner/name.git":   "",
+		"git@notgithub.com:owner/name.git":            "",
+		"https://www.github.com/owner/name":           "owner/name",
 		"https://github.com/owner":                    "",
 		"https://github.com/":                         "",
 		"":                                            "",
@@ -46,10 +49,27 @@ func TestGitBranch(t *testing.T) {
 		t.Errorf("got %q, want feature/x", got)
 	}
 	git(t, dir, "switch", "-q", "--detach")
-	if got := gitBranch(dir); got != "HEAD" {
-		t.Errorf("detached: got %q, want HEAD", got)
+	if got, want := gitBranch(dir), gitOutput(dir, "rev-parse", "--short", "HEAD"); got != want || got == "" {
+		t.Errorf("detached: got %q, want the commit %q", got, want)
 	}
 	if got := gitBranch(t.TempDir()); got != "" {
 		t.Errorf("not a repository: got %q, want none", got)
+	}
+}
+
+func TestGitBranchDetached(t *testing.T) {
+	dir := newRepo(t, "")
+	if b := gitBranch(dir); b != "main" {
+		t.Fatalf("branch = %q", b)
+	}
+	git(t, dir, "tag", "v1.0.0")
+	git(t, dir, "checkout", "-q", "--detach")
+	if b := gitBranch(dir); b != "v1.0.0" {
+		t.Errorf("detached at a tag: %q", b)
+	}
+	git(t, dir, "tag", "-d", "v1.0.0")
+	sha := gitOutput(dir, "rev-parse", "--short", "HEAD")
+	if b := gitBranch(dir); b != sha || sha == "" {
+		t.Errorf("detached: %q, want %q", b, sha)
 	}
 }

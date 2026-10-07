@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -24,8 +25,21 @@ func gitIgnored(dir string) map[string]bool {
 	return set
 }
 
+// gitBranch is the branch checked out; on a detached HEAD, the tag there,
+// or the commit.
 func gitBranch(dir string) string {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
+	branch := gitOutput(dir, "rev-parse", "--abbrev-ref", "HEAD")
+	if branch != "HEAD" {
+		return branch
+	}
+	if tag := gitOutput(dir, "describe", "--tags", "--exact-match"); tag != "" {
+		return tag
+	}
+	return gitOutput(dir, "rev-parse", "--short", "HEAD")
+}
+
+func gitOutput(dir string, args ...string) string {
+	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
 	if err != nil {
 		return ""
 	}
@@ -42,15 +56,14 @@ func gitHubRepo(dir string) string {
 
 // parseGitHubRepo returns "owner/name" from a GitHub remote URL, HTTPS or
 // SSH, or "" when the URL is not GitHub's.
+// gitHubRemote finds owner and name in a remote on github.com, over
+// HTTPS or SSH, and nowhere else: github.company.com is another host.
+var gitHubRemote = regexp.MustCompile(`(?:^|[@/.])github\.com[:/]+([^/:]+)/([^/]+?)(?:\.git)?(?:/.*)?$`)
+
 func parseGitHubRepo(url string) string {
-	u := strings.TrimSuffix(url, ".git")
-	i := strings.Index(u, "github.com")
-	if i < 0 {
+	m := gitHubRemote.FindStringSubmatch(url)
+	if m == nil {
 		return ""
 	}
-	parts := strings.FieldsFunc(u[i+len("github.com"):], func(r rune) bool { return r == '/' || r == ':' })
-	if len(parts) < 2 {
-		return ""
-	}
-	return parts[0] + "/" + parts[1]
+	return m[1] + "/" + m[2]
 }
