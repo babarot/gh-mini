@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -34,35 +35,55 @@ Flags:
 `
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
+		var ue usageError
+		if errors.As(err, &ue) {
+			// The flag package has told what is wrong already
+			os.Exit(2)
+		}
 		fmt.Fprintln(os.Stderr, "gh-mini:", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	var (
-		port      int
-		host      string
-		noOpen    bool
-		noReload  bool
-		theme     string
-		skip      string
-		showVer   bool
-		themesDir = defaultThemesDir()
-	)
-	flag.IntVar(&port, "p", 6419, "")
-	flag.IntVar(&port, "port", 6419, "port to listen on; the next free one is used when it is taken")
-	flag.StringVar(&host, "host", "localhost", "address to listen on")
-	flag.BoolVar(&noOpen, "no-open", false, "do not open the browser")
-	flag.BoolVar(&noReload, "no-reload", false, "do not reload pages when files change")
-	flag.StringVar(&theme, "theme", os.Getenv("GH_MINI_THEME"), "theme to use until one is picked in the page ($GH_MINI_THEME)")
-	flag.StringVar(&skip, "skip", ".git,node_modules,.DS_Store", "comma-separated names left out of the tree")
-	flag.StringVar(&themesDir, "themes", themesDir, "directory of themes")
-	flag.BoolVar(&showVer, "version", false, "print the version")
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), usage, themesDir)
-		flag.VisitAll(func(f *flag.Flag) {
+// config is what the command line asks for.
+type config struct {
+	port      int
+	host      string
+	noOpen    bool
+	noReload  bool
+	theme     string
+	skip      []string
+	themesDir string
+	version   bool
+	// target is the directory or file to serve, "" for the current
+	// directory.
+	target string
+}
+
+// usageError is a flag the flag package could not parse.
+type usageError struct{ error }
+
+// parseArgs reads the command line, args without the program name. Usage
+// and what is wrong with the flags are written to stderr. With -h, it
+// returns flag.ErrHelp.
+func parseArgs(args []string, stderr io.Writer) (config, error) {
+	c := config{themesDir: defaultThemesDir()}
+	var skip string
+	fs := flag.NewFlagSet("gh-mini", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	fs.IntVar(&c.port, "p", 6419, "")
+	fs.IntVar(&c.port, "port", 6419, "port to listen on; the next free one is used when it is taken")
+	fs.StringVar(&c.host, "host", "localhost", "address to listen on")
+	fs.BoolVar(&c.noOpen, "no-open", false, "do not open the browser")
+	fs.BoolVar(&c.noReload, "no-reload", false, "do not reload pages when files change")
+	fs.StringVar(&c.theme, "theme", os.Getenv("GH_MINI_THEME"), "theme to use until one is picked in the page ($GH_MINI_THEME)")
+	fs.StringVar(&skip, "skip", ".git,node_modules,.DS_Store", "comma-separated names left out of the tree")
+	fs.StringVar(&c.themesDir, "themes", c.themesDir, "directory of themes")
+	fs.BoolVar(&c.version, "version", false, "print the version")
+	fs.Usage = func() {
+		fmt.Fprintf(stderr, usage, c.themesDir)
+		fs.VisitAll(func(f *flag.Flag) {
 			if f.Usage == "" {
 				return
 			}
@@ -70,24 +91,42 @@ func run() error {
 			if f.Name == "port" {
 				name = "-p, --port"
 			}
-			fmt.Fprintf(flag.CommandLine.Output(), "  %-14s %s", name, f.Usage)
+			fmt.Fprintf(stderr, "  %-14s %s", name, f.Usage)
 			if f.DefValue != "" && f.DefValue != "false" {
-				fmt.Fprintf(flag.CommandLine.Output(), " (default %q)", f.DefValue)
+				fmt.Fprintf(stderr, " (default %q)", f.DefValue)
 			}
-			fmt.Fprintln(flag.CommandLine.Output())
+			fmt.Fprintln(stderr)
 		})
 	}
-	flag.Parse()
-	if showVer {
-		fmt.Println("gh-mini", version)
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return c, err
+		}
+		return c, usageError{err}
+	}
+	c.skip = splitList(skip)
+	if fs.NArg() > 1 {
+		fs.Usage()
+		return c, errors.New("too many arguments")
+	}
+	c.target = fs.Arg(0)
+	return c, nil
+}
+
+func run(args []string, stdout, stderr io.Writer) error {
+	c, err := parseArgs(args, stderr)
+	if errors.Is(err, flag.ErrHelp) {
 		return nil
 	}
-	if flag.NArg() > 1 {
-		flag.Usage()
-		return errors.New("too many arguments")
+	if err != nil {
+		return err
+	}
+	if c.version {
+		fmt.Fprintln(stdout, "gh-mini", version)
+		return nil
 	}
 
-	root, open, err := resolve(flag.Arg(0))
+	root, open, err := resolve(c.target)
 	if err != nil {
 		return err
 	}
@@ -95,22 +134,22 @@ func run() error {
 	srv, err := server.New(server.Options{
 		Root:      root,
 		Name:      filepath.Base(root),
-		Skip:      splitList(skip),
-		Theme:     theme,
-		ThemesDir: themesDir,
-		Reload:    !noReload,
+		Skip:      c.skip,
+		Theme:     c.theme,
+		ThemesDir: c.themesDir,
+		Reload:    !c.noReload,
 	})
 	if err != nil {
 		return err
 	}
 
-	ln, err := listen(host, port)
+	ln, err := listen(c.host, c.port)
 	if err != nil {
 		return err
 	}
 	url := fmt.Sprintf("http://%s%s", ln.Addr().String(), open)
-	fmt.Printf("gh-mini: serving %s at %s\n", root, url)
-	if !noOpen {
+	fmt.Fprintf(stdout, "gh-mini: serving %s at %s\n", root, url)
+	if !c.noOpen {
 		openBrowser(url)
 	}
 	return http.Serve(ln, srv.Handler())
