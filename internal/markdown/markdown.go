@@ -15,7 +15,6 @@ import (
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
-	"go.abhg.dev/goldmark/mermaid"
 )
 
 // Features tells which scripts a rendered file needs.
@@ -38,7 +37,6 @@ func New(repo string) *Renderer {
 			extension.Table,
 			extension.Strikethrough,
 			emoji.Emoji,
-			&mermaid.Extender{RenderMode: mermaid.RenderModeClient, NoScript: true},
 		),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
@@ -87,8 +85,8 @@ func (r *Renderer) Render(src []byte) ([]byte, Features, error) {
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering {
 			switch n.Kind() {
-			case mermaid.Kind:
-				f.Mermaid = true
+			case ast.KindFencedCodeBlock:
+				f.Mermaid = f.Mermaid || language(n, src) == "mermaid"
 			case kindMathBlock, kindInlineMath:
 				f.Math = true
 			}

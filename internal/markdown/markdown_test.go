@@ -131,6 +131,12 @@ func TestRender(t *testing.T) {
 			},
 		},
 		{
+			name:   "mermaid blocks are left for Mermaid",
+			src:    "```mermaid\ngraph TD; A-->B<br>\n```\n",
+			want:   []string{"<pre class=\"mermaid\">graph TD; A--&gt;B&lt;br&gt;\n</pre>\n"},
+			reject: []string{"highlight"},
+		},
+		{
 			name: "raw HTML is kept whole",
 			src:  "<details>\n<summary>More</summary>\n\nHidden\n\n</details>\n\n<!-- a\nb -->\n",
 			want: []string{"<details>\n<summary>More</summary>\n<p>Hidden</p>\n</details>\n", "<!-- a\nb -->"},
