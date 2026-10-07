@@ -77,8 +77,7 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		b, err := s.ws.FS().ReadFile(path.Join(rel, readme))
 		if err == nil {
 			v.Readme = readme
-			p.Markdown = true
-			v.Content, _ = s.renderMarkdown(b)
+			v.Content, p.Features, _ = s.renderMarkdown(b)
 			for _, name := range readmes {
 				lang := langOf(name)
 				v.Langs = append(v.Langs, langTab{

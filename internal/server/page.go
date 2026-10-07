@@ -31,8 +31,8 @@ type page struct {
 	// Dir is set for a directory, File for the other kinds but notfound.
 	Dir  *dirView
 	File *fileView
-	// Markdown loads the scripts that Markdown needs, MathJax and Mermaid.
-	Markdown bool
+	// Features loads the scripts the page's Markdown needs.
+	Features features
 }
 
 // layout is what every page shows around its content.

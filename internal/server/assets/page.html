@@ -23,9 +23,11 @@
 <link rel="stylesheet" href="{{.Static}}/assets/app.css">
 <link rel="stylesheet" id="theme" href="/_mini/theme/{{.Theme}}.css">
 <script src="{{.Static}}/grip/js/clipboard-copy.js" defer></script>
-{{- if .Markdown}}
+{{- if .Features.Math}}
 <script src="{{.Static}}/grip/js/mathjax-options.js"></script>
 <script src="{{.Static}}/grip/js/tex-mml-chtml.js" defer></script>
+{{- end}}
+{{- if .Features.Mermaid}}
 <script src="{{.Static}}/grip/js/mermaid.min.js" defer></script>
 <script src="{{.Static}}/grip/js/mermaid-init.js" defer></script>
 {{- end}}

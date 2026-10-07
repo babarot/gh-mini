@@ -21,9 +21,11 @@ import (
 	"github.com/chrishrb/go-grip/pkg/tasklist"
 	"github.com/yuin/goldmark"
 	emoji "github.com/yuin/goldmark-emoji"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
 	"github.com/yuin/goldmark/renderer/html"
+	"github.com/yuin/goldmark/text"
 	"go.abhg.dev/goldmark/hashtag"
 	"go.abhg.dev/goldmark/mermaid"
 )
@@ -56,7 +58,13 @@ func newMarkdown(repo string) goldmark.Markdown {
 	)
 }
 
-func (s *Server) renderMarkdown(src []byte) (template.HTML, error) {
+// features tells which scripts a rendered Markdown file needs.
+type features struct {
+	Mermaid bool
+	Math    bool
+}
+
+func (s *Server) renderMarkdown(src []byte) (template.HTML, features, error) {
 	var prefix []byte
 	if fm, body, ok := frontmatter.Extract(src); ok {
 		if table, err := frontmatter.RenderTable(fm); err == nil {
@@ -66,12 +74,25 @@ func (s *Server) renderMarkdown(src []byte) (template.HTML, error) {
 	}
 	// Heading ids like GitHub's, so that anchors written for GitHub work
 	ctx := parser.NewContext(parser.WithIDs(slug.NewIDs()))
+	doc := s.md.Parser().Parse(text.NewReader(src), parser.WithContext(ctx))
+	var f features
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if entering {
+			switch n.Kind() {
+			case mermaid.Kind:
+				f.Mermaid = true
+			case mathjax.KindMathBlock, mathjax.KindInlineMath:
+				f.Math = true
+			}
+		}
+		return ast.WalkContinue, nil
+	})
 	var buf bytes.Buffer
 	buf.Write(prefix)
-	if err := s.md.Convert(src, &buf, parser.WithContext(ctx)); err != nil {
-		return "", err
+	if err := s.md.Renderer().Render(&buf, src, doc); err != nil {
+		return "", f, err
 	}
-	return template.HTML(buf.String()), nil
+	return template.HTML(buf.String()), f, nil
 }
 
 // renderCode highlights a source file with line numbers that link to #L<n>,

@@ -80,6 +80,9 @@ func newTestRepo(t *testing.T) (root, themes string) {
 		"docs/guide.md":      "# Guide\n\n## Install\n",
 		"docs/guide.ja.md":   "# ガイド\n",
 		"docs/a b.md":        "# Spaces\n",
+		"docs/diagram.md":    "# Diagram\n\n```mermaid\ngraph TD; A-->B\n```\n",
+		"docs/math.md":       "# Math\n\nEuler: $e^{i\\pi} = -1$\n",
+		"docs/README.md":     "# Docs\n\n```mermaid\ngraph TD; A-->B\n```\n",
 		"local-only/note.md": "# Note\n",
 		"main.go":            "package main\n\nfunc main() {}\n",
 		"bin.dat":            "a\x00b",
@@ -404,5 +407,26 @@ func TestHandlerStaticFiles(t *testing.T) {
 	get(t, h, prefix+"/nope/x").expect(t, http.StatusNotFound)
 	if cc := get(t, h, "/_mini/theme/sepia.css").header.Get("Cache-Control"); cc != "no-store" {
 		t.Errorf("theme Cache-Control = %q", cc)
+	}
+}
+
+func TestHandlerScriptsForFeatures(t *testing.T) {
+	h := newTestServer(t)
+	const mermaid, mathjax = "mermaid.min.js", "tex-mml-chtml.js"
+	for target, want := range map[string][2]bool{
+		"/":                {false, false},
+		"/docs/guide.md":   {false, false},
+		"/docs/diagram.md": {true, false},
+		"/docs/math.md":    {false, true},
+		"/docs/":           {true, false}, // its README has a diagram
+		"/main.go":         {false, false},
+	} {
+		r := get(t, h, target)
+		if got := strings.Contains(r.body, mermaid); got != want[0] {
+			t.Errorf("%s: Mermaid loaded = %v, want %v", target, got, want[0])
+		}
+		if got := strings.Contains(r.body, mathjax); got != want[1] {
+			t.Errorf("%s: MathJax loaded = %v, want %v", target, got, want[1])
+		}
 	}
 }

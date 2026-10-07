@@ -83,8 +83,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 		v.Plain = r.URL.Query().Get("plain") == "1"
 		if isMarkdown(rel) && !v.Plain {
 			p.Kind = "markdown"
-			p.Markdown = true
-			v.Content, err = s.renderMarkdown(b)
+			v.Content, p.Features, err = s.renderMarkdown(b)
 		} else {
 			p.Kind = "code"
 			v.Content, err = renderCode(path.Base(rel), b)
