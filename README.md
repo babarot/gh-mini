@@ -12,7 +12,7 @@ It opens `http://localhost:6419/` with:
 
 - a file tree in the sidebar, with a file finder (press `t`) and a "Markdown only" filter
 - directory pages that list their files and show their README, as GitHub does
-- Markdown rendered as GitHub renders it: alerts, task lists, footnotes, Mermaid, math, emoji, heading anchors, `#123` links to the repository's issues
+- Markdown rendered as GitHub renders it: alerts, task lists, footnotes, Mermaid, math, emoji, heading anchors, `#123` links to the repository's issues. HTML in Markdown is kept as far as GitHub keeps it: `<details>`, `align`, image sizes and the like stay; scripts, styles, frames and forms go, and the pages run scripts from gh-mini's own files only
 - source files highlighted with line numbers you can link to (`#L10`), and a Preview / Code switch for Markdown and HTML
 - HTML files previewed as a browser shows them, scripts included (see [HTML previews](#html-previews))
 - every file on disk, including what git ignores; those are marked `local`
