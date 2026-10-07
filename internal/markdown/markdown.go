@@ -52,6 +52,7 @@ func New(repo string) *Renderer {
 			),
 			parser.WithASTTransformers(
 				util.Prioritized(headingIDTransformer{}, 100),
+				util.Prioritized(imageLinkTransformer{}, 100),
 				util.Prioritized(alertTransformer{}, 100),
 				util.Prioritized(taskListTransformer{}, 100),
 				util.Prioritized(mathCodeTransformer{}, 100),

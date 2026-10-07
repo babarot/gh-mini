@@ -301,3 +301,18 @@ func TestHeadingIDsFromText(t *testing.T) {
 		}
 	}
 }
+
+func TestImageLinks(t *testing.T) {
+	for src, want := range map[string]string{
+		"![shot](shot.png)\n": `<a href="shot.png" target="_blank" rel="noopener noreferrer"><img src="shot.png" alt="shot"></a>`,
+		"[![badge](b.svg)](https://ci)\n": `<a href="https://ci"><img src="b.svg" alt="badge"></a>`,
+	} {
+		out, _ := render(t, "", src)
+		if !strings.Contains(string(out), want) {
+			t.Errorf("%q: got %s, want %s", src, out, want)
+		}
+	}
+	if out, _ := render(t, "", "![x](data:image/png;base64,AAAA)\n"); strings.Contains(string(out), "<a") {
+		t.Errorf("a data: image is linked: %s", out)
+	}
+}
