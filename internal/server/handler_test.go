@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/babarot/gh-mini/internal/workspace"
 )
 
 // A 1x1 PNG
@@ -252,7 +254,7 @@ func TestHandlerSymlinkOutOfRoot(t *testing.T) {
 
 func TestHandlerTree(t *testing.T) {
 	r := get(t, newTestServer(t), "/_mini/api/tree")
-	var root Node
+	var root workspace.Node
 	if err := json.Unmarshal([]byte(r.body), &root); err != nil {
 		t.Fatal(err)
 	}
@@ -269,9 +271,9 @@ func TestHandlerTree(t *testing.T) {
 	if got := strings.Join(names, ","); got != want {
 		t.Errorf("root children = %s, want %s", got, want)
 	}
-	find := func(p string) *Node {
-		var walk func(n *Node) *Node
-		walk = func(n *Node) *Node {
+	find := func(p string) *workspace.Node {
+		var walk func(n *workspace.Node) *workspace.Node
+		walk = func(n *workspace.Node) *workspace.Node {
 			if n.Path == p {
 				return n
 			}
@@ -298,6 +300,12 @@ func TestHandlerTree(t *testing.T) {
 			t.Errorf("%s ignored = %v, want %v", p, n.Ignored, ignored)
 		}
 	}
+}
+
+// The ignored mark on a file's page must not depend on the tree having
+// been built by an earlier request.
+func TestHandlerIgnoredFileFirst(t *testing.T) {
+	get(t, newTestServer(t), "/docs/guide.ja.md").expect(t, http.StatusOK, `<span class="badge" title="Ignored by git`)
 }
 
 func TestHandlerThemes(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/babarot/gh-mini/internal/workspace"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -93,7 +94,7 @@ func (s *Server) watch() error {
 			if err != nil || !d.IsDir() {
 				return nil
 			}
-			if p != dir && s.skipped(d.Name()) {
+			if p != dir && s.ws.Skipped(d.Name()) {
 				return fs.SkipDir
 			}
 			if err := w.Add(p); err != nil {
@@ -140,7 +141,7 @@ func (s *Server) watch() error {
 						continue
 					}
 					rel = filepath.ToSlash(rel)
-					if s.skipped(filepath.Base(rel)) {
+					if s.ws.Skipped(filepath.Base(rel)) {
 						continue
 					}
 					if !seen[rel] {
@@ -160,7 +161,7 @@ func (s *Server) watch() error {
 				timer.Reset(150 * time.Millisecond)
 			case <-timer.C:
 				if pending.Structure {
-					s.invalidateTree()
+					s.ws.Invalidate(workspace.Change{Structure: true})
 				}
 				s.hub.publish(pending)
 				pending = change{}

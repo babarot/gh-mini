@@ -18,9 +18,9 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 	"unicode/utf8"
 
+	"github.com/babarot/gh-mini/internal/workspace"
 	"github.com/chrishrb/go-grip/defaults"
 	"github.com/yuin/goldmark"
 )
@@ -47,15 +47,10 @@ type Options struct {
 // Server serves one directory.
 type Server struct {
 	opts Options
-	root *os.Root
+	ws   *workspace.Workspace
 	md   goldmark.Markdown
 	tmpl *template.Template
 	hub  *hub
-
-	treeMu     sync.Mutex
-	cachedTree *Node
-	treeDirty  bool
-	ignored    map[string]bool
 }
 
 const builtinTheme = "github"
@@ -65,7 +60,12 @@ const maxRender = 2 << 20
 
 // New opens the root and, when reloading is on, starts watching it.
 func New(opts Options) (*Server, error) {
-	root, err := os.OpenRoot(opts.Root)
+	ws, err := workspace.Open(workspace.Options{
+		Root:    opts.Root,
+		Name:    opts.Name,
+		Skip:    opts.Skip,
+		Watched: opts.Reload,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -76,17 +76,19 @@ func New(opts Options) (*Server, error) {
 		"isMarkdown": isMarkdown,
 	}).ParseFS(assets, "assets/page.html")
 	if err != nil {
+		ws.Close()
 		return nil, err
 	}
 	s := &Server{
 		opts: opts,
-		root: root,
-		md:   newMarkdown(gitHubRepo(opts.Root)),
+		ws:   ws,
+		md:   newMarkdown(ws.Repo()),
 		tmpl: tmpl,
 		hub:  &hub{subs: map[chan change]struct{}{}},
 	}
 	if opts.Reload {
 		if err := s.watch(); err != nil {
+			ws.Close()
 			return nil, err
 		}
 	}
@@ -110,7 +112,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/_mini/api/tree", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(s.tree())
+		_ = json.NewEncoder(w).Encode(s.ws.Snapshot().Tree)
 	})
 	mux.HandleFunc("/_mini/events", s.serveEvents)
 	mux.HandleFunc("/", s.serveFile)
@@ -214,10 +216,10 @@ type page struct {
 	Markdown bool
 }
 
-func (s *Server) newPage(r *http.Request, rel string) *page {
+func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel string) *page {
 	p := &page{
 		Name:   s.opts.Name,
-		Branch: gitBranch(s.opts.Root),
+		Branch: snap.Branch,
 		Path:   rel,
 		Themes: s.themes(),
 		Theme:  s.currentTheme(r),
@@ -234,7 +236,7 @@ func (s *Server) newPage(r *http.Request, rel string) *page {
 		for i, name := range parts {
 			p.Crumbs = append(p.Crumbs, crumb{Name: name, Href: dirHref(strings.Join(parts[:i+1], "/"))})
 		}
-		p.Ignored = s.isIgnored(rel)
+		p.Ignored = snap.Ignored(rel)
 	}
 	return p
 }
@@ -244,9 +246,10 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
 	if rel == "" {
 		rel = "."
 	}
-	info, err := s.root.Stat(rel)
+	snap := s.ws.Snapshot()
+	info, err := s.ws.FS().Stat(rel)
 	if err != nil {
-		p := s.newPage(r, rel)
+		p := s.newPage(r, snap, rel)
 		p.Kind = "notfound"
 		w.WriteHeader(http.StatusNotFound)
 		s.render(w, p)
@@ -257,11 +260,11 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, dirHref(rel), http.StatusMovedPermanently)
 			return
 		}
-		s.serveDir(w, r, rel)
+		s.serveDir(w, r, snap, rel)
 		return
 	}
 	if wantsRaw(r) {
-		f, err := s.root.Open(rel)
+		f, err := s.ws.FS().Open(rel)
 		if err != nil {
 			http.NotFound(w, r)
 			return
@@ -272,7 +275,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p := s.newPage(r, rel)
+	p := s.newPage(r, snap, rel)
 	p.Size = humanSize(info.Size())
 	p.Langs = s.langTabs(rel)
 	switch {
@@ -281,7 +284,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
 	case info.Size() > maxRender:
 		p.Kind = "binary"
 	default:
-		b, err := s.root.ReadFile(rel)
+		b, err := s.ws.FS().ReadFile(rel)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -308,27 +311,26 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request) {
 	s.render(w, p)
 }
 
-func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, rel string) {
-	p := s.newPage(r, rel)
+func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspace.Snapshot, rel string) {
+	p := s.newPage(r, snap, rel)
 	p.Kind = "dir"
-	dirents, err := fs.ReadDir(s.root.FS(), rel)
+	dirents, err := fs.ReadDir(s.ws.FS().FS(), rel)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	s.tree() // refreshes what git ignores
 	var readmes []string
 	for _, d := range dirents {
-		if s.skipped(d.Name()) {
+		if s.ws.Skipped(d.Name()) {
 			continue
 		}
 		child := path.Join(rel, d.Name())
-		e := entry{Name: d.Name(), Dir: d.IsDir(), Ignored: s.isIgnored(child)}
+		e := entry{Name: d.Name(), Dir: d.IsDir(), Ignored: snap.Ignored(child)}
 		if info, err := d.Info(); err == nil {
 			e.Ago = ago(info.ModTime())
 			if info.Mode()&fs.ModeSymlink != 0 {
 				e.Link = true
-				if st, err := s.root.Stat(child); err == nil {
+				if st, err := s.ws.FS().Stat(child); err == nil {
 					e.Dir = st.IsDir()
 				}
 			}
@@ -351,7 +353,7 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, rel string) {
 	})
 
 	if readme := pickReadme(readmes, r.URL.Query().Get("lang"), cookie(r, "gh-mini-lang")); readme != "" {
-		b, err := s.root.ReadFile(path.Join(rel, readme))
+		b, err := s.ws.FS().ReadFile(path.Join(rel, readme))
 		if err == nil {
 			p.Readme = readme
 			p.Markdown = true
@@ -456,7 +458,7 @@ func (s *Server) langTabs(rel string) []langTab {
 	}
 	base := strings.ToLower(m[1])
 	dir := path.Dir(rel)
-	dirents, err := fs.ReadDir(s.root.FS(), dir)
+	dirents, err := fs.ReadDir(s.ws.FS().FS(), dir)
 	if err != nil {
 		return nil
 	}
