@@ -120,6 +120,31 @@ function select(i) {
 // a link or the file finder, does the tree scroll to it.
 const scrollKey = "gh-mini-tree-scroll:" + (body.dataset.name || "");
 
+// A reload keeps what was typed in the filter, and the focus on it; the
+// next page does not, as one opens a file found there.
+const filterKey = "gh-mini-filter:" + location.pathname + location.search;
+
+function keepFilter() {
+  try {
+    const q = filterEl.value;
+    if (q) sessionStorage.setItem(filterKey, JSON.stringify({ q, focused: document.activeElement === filterEl, selected }));
+    else sessionStorage.removeItem(filterKey);
+  } catch (e) {}
+}
+
+function restoreFilter() {
+  try {
+    const kept = sessionStorage.getItem(filterKey);
+    if (kept === null) return;
+    sessionStorage.removeItem(filterKey);
+    const f = JSON.parse(kept);
+    filterEl.value = f.q;
+    selected = f.selected || 0;
+    render();
+    if (f.focused) filterEl.focus();
+  } catch (e) {}
+}
+
 function keepScroll() {
   try {
     // A filtered list is gone on the next page, and so is its position
@@ -278,7 +303,9 @@ export function initTree() {
   });
 
   window.addEventListener("pagehide", keepScroll);
+  window.addEventListener("pagehide", keepFilter);
   fetchTree().then(() => {
+    restoreFilter();
     restoreScroll();
     revealCurrent();
   });
