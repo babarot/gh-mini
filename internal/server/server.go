@@ -5,7 +5,6 @@ package server
 
 import (
 	"embed"
-	"encoding/json"
 	"html/template"
 	"net/http"
 	"path"
@@ -96,12 +95,22 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/_mini/static/", s.static)
 	mux.HandleFunc("/_mini/theme/", s.serveTheme)
-	mux.HandleFunc("/_mini/api/tree", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(s.ws.Snapshot().Tree)
-	})
+	mux.HandleFunc("/_mini/api/tree", s.serveTree)
 	mux.HandleFunc("/_mini/events", s.serveEvents)
 	mux.HandleFunc("/", s.servePath)
 	return mux
+}
+
+// serveTree serves the tree as JSON. The browser asks again on every page,
+// and gets 304 while the tree is the same.
+func (s *Server) serveTree(w http.ResponseWriter, r *http.Request) {
+	snap := s.ws.Snapshot()
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("ETag", snap.TreeETag)
+	if r.Header.Get("If-None-Match") == snap.TreeETag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(snap.TreeJSON)
 }

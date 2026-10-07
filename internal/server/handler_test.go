@@ -430,3 +430,38 @@ func TestHandlerScriptsForFeatures(t *testing.T) {
 		}
 	}
 }
+
+func TestHandlerTreeETag(t *testing.T) {
+	root, themes := newTestRepo(t)
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git"}, ThemesDir: themes, Reload: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+
+	first := get(t, h, "/_mini/api/tree")
+	etag := first.header.Get("ETag")
+	if first.code != http.StatusOK || etag == "" {
+		t.Fatalf("status %d, ETag %q", first.code, etag)
+	}
+	if r := get(t, h, "/_mini/api/tree", withHeader("If-None-Match", etag)); r.code != http.StatusNotModified || r.body != "" {
+		t.Errorf("same tree: status %d, %d bytes", r.code, len(r.body))
+	}
+
+	writeFile(t, filepath.Join(root, "added.md"), []byte("# Added\n"))
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		r := get(t, h, "/_mini/api/tree", withHeader("If-None-Match", etag))
+		if r.code == http.StatusOK {
+			if r.header.Get("ETag") == etag || !strings.Contains(r.body, `"added.md"`) {
+				t.Errorf("changed tree: ETag %q, body has added.md: %v", r.header.Get("ETag"), strings.Contains(r.body, `"added.md"`))
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the tree never changed")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}

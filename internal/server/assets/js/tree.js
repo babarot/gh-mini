@@ -74,7 +74,7 @@ function scrollToCurrent() {
 
 // fetchTree loads the tree, again when files were added or removed.
 export function fetchTree() {
-  return fetch("/_mini/api/tree", { cache: "no-store" })
+  return fetch("/_mini/api/tree", { cache: "no-cache" })
     .then((r) => r.json())
     .then((t) => { tree = t; render(); });
 }

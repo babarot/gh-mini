@@ -3,6 +3,7 @@ package workspace
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -39,11 +40,17 @@ func TestSnapshotRebuildsOnlyWhenInvalidated(t *testing.T) {
 	if s3.Version != s1.Version+1 || s3.Tree != s1.Tree {
 		t.Errorf("GitHead rebuilt the tree: version %d, same tree %v", s3.Version, s3.Tree == s1.Tree)
 	}
+	if s3.TreeETag != s1.TreeETag {
+		t.Error("GitHead changed the tree's ETag")
+	}
 
 	w.Invalidate(Change{Structure: true})
 	s4 := w.Snapshot()
 	if got := names(s4.Tree); len(got) != 2 {
 		t.Errorf("tree after Structure = %v, want a.md and b.md", got)
+	}
+	if s4.TreeETag == s1.TreeETag || !strings.Contains(string(s4.TreeJSON), `"b.md"`) {
+		t.Errorf("tree JSON after Structure: ETag %s, %s", s4.TreeETag, s4.TreeJSON)
 	}
 	if len(names(s1.Tree)) != 1 {
 		t.Error("an old snapshot was modified")

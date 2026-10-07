@@ -4,6 +4,9 @@
 package workspace
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path"
 	"sync"
@@ -55,7 +58,11 @@ type Snapshot struct {
 	// Version grows every time a snapshot is rebuilt.
 	Version uint64
 	Tree    *Node
-	Branch  string
+	// TreeJSON is Tree encoded once, and TreeETag a hash of it, the same
+	// for the same tree even across restarts.
+	TreeJSON []byte
+	TreeETag string
+	Branch   string
 	// Repo is the GitHub repository of the origin remote, "owner/name", or
 	// "" when there is none.
 	Repo    string
@@ -141,6 +148,9 @@ func (w *Workspace) Snapshot() *Snapshot {
 	if prev == nil || bits&dirtyStructure != 0 {
 		next.ignored = gitIgnored(w.opts.Root)
 		next.Tree = w.buildTree(next.ignored)
+		next.TreeJSON, _ = json.Marshal(next.Tree)
+		sum := sha256.Sum256(next.TreeJSON)
+		next.TreeETag = `"` + hex.EncodeToString(sum[:8]) + `"`
 	}
 	if prev == nil || bits&dirtyGitHead != 0 {
 		next.Branch = gitBranch(w.opts.Root)
