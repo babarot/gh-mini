@@ -65,6 +65,13 @@ var settingDefs = []setting{
 		},
 		Default: func(*Server) string { return "" },
 	},
+	{
+		Key:         "htmlPreview",
+		Label:       "HTML preview",
+		Description: "Open HTML files rendered, with their scripts, rather than as code",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "false" },
+	},
 }
 
 // legacyCookies are where settings were kept before settingsCookie.

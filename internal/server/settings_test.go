@@ -80,7 +80,7 @@ func TestSettingsDialog(t *testing.T) {
 		`<option value="sepia" selected>sepia</option>`,
 		`data-setting="mode" data-value="dark" aria-checked="true" class="selected">Dark</button>`,
 		`data-setting="mode" data-value="" aria-checked="false">Auto</button>`,
-		`<script type="application/json" id="settings-data">{"mode":"dark","theme":"sepia"}</script>`,
+		`<script type="application/json" id="settings-data">{"htmlPreview":"false","mode":"dark","theme":"sepia"}</script>`,
 	)
 	r.reject(t, `id="theme-select"`, `id="mode-select"`)
 }

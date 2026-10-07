@@ -3,7 +3,8 @@
 // cookie, so the next page is rendered with it, and applied to this page
 // at once.
 
-import { setCookie } from "./util.js";
+import { page, setCookie } from "./util.js";
+import { reload } from "./reload.js";
 
 const COOKIE = "gh-mini-settings";
 const root = document.documentElement;
@@ -77,6 +78,12 @@ const appliers = {
       root.dataset.auto = "1";
       root.dataset.mode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
+  },
+  htmlPreview() {
+    // The server picks the view of an HTML file, unless the URL does
+    const q = new URLSearchParams(location.search);
+    const html = page.kind === "html" || (page.kind === "code" && /\.html?$/i.test(page.path));
+    if (html && !q.has("plain") && !q.has("preview")) reload();
   },
 };
 

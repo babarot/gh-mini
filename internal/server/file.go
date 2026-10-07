@@ -19,10 +19,19 @@ const maxRender = 2 << 20
 type fileView struct {
 	Content template.HTML
 	Langs   []langTab
-	// Plain shows a Markdown file as code
-	Plain bool
-	Size  string
-	Lines int
+	// Views switches between a rendered view and the code, for Markdown
+	// and HTML files
+	Views []viewTab
+	// PreviewURL is where the iframe of an HTML preview loads the file
+	PreviewURL string
+	Size       string
+	Lines      int
+}
+
+type viewTab struct {
+	Label   string
+	Href    string
+	Current bool
 }
 
 // servePath serves the page of a file or directory under the root, or the
@@ -94,6 +103,27 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 	p := s.newPage(r, snap, rel, "")
 	v := &fileView{Size: humanSize(info.Size()), Langs: s.langTabs(rel)}
 	p.File = v
+	plain := r.URL.Query().Get("plain") == "1"
+	if isHTML(rel) && s.opts.PreviewPort != 0 {
+		preview := s.htmlPreview(r, p.Settings)
+		v.Views = []viewTab{{"Preview", "?preview=1", preview}, {"Code", "?plain=1", !preview}}
+		if preview {
+			p.Kind = "html"
+			v.PreviewURL = s.previewURL(r, rel)
+			http.SetCookie(w, &http.Cookie{
+				Name:     s.previewCookie(),
+				Value:    s.previewToken,
+				Path:     "/",
+				HttpOnly: true,
+				SameSite: http.SameSiteStrictMode,
+			})
+			s.render(w, p)
+			return
+		}
+	}
+	if isMarkdown(rel) {
+		v.Views = []viewTab{{"Preview", "?", !plain}, {"Code", "?plain=1", plain}}
+	}
 	switch {
 	case isImage(rel):
 		p.Kind = "image"
@@ -110,8 +140,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 			break
 		}
 		v.Lines = strings.Count(string(b), "\n")
-		v.Plain = r.URL.Query().Get("plain") == "1"
-		if isMarkdown(rel) && !v.Plain {
+		if isMarkdown(rel) && !plain {
 			p.Kind = "markdown"
 			v.Content, p.Features, err = s.renderMarkdownFile(rel, info, b)
 		} else {
@@ -134,6 +163,11 @@ func wantsRaw(r *http.Request) bool {
 	}
 	dest := r.Header.Get("Sec-Fetch-Dest")
 	return dest != "" && dest != "document" && dest != "iframe"
+}
+
+func isHTML(name string) bool {
+	ext := strings.ToLower(path.Ext(name))
+	return ext == ".html" || ext == ".htm"
 }
 
 func isMarkdown(name string) bool {

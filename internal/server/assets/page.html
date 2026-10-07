@@ -159,10 +159,11 @@
     {{- with .File}}
     <div class="box">
       <div class="box-header">
-        {{- if or (eq $.Kind "markdown") (and .Plain (isMarkdown $.Path))}}
+        {{- with .Views}}
         <div class="segmented">
-          <a href="?"{{if not .Plain}} class="selected"{{end}}>Preview</a>
-          <a href="?plain=1"{{if .Plain}} class="selected"{{end}}>Code</a>
+          {{- range .}}
+          <a href="{{.Href}}"{{if .Current}} class="selected"{{end}}>{{.Label}}</a>
+          {{- end}}
         </div>
         {{- end}}
         {{- if .Lines}}<span class="meta">{{.Lines}} lines</span>{{end}}
@@ -175,6 +176,8 @@
       <article class="markdown-body">{{.Content}}</article>
       {{- else if eq $.Kind "code"}}
       <div class="code">{{.Content}}</div>
+      {{- else if eq $.Kind "html"}}
+      <iframe class="html-preview" src="{{.PreviewURL}}" title="{{$.Path}}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
       {{- else if eq $.Kind "image"}}
       <div class="image"><img src="?raw" alt="{{$.Path}}"></div>
       {{- else}}

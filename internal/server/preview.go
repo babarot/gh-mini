@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"net"
 	"net/http"
 	"path"
 	"strconv"
@@ -78,4 +79,34 @@ func (s *Server) PreviewHandler() http.Handler {
 		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 	})
+}
+
+// htmlPreview tells whether an HTML file's page shows its preview: when the
+// URL asks for it, else when the setting says so. Only for a visit from a
+// gh-mini page or typed in: a page on another site linking here must not
+// get this page to set the preview cookie and run the file.
+func (s *Server) htmlPreview(r *http.Request, settings map[string]string) bool {
+	switch r.Header.Get("Sec-Fetch-Site") {
+	case "same-origin", "none":
+	default:
+		return false
+	}
+	q := r.URL.Query()
+	switch {
+	case q.Get("plain") == "1":
+		return false
+	case q.Get("preview") == "1":
+		return true
+	}
+	return settings["htmlPreview"] == "true"
+}
+
+// previewURL is the file on the preview server, on the host the browser
+// reached this server by, so that the preview cookie set here goes there.
+func (s *Server) previewURL(r *http.Request, rel string) string {
+	host, _, err := net.SplitHostPort(r.Host)
+	if err != nil {
+		host = r.Host
+	}
+	return "http://" + net.JoinHostPort(host, strconv.Itoa(s.opts.PreviewPort)) + href(rel)
 }

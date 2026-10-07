@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -96,4 +97,64 @@ func newServerFor(t *testing.T, opts Options) *Server {
 	}
 	t.Cleanup(func() { srv.Close() })
 	return srv
+}
+
+func sameOrigin(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "same-origin") }
+
+func TestHTMLPage(t *testing.T) {
+	srv, root := newPreviewServer(t)
+	writeFile(t, filepath.Join(root, "old.htm"), []byte("<p>old</p>"))
+	h := srv.Handler()
+	const iframe = `<iframe class="html-preview" src="http://example.com:7000/site/index.html"`
+	on := withSettings(`{"htmlPreview":true}`)
+	cookieSet := func(r response) bool {
+		for _, c := range r.header.Values("Set-Cookie") {
+			if strings.HasPrefix(c, "gh-mini-preview-7000="+srv.previewToken) &&
+				strings.Contains(c, "HttpOnly") && strings.Contains(c, "SameSite=Strict") {
+				return true
+			}
+		}
+		return false
+	}
+	for _, tt := range []struct {
+		name    string
+		target  string
+		edit    []func(*http.Request)
+		preview bool
+	}{
+		{"setting off", "/site/index.html", []func(*http.Request){sameOrigin}, false},
+		{"setting on", "/site/index.html", []func(*http.Request){sameOrigin, on}, true},
+		{"typed in", "/site/index.html", []func(*http.Request){withHeader("Sec-Fetch-Site", "none"), on}, true},
+		{"plain wins", "/site/index.html?plain=1", []func(*http.Request){sameOrigin, on}, false},
+		{"asked for", "/site/index.html?preview=1", []func(*http.Request){sameOrigin}, true},
+		{"from another site", "/site/index.html?preview=1", []func(*http.Request){withHeader("Sec-Fetch-Site", "cross-site"), on}, false},
+		{"no fetch metadata", "/site/index.html?preview=1", []func(*http.Request){on}, false},
+	} {
+		r := get(t, h, tt.target, tt.edit...)
+		if got := strings.Contains(r.body, iframe); got != tt.preview {
+			t.Errorf("%s: preview %v, want %v", tt.name, got, tt.preview)
+		}
+		if got := cookieSet(r); got != tt.preview {
+			t.Errorf("%s: preview cookie set %v, want %v", tt.name, got, tt.preview)
+		}
+		kind := `data-kind="code"`
+		if tt.preview {
+			kind = `data-kind="html"`
+		}
+		r.expect(t, http.StatusOK, kind, `href="?preview=1"`, `href="?plain=1"`)
+	}
+	r := get(t, h, "/site/index.html", sameOrigin, on)
+	r.expect(t, http.StatusOK, `sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"`)
+	r.reject(t, "allow-top-navigation")
+	get(t, h, "/old.htm", sameOrigin, on).expect(t, http.StatusOK, `data-kind="html"`)
+	get(t, h, "/", sameOrigin).expect(t, http.StatusOK, `data-setting="htmlPreview"`)
+}
+
+// Without a preview server, HTML files are code with no switch.
+func TestHTMLPageWithoutPreviews(t *testing.T) {
+	srv := newServerFor(t, Options{})
+	writeFile(t, filepath.Join(srv.opts.Root, "page.html"), []byte("<p>x</p>"))
+	r := get(t, srv.Handler(), "/page.html?preview=1", sameOrigin)
+	r.expect(t, http.StatusOK, `data-kind="code"`)
+	r.reject(t, "html-preview", `href="?preview=1"`)
 }

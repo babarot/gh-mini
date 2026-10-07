@@ -74,8 +74,15 @@
       <button type="button" role="radio" data-setting="mode" data-value="dark" aria-checked="false">Dark</button>
     </div>
   </div>
+  <div class="setting">
+    <div class="setting-text">
+      <div class="setting-label" id="setting-htmlPreview">HTML preview</div>
+      <div class="setting-description">Open HTML files rendered, with their scripts, rather than as code</div>
+    </div>
+    <input type="checkbox" role="switch" data-setting="htmlPreview" aria-labelledby="setting-htmlPreview">
+  </div>
 </dialog>
-<script type="application/json" id="settings-data">{"mode":"","theme":"github"}</script>
+<script type="application/json" id="settings-data">{"htmlPreview":"false","mode":"","theme":"github"}</script>
 
 <div class="layout">
   <aside class="sidebar" id="sidebar">

@@ -214,6 +214,18 @@ body.sidebar-hidden .sidebar { display: none; }
 .segmented a.selected, .segmented button.selected { background: var(--mini-selected); font-weight: 600; }
 .segmented button { font-family: inherit; cursor: pointer; }
 
+/* An HTML file's preview, from the preview server. The page's own
+   background is transparent unless it sets one, so give it white */
+.html-preview {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 220px);
+  min-height: 480px;
+  border: 0;
+  border-radius: 0 0 var(--mini-radius) var(--mini-radius);
+  background: #fff;
+}
+
 /* Settings dialog */
 .settings {
   width: min(480px, calc(100vw - 32px));

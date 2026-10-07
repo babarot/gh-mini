@@ -42,9 +42,17 @@ export function initReload({ onTheme, onStructure }) {
     if (c.theme) onTheme();
     if (c.structure) onStructure();
     const paths = c.paths || [];
-    const hit = paths.some((p) => p === page.path || (page.kind === "dir" && dirname(p) === page.path));
+    const hit = paths.some((p) => p === page.path || (page.kind === "dir" && dirname(p) === page.path) ||
+      (page.kind === "html" && underDir(p)));
     if (hit || (page.kind === "notfound" && c.structure)) reload();
   });
+}
+
+// underDir tells whether a path is in the directory of the page's file or
+// under it: an HTML preview loads its styles and scripts from around it.
+function underDir(p) {
+  const dir = dirname(page.path);
+  return dir === "." || p.startsWith(dir + "/");
 }
 
 // subscribe calls onChange with every change the server tells. The tabs

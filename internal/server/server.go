@@ -62,10 +62,9 @@ func New(opts Options) (*Server, error) {
 		return nil, err
 	}
 	tmpl, err := template.New("page.html").Funcs(template.FuncMap{
-		"href":       href,
-		"join":       path.Join,
-		"inc":        func(i int) int { return i + 1 },
-		"isMarkdown": isMarkdown,
+		"href": href,
+		"join": path.Join,
+		"inc":  func(i int) int { return i + 1 },
 	}).ParseFS(assets, "assets/page.html")
 	if err != nil {
 		ws.Close()
