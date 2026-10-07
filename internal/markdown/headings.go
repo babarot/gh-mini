@@ -1,10 +1,13 @@
 package markdown
 
 import (
+	"html"
 	"strings"
 
 	emojiast "github.com/yuin/goldmark-emoji/ast"
 	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/text"
 )
 
 // Heading is a heading of a rendered file, for its table of contents.
@@ -35,8 +38,14 @@ func headingOf(n ast.Node, src []byte) (Heading, bool) {
 }
 
 // plainText is the text a node shows: its words, code and emoji, without
-// markup or the HTML written in it.
+// markup, images or the HTML written in it.
 func plainText(n ast.Node, src []byte) string {
+	return strings.TrimSpace(nodeText(n, src, false))
+}
+
+// nodeText is the text of a node, with entities as the characters they
+// stand for. With shortcodes, an emoji is its name, as in :tada:.
+func nodeText(n ast.Node, src []byte, shortcodes bool) string {
 	var b strings.Builder
 	_ = ast.Walk(n, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
@@ -44,21 +53,39 @@ func plainText(n ast.Node, src []byte) string {
 		}
 		switch c := c.(type) {
 		case *ast.Text:
-			b.Write(c.Segment.Value(src))
+			b.WriteString(html.UnescapeString(string(c.Segment.Value(src))))
 			if c.SoftLineBreak() {
 				b.WriteByte(' ')
 			}
 		case *ast.String:
-			b.Write(c.Value)
+			b.WriteString(html.UnescapeString(string(c.Value)))
 		case *emojiast.Emoji:
-			if c.Value != nil && len(c.Value.Unicode) > 0 {
+			if shortcodes {
+				b.WriteString(":" + string(c.ShortName) + ":")
+			} else if c.Value != nil && len(c.Value.Unicode) > 0 {
 				b.WriteString(string(c.Value.Unicode))
 			}
 			return ast.WalkSkipChildren, nil
-		case *ast.RawHTML:
+		case *ast.RawHTML, *ast.Image:
 			return ast.WalkSkipChildren, nil
 		}
 		return ast.WalkContinue, nil
 	})
-	return strings.TrimSpace(b.String())
+	return b.String()
+}
+
+// headingIDTransformer gives headings ids made from the text they show, as
+// GitHub does: "## [1.2.0](url) - date" is #120---date, not one with the
+// URL in it, and "A &amp; B" is #a--b. Goldmark makes them from the source.
+type headingIDTransformer struct{}
+
+func (headingIDTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	src := reader.Source()
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if h, ok := n.(*ast.Heading); ok && entering {
+			h.SetAttributeString("id", pc.IDs().Generate([]byte(nodeText(h, src, true)), ast.KindHeading))
+			return ast.WalkSkipChildren, nil
+		}
+		return ast.WalkContinue, nil
+	})
 }

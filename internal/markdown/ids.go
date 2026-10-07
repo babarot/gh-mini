@@ -43,7 +43,9 @@ func (s ids) Put(value []byte) {
 // turns spaces into dashes and drops the rest.
 func slug(s string) string {
 	var b strings.Builder
-	for _, r := range strings.TrimSpace(s) {
+	// Not trimmed: the parser trims a heading, and a space left by an image
+	// or HTML at its start is a dash on GitHub, as in #-image-head
+	for _, r := range s {
 		switch {
 		case r == ' ':
 			b.WriteByte('-')

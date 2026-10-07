@@ -40,7 +40,6 @@ func New(repo string) *Renderer {
 			emoji.Emoji,
 		),
 		goldmark.WithParserOptions(
-			parser.WithAutoHeadingID(),
 			parser.WithBlockParsers(
 				util.Prioritized(mathBlockParser{}, 701),
 				util.Prioritized(extension.NewFootnoteBlockParser(), 999),
@@ -52,6 +51,7 @@ func New(repo string) *Renderer {
 				util.Prioritized(inlineMathParser{}, 501),
 			),
 			parser.WithASTTransformers(
+				util.Prioritized(headingIDTransformer{}, 100),
 				util.Prioritized(alertTransformer{}, 100),
 				util.Prioritized(taskListTransformer{}, 100),
 				util.Prioritized(mathCodeTransformer{}, 100),

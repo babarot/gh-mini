@@ -229,9 +229,9 @@ func TestHeadings(t *testing.T) {
 	_, f := render(t, "", "# Title :tada:\n\n## Use `go test` and [links](x.md)\n\n##### Too deep\n\n## Title :tada:\n\n### <b>raw</b> text\n")
 	want := []Heading{
 		{1, "title-tada", "Title 🎉"},
-		{2, "use-go-test-and-linksxmd", "Use go test and links"},
+		{2, "use-go-test-and-links", "Use go test and links"},
 		{2, "title-tada-1", "Title 🎉"},
-		{3, "brawb-text", "raw text"}, // ids come from the source for now
+		{3, "raw-text", "raw text"},
 	}
 	if len(f.Headings) != len(want) {
 		t.Fatalf("headings = %+v", f.Headings)
@@ -279,6 +279,24 @@ func TestInlineDoubleDollarMath(t *testing.T) {
 		out, _ := render(t, "", src)
 		if !strings.Contains(string(out), want) {
 			t.Errorf("%q: got %s, want %q", src, out, want)
+		}
+	}
+}
+
+// Heading ids come from the text shown, as on GitHub.
+func TestHeadingIDsFromText(t *testing.T) {
+	for src, want := range map[string]string{
+		"## Foo [link](x.md)\n":                `id="foo-link"`,
+		"## A &amp; B &lt;tag&gt;\n":           `id="a--b-tag"`,
+		"## <img src=\"x.png\"> Image head\n":  `id="-image-head"`,
+		"## [1.2.0](https://x) - 2024-01-02\n": `id="120---2024-01-02"`,
+		"## Release :tada:\n":                  `id="release-tada"`,
+		"## Use `go test`\n":                   `id="use-go-test"`,
+		"## 日本語の見出し\n":                         `id="日本語の見出し"`,
+	} {
+		out, _ := render(t, "", src)
+		if !strings.Contains(string(out), want) {
+			t.Errorf("%q: got %s, want %s", src, out, want)
 		}
 	}
 }
