@@ -10,6 +10,7 @@
   --mini-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
   --mini-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --mini-selected: var(--bgColor-neutral-muted);
+  --mini-folder-color: var(--fgColor-accent);
   --mini-radius: 6px;
 }
 
@@ -141,7 +142,7 @@ body.sidebar-hidden .sidebar { display: none; }
 .tree .row .chevron { width: 12px; color: var(--fgColor-muted); transition: transform .1s; }
 .tree li.open > .row .chevron { transform: rotate(90deg); }
 .tree li:not(.open) > ul { display: none; }
-.tree .row .octicon.dir { color: var(--fgColor-muted); }
+.tree .row .octicon.dir { color: var(--mini-folder-color); }
 .tree .row .label { overflow: hidden; text-overflow: ellipsis; }
 .tree .row .dir-path { color: var(--fgColor-muted); }
 .tree .ignored > .row .label { opacity: .6; }
@@ -284,7 +285,7 @@ body[data-kind="html"] .main > .box {
 .files tr:hover td { background: var(--bgColor-muted); }
 .files .name > div { display: flex; align-items: center; gap: 10px; }
 .files .name .octicon { color: var(--fgColor-muted); }
-.files .name .octicon.dir { color: var(--fgColor-accent); }
+.files .name .octicon.dir { color: var(--mini-folder-color); }
 .files .name a { color: var(--fgColor-default); }
 .files .ignored .name a { color: var(--fgColor-muted); }
 .files .ago { color: var(--fgColor-muted); text-align: right; white-space: nowrap; }
