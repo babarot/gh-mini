@@ -18,9 +18,6 @@ type Options struct {
 	Name string
 	// Skip lists file and directory names left out of the tree.
 	Skip []string
-	// Watched tells that a watcher calls Invalidate on every change.
-	// Without one, every Snapshot is rebuilt from scratch.
-	Watched bool
 }
 
 // Change tells which parts of a snapshot are out of date.
@@ -47,6 +44,9 @@ type Workspace struct {
 	mu    sync.Mutex // serializes rebuilds
 	snap  atomic.Pointer[Snapshot]
 	dirty atomic.Uint32
+	// watched is set once a Watcher invalidates the snapshot on changes.
+	// Until then, every Snapshot is rebuilt from scratch.
+	watched atomic.Bool
 }
 
 // Snapshot is the state of a workspace at one time. It is never modified,
@@ -119,7 +119,7 @@ func (w *Workspace) Invalidate(c Change) {
 
 // Snapshot returns the current state, rebuilding the parts that changed.
 func (w *Workspace) Snapshot() *Snapshot {
-	if !w.opts.Watched {
+	if !w.watched.Load() {
 		w.dirty.Store(dirtyAll)
 	}
 	if s := w.snap.Load(); s != nil && w.dirty.Load() == 0 {

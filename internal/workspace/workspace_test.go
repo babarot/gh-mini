@@ -19,11 +19,12 @@ func TestSnapshotRebuildsOnlyWhenInvalidated(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "a.md"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	w, err := Open(Options{Root: dir, Name: "x", Watched: true})
+	w, err := Open(Options{Root: dir, Name: "x"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer w.Close()
+	w.watched.Store(true)
 
 	s1 := w.Snapshot()
 	if err := os.WriteFile(filepath.Join(dir, "b.md"), nil, 0o644); err != nil {

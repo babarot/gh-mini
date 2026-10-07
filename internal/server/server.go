@@ -46,11 +46,12 @@ type Options struct {
 
 // Server serves one directory.
 type Server struct {
-	opts Options
-	ws   *workspace.Workspace
-	md   goldmark.Markdown
-	tmpl *template.Template
-	hub  *hub
+	opts    Options
+	ws      *workspace.Workspace
+	watcher *workspace.Watcher
+	md      goldmark.Markdown
+	tmpl    *template.Template
+	hub     *hub
 }
 
 const builtinTheme = "github"
@@ -61,10 +62,9 @@ const maxRender = 2 << 20
 // New opens the root and, when reloading is on, starts watching it.
 func New(opts Options) (*Server, error) {
 	ws, err := workspace.Open(workspace.Options{
-		Root:    opts.Root,
-		Name:    opts.Name,
-		Skip:    opts.Skip,
-		Watched: opts.Reload,
+		Root: opts.Root,
+		Name: opts.Name,
+		Skip: opts.Skip,
 	})
 	if err != nil {
 		return nil, err
@@ -87,12 +87,21 @@ func New(opts Options) (*Server, error) {
 		hub:  &hub{subs: map[chan change]struct{}{}},
 	}
 	if opts.Reload {
-		if err := s.watch(); err != nil {
+		s.watcher, err = workspace.Watch(ws, opts.ThemesDir, s.notify)
+		if err != nil {
 			ws.Close()
 			return nil, err
 		}
 	}
 	return s, nil
+}
+
+// Close stops watching and closes the root.
+func (s *Server) Close() error {
+	if s.watcher != nil {
+		s.watcher.Close()
+	}
+	return s.ws.Close()
 }
 
 // Handler routes the server's own files under /_mini/ and everything else

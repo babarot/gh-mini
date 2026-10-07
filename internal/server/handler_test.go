@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -9,8 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/babarot/gh-mini/internal/workspace"
 )
@@ -320,4 +323,58 @@ func TestHandlerThemes(t *testing.T) {
 	get(t, h, "/", withCookie("gh-mini-theme", "unknown")).expect(t, http.StatusOK,
 		`href="/_mini/theme/github.css"`)
 	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark">`)
+}
+
+func TestHandlerEvents(t *testing.T) {
+	root, themes := newTestRepo(t)
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git"}, ThemesDir: themes, Reload: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	defer func() {
+		ts.CloseClientConnections()
+		ts.Close()
+		srv.Close()
+	}()
+
+	res, err := http.Get(ts.URL + "/_mini/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	lines := make(chan string)
+	go func() {
+		sc := bufio.NewScanner(res.Body)
+		for sc.Scan() {
+			lines <- sc.Text()
+		}
+		close(lines)
+	}()
+	if l := <-lines; l != ": connected" {
+		t.Fatalf("first line = %q", l)
+	}
+
+	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Changed\n"))
+	writeFile(t, filepath.Join(themes, "sepia.css"), []byte(":root {}\n"))
+	var got change
+	timeout := time.After(5 * time.Second)
+	for !(got.Theme && slices.Contains(got.Paths, "docs/guide.md")) {
+		select {
+		case l, ok := <-lines:
+			if !ok {
+				t.Fatal("stream closed")
+			}
+			if data, ok := strings.CutPrefix(l, "data: "); ok {
+				var c change
+				if err := json.Unmarshal([]byte(data), &c); err != nil {
+					t.Fatal(err)
+				}
+				got.Theme = got.Theme || c.Theme
+				got.Paths = append(got.Paths, c.Paths...)
+			}
+		case <-timeout:
+			t.Fatalf("got %+v, want docs/guide.md and the theme", got)
+		}
+	}
 }
