@@ -16,6 +16,25 @@
   --fgColor-muted: #7a6c58;
   --fgColor-accent: #a0522d;
   --focus-outlineColor: #a0522d;
+  --fgColor-success: #5f7a2e;
+  --fgColor-attention: #9a6a12;
+  --fgColor-danger: #b03a2e;
+  --fgColor-done: #7a4f8a;
+
+  --syntax-comment: #8c7e68;
+  --syntax-keyword: #a0522d;
+  --syntax-string: #5f7a2e;
+  --syntax-number: #9a6a12;
+  --syntax-function: #7a4f8a;
+  --syntax-type: #8a5a1c;
+  --syntax-constant: #b0602a;
+  --syntax-tag: #a0522d;
+  --syntax-operator: #7a6c58;
+  --syntax-variable: #3b3227;
+  --syntax-inserted: #5f7a2e;
+  --syntax-deleted: #b03a2e;
+  --syntax-inserted-bg: #5f7a2e1f;
+  --syntax-deleted-bg: #b03a2e1a;
 }
 
 :root[data-mode="dark"] {
@@ -28,6 +47,25 @@
   --fgColor-muted: #a89a84;
   --fgColor-accent: #e0a46f;
   --focus-outlineColor: #e0a46f;
+  --fgColor-success: #a3b56b;
+  --fgColor-attention: #e0b05a;
+  --fgColor-danger: #e07a5f;
+  --fgColor-done: #c49ac9;
+
+  --syntax-comment: #8a7d68;
+  --syntax-keyword: #e0a46f;
+  --syntax-string: #a3b56b;
+  --syntax-number: #e0b05a;
+  --syntax-function: #c49ac9;
+  --syntax-type: #d9a066;
+  --syntax-constant: #e8916a;
+  --syntax-tag: #e0a46f;
+  --syntax-operator: #a89a84;
+  --syntax-variable: #e8dcc8;
+  --syntax-inserted: #a3b56b;
+  --syntax-deleted: #e07a5f;
+  --syntax-inserted-bg: #a3b56b26;
+  --syntax-deleted-bg: #e07a5f26;
 }
 
 .markdown-body {
