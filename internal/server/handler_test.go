@@ -682,3 +682,18 @@ func TestHandlerFileWithSlash(t *testing.T) {
 		}
 	}
 }
+
+// A file named after a language-like extension is no translation.
+func TestNoLanguageForExtensions(t *testing.T) {
+	root, _ := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "api.md"), []byte("# API\n"))
+	writeFile(t, filepath.Join(root, "api.go.md"), []byte("# API in Go\n"))
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	if r := get(t, srv.Handler(), "/api.md"); strings.Contains(r.body, `class="segmented langs"`) {
+		t.Error("api.md and api.go.md shown as translations")
+	}
+}

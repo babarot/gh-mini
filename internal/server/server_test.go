@@ -9,16 +9,20 @@ import (
 
 func TestLangOf(t *testing.T) {
 	for name, want := range map[string]string{
-		"README.md":      "",
-		"README.ja.md":   "ja",
-		"guide.zh-TW.md": "zh-tw",
-		"notes.markdown": "",
-		"v1.2.md":        "",
-		"my.notes.ja.md": "ja",
-		"guide.ja.mdx":   "ja",
-		"guide.mdx":      "",
-		"notamd.ja.txt":  "",
-		"guideXjaXmd":    "",
+		"README.md":       "",
+		"README.ja.md":    "ja",
+		"guide.zh-TW.md":  "zh-tw",
+		"notes.markdown":  "",
+		"v1.2.md":         "",
+		"my.notes.ja.md":  "ja",
+		"guide.ja.mdx":    "ja",
+		"guide.mdx":       "",
+		"notamd.ja.txt":   "",
+		"guideXjaXmd":     "",
+		"api.go.md":       "",
+		"build.sh.md":     "",
+		"notes.github.md": "",
+		"guide.pt-BR.md":  "pt-br",
 	} {
 		if got := langOf(name); got != want {
 			t.Errorf("langOf(%q) = %q, want %q", name, got, want)
@@ -40,8 +44,8 @@ func TestPickReadme(t *testing.T) {
 			t.Errorf("pickReadme(%q, %q) = %q, want %q", tt.query, tt.saved, got, tt.want)
 		}
 	}
-	if !readmeRe.MatchString("README.mdx") || readmeRe.MatchString("READMEXmd") {
-		t.Error("readmeRe: README.mdx must match, READMEXmd must not")
+	if !isReadme("README.mdx") || isReadme("READMEXmd") || isReadme("README.go.md") || !isReadme("readme.zh-TW.md") {
+		t.Error("isReadme: README.mdx and readme.zh-TW.md are READMEs, READMEXmd and README.go.md are not")
 	}
 	if got := pickReadme([]string{"readme.ja.md"}, "", ""); got != "readme.ja.md" {
 		t.Errorf("only a translation: got %q", got)

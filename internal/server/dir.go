@@ -61,7 +61,7 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 			e.Href = dirHref(child)
 		}
 		v.Entries = append(v.Entries, e)
-		if !e.Dir && readmeRe.MatchString(d.Name()) {
+		if !e.Dir && isReadme(d.Name()) {
 			readmes = append(readmes, d.Name())
 		}
 	}
