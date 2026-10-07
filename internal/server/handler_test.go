@@ -495,3 +495,27 @@ func TestHandlerTreeETag(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 	}
 }
+
+// A changed file is rendered again, though its page was cached.
+func TestHandlerRenderAfterChange(t *testing.T) {
+	root, _ := newTestRepo(t)
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+	for _, target := range []string{"/docs/guide.md", "/docs/"} {
+		get(t, h, target)
+	}
+	later := time.Now().Add(time.Minute)
+	for name, body := range map[string]string{"docs/guide.md": "# Guide v2\n", "docs/README.md": "# Docs v2\n"} {
+		p := filepath.Join(root, filepath.FromSlash(name))
+		writeFile(t, p, []byte(body))
+		if err := os.Chtimes(p, later, later); err != nil {
+			t.Fatal(err)
+		}
+	}
+	get(t, h, "/docs/guide.md").expect(t, http.StatusOK, ">Guide v2</h1>")
+	get(t, h, "/docs/").expect(t, http.StatusOK, ">Docs v2</h1>")
+}

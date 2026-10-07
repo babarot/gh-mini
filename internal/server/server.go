@@ -42,6 +42,7 @@ type Server struct {
 	tmpl    *template.Template
 	hub     *hub
 	static  *staticFiles
+	renders *renderCache
 }
 
 // New opens the root and, when reloading is on, starts watching it.
@@ -66,12 +67,13 @@ func New(opts Options) (*Server, error) {
 		return nil, err
 	}
 	s := &Server{
-		opts:   opts,
-		ws:     ws,
-		md:     newMarkdown(ws.Repo()),
-		tmpl:   tmpl,
-		hub:    &hub{subs: map[chan change]struct{}{}},
-		static: newStaticFiles(),
+		opts:    opts,
+		ws:      ws,
+		md:      newMarkdown(ws.Repo()),
+		tmpl:    tmpl,
+		hub:     &hub{subs: map[chan change]struct{}{}},
+		static:  newStaticFiles(),
+		renders: newRenderCache(maxRenderCache),
 	}
 	if opts.Reload {
 		s.watcher, err = workspace.Watch(ws, opts.ThemesDir, s.notify)

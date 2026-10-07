@@ -74,10 +74,17 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 	})
 
 	if readme := pickReadme(readmes, r.URL.Query().Get("lang"), cookie(r, "gh-mini-lang")); readme != "" {
-		b, err := s.ws.FS().ReadFile(path.Join(rel, readme))
+		name := path.Join(rel, readme)
+		// Stat before reading, so that a file changing in between is
+		// cached under its old key and rendered again next time
+		info, err := s.ws.FS().Stat(name)
+		var b []byte
+		if err == nil {
+			b, err = s.ws.FS().ReadFile(name)
+		}
 		if err == nil {
 			v.Readme = readme
-			v.Content, p.Features, _ = s.renderMarkdown(b)
+			v.Content, p.Features, _ = s.renderMarkdownFile(name, info, b)
 			for _, name := range readmes {
 				lang := langOf(name)
 				v.Langs = append(v.Langs, langTab{
