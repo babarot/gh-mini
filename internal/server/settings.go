@@ -50,7 +50,7 @@ var settingDefs = []setting{
 	{
 		Key:         "theme",
 		Label:       "Theme",
-		Description: "CSS files in the themes directory",
+		Description: "Built-in themes and CSS files in the themes directory",
 		Control:     "select",
 		Choices:     themeChoices,
 		Default:     defaultTheme,

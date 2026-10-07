@@ -345,11 +345,34 @@ func TestHandlerThemes(t *testing.T) {
 	}
 	get(t, h, "/_mini/theme/sepia.css").expect(t, http.StatusOK, "--sepia: 1")
 	get(t, h, "/_mini/theme/nope.css").expect(t, http.StatusNotFound)
+	get(t, h, "/_mini/theme/nord.css").expect(t, http.StatusOK, "--bgColor-default: #2e3440")
+	get(t, h, "/_mini/theme/tokyo-night.css").expect(t, http.StatusOK, "--bgColor-default: #1a1b26")
+	get(t, h, "/", withSettings(`{"theme":"nord"}`)).expect(t, http.StatusOK,
+		`href="/_mini/theme/nord.css"`, `<option value="nord" selected>`)
 	get(t, h, "/", withCookie("gh-mini-theme", "sepia")).expect(t, http.StatusOK,
 		`href="/_mini/theme/sepia.css"`, `<option value="sepia" selected>`)
 	get(t, h, "/", withCookie("gh-mini-theme", "unknown")).expect(t, http.StatusOK,
 		`href="/_mini/theme/github.css"`)
 	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark">`)
+}
+
+// A theme of the viewer's own replaces the built-in one of the same name.
+func TestHandlerThemeOverridesBuiltin(t *testing.T) {
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(themes, "nord.css"), []byte(":root { --mine: 1; }\n"))
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git"}, ThemesDir: themes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := srv.Handler()
+	r := get(t, h, "/_mini/theme/nord.css")
+	r.expect(t, http.StatusOK, "--mine: 1")
+	if strings.Contains(r.body, "#2e3440") {
+		t.Errorf("built-in nord served instead of the viewer's: %q", r.body)
+	}
+	if n := strings.Count(get(t, h, "/").body, `<option value="nord"`); n != 1 {
+		t.Errorf("nord listed %d times", n)
+	}
 }
 
 // events reads the server's event stream and sends each change on.

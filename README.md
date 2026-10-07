@@ -16,7 +16,7 @@ It opens `http://localhost:6419/` with:
 - source files highlighted with line numbers you can link to (`#L10`), and a Preview / Code switch for Markdown
 - every file on disk, including what git ignores; those are marked `local`
 - translations side by side: `guide.md` and `guide.ja.md` get a language switch, and a language picked on a README stays picked
-- settings behind the gear button (or press `,`): themes you write as CSS, and a light, dark or automatic mode. They are kept per browser
+- settings behind the gear button (or press `,`): built-in `github`, `nord` and `tokyo-night` themes or ones you write as CSS, and a light, dark or automatic mode. They are kept per browser
 - live reload of the page you are reading when its file changes. Directories git ignores are watched only while you look at a page in them, so files added there show in the tree later
 
 Rendering uses [goldmark](https://github.com/yuin/goldmark) and the stylesheet of [github-markdown-css](https://github.com/sindresorhus/github-markdown-css).
@@ -41,7 +41,9 @@ go install github.com/babarot/gh-mini@latest
 
 ## Themes
 
-A theme is a CSS file in `~/.config/gh-mini/themes/` (`$XDG_CONFIG_HOME/gh-mini/themes/`). Its file name is the theme's name in the settings. It is read on every page load, and saving it updates open pages.
+The built-in themes are `github` (the default), `nord` and `tokyo-night`; each has a light and a dark version.
+
+Your own theme is a CSS file in `~/.config/gh-mini/themes/` (`$XDG_CONFIG_HOME/gh-mini/themes/`). Its file name is the theme's name in the settings, and a file named after a built-in theme replaces it. It is read on every page load, and saving it updates open pages.
 
 Colors are CSS variables, so a theme usually only sets them. Set them under `:root[data-mode="light"]` and `:root[data-mode="dark"]`, or `:root[data-mode]` for both:
 
@@ -57,7 +59,7 @@ Colors are CSS variables, so a theme usually only sets them. Set them under `:ro
 }
 ```
 
-The main variables are `--bgColor-default`, `--bgColor-muted`, `--fgColor-default`, `--fgColor-muted`, `--fgColor-accent`, `--focus-outlineColor` (the ring around a focused or linked-to element) and `--borderColor-default`; the full list is at the top of [markdown.css](internal/server/assets/markdown.css), and the layout ones (`--mini-sidebar-width`, `--mini-content-width`, ...) at the top of [app.css](internal/server/assets/app.css). See [examples/themes/sepia.css](examples/themes/sepia.css).
+The main variables are `--bgColor-default`, `--bgColor-muted`, `--fgColor-default`, `--fgColor-muted`, `--fgColor-accent`, `--focus-outlineColor` (the ring around a focused or linked-to element) and `--borderColor-default`; the full list is at the top of [markdown.css](internal/server/assets/markdown.css), and the layout ones (`--mini-sidebar-width`, `--mini-content-width`, ...) at the top of [app.css](internal/server/assets/app.css). See [examples/themes/sepia.css](examples/themes/sepia.css), and the built-in themes in [internal/server/assets/themes](internal/server/assets/themes), which also recolor code.
 
 ## Development
 
