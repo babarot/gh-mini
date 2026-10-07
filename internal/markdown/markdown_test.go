@@ -234,3 +234,17 @@ func TestHeadings(t *testing.T) {
 		}
 	}
 }
+
+// References in code or links written as HTML stay as they are.
+func TestIssueRefsNotInRawHTML(t *testing.T) {
+	out, _ := render(t, "acme/widget", "<code>#12</code> and <a href=\"x\">#13</a> and <pre>#14</pre> but #15\n")
+	html := string(out)
+	for _, n := range []string{"12", "13", "14"} {
+		if strings.Contains(html, "issues/"+n) {
+			t.Errorf("#%s linked: %s", n, html)
+		}
+	}
+	if !strings.Contains(html, "issues/15") {
+		t.Errorf("#15 not linked: %s", html)
+	}
+}

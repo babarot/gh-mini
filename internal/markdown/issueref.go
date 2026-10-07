@@ -28,7 +28,7 @@ func (t issueRefTransformer) Transform(doc *ast.Document, reader text.Reader, pc
 		case ast.KindCodeSpan, ast.KindLink, ast.KindAutoLink, ast.KindImage:
 			return ast.WalkSkipChildren, nil
 		}
-		runs = append(runs, textRuns(n)...)
+		runs = append(runs, textRuns(n, src)...)
 		return ast.WalkContinue, nil
 	})
 	for _, run := range runs {
@@ -36,9 +36,17 @@ func (t issueRefTransformer) Transform(doc *ast.Document, reader text.Reader, pc
 	}
 }
 
+// rawOpenTag and rawCloseTag find the HTML written around text that must
+// not be linked: code, preformatted text and links.
+var (
+	rawOpenTag  = regexp.MustCompile(`(?i)^<(a|code|pre)[\s>]`)
+	rawCloseTag = regexp.MustCompile(`(?i)^</(a|code|pre)\s*>`)
+)
+
 // textRuns returns the runs of a node's children that are one stretch of
-// the source, split into texts only by the inline parsers.
-func textRuns(n ast.Node) [][]*ast.Text {
+// the source, split into texts only by the inline parsers. Text between
+// <code>, <pre> or <a> and its end tag, written as HTML, is left out.
+func textRuns(n ast.Node, src []byte) [][]*ast.Text {
 	var runs [][]*ast.Text
 	var run []*ast.Text
 	flush := func() {
@@ -47,9 +55,22 @@ func textRuns(n ast.Node) [][]*ast.Text {
 		}
 		run = nil
 	}
+	inside := 0
 	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		if raw, ok := c.(*ast.RawHTML); ok && raw.Segments.Len() > 0 {
+			seg := raw.Segments.At(0)
+			tag := seg.Value(src)
+			switch {
+			case rawOpenTag.Match(tag):
+				inside++
+			case rawCloseTag.Match(tag) && inside > 0:
+				inside--
+			}
+			flush()
+			continue
+		}
 		t, ok := c.(*ast.Text)
-		if !ok || t.IsRaw() {
+		if !ok || t.IsRaw() || inside > 0 {
 			flush()
 			continue
 		}
