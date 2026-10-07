@@ -2,7 +2,7 @@
 // shows one of the changed files, keeping its scroll position and which of
 // its <details> are open.
 
-import { page, dirname } from "./util.js";
+import { page, dirname, isImage } from "./util.js";
 
 const scrollKey = "gh-mini-scroll:" + location.pathname + location.search;
 const detailsKey = "gh-mini-details:" + location.pathname + location.search;
@@ -53,7 +53,9 @@ export function initReload({ onTheme, onStructure, onFiles }) {
     const inDirs = dirs.some((d) => d === page.path || d === dirname(page.path) ||
       (page.kind === "html" && underDir(d + "/x")));
     const hit = inDirs || paths.some((p) => p === page.path || (page.kind === "dir" && dirname(p) === page.path) ||
-      (page.kind === "html" && underDir(p)));
+      (page.kind === "html" && underDir(p)) ||
+      // A Markdown page shows the images next to it
+      ((page.kind === "markdown" || page.kind === "dir") && isImage(p) && underDir(p)));
     if (hit || (page.kind === "notfound" && c.structure)) reload();
   });
 }
@@ -61,7 +63,7 @@ export function initReload({ onTheme, onStructure, onFiles }) {
 // underDir tells whether a path is in the directory of the page's file or
 // under it: an HTML preview loads its styles and scripts from around it.
 function underDir(p) {
-  const dir = dirname(page.path);
+  const dir = page.kind === "dir" ? page.path : dirname(page.path);
   return dir === "." || p.startsWith(dir + "/");
 }
 

@@ -38,6 +38,10 @@ export function dirname(p) {
   return i < 0 ? "." : p.slice(0, i);
 }
 
+export function isImage(name) {
+  return /\.(png|jpe?g|gif|svg|webp|avif|ico|bmp)$/i.test(name);
+}
+
 export function isMarkdown(name) {
   return /\.(md|markdown|mdx)$/i.test(name);
 }
