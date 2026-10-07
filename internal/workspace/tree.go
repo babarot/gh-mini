@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"io/fs"
+	"os"
 	"path"
 	"sort"
 	"strings"
@@ -20,7 +21,10 @@ func (w *Workspace) buildTree(ignored map[string]bool) *Node {
 	snap := &Snapshot{ignored: ignored}
 	root := &Node{Name: w.opts.Name, Dir: true}
 	nodes := map[string]*Node{".": root}
-	_ = fs.WalkDir(w.root.FS(), ".", func(p string, d fs.DirEntry, err error) error {
+	// Only names are read, and a walk does not follow symlinks, so the
+	// plain directory is enough; walking through os.Root, which checks
+	// every path it opens, took five times as long
+	_ = fs.WalkDir(os.DirFS(w.opts.Root), ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || p == "." {
 			return nil
 		}
