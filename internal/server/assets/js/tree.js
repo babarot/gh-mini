@@ -67,9 +67,14 @@ function render() {
   treeEl.innerHTML = listHTML(data.children || []);
 }
 
+// scrollToCurrent centers the current file in the tree. It scrolls the tree
+// alone: scrollIntoView also scrolls the page, by a little more on every
+// load, as the browser restores the scroll position before it runs.
 function scrollToCurrent() {
   const el = treeEl.querySelector(".row.current");
-  if (el) el.scrollIntoView({ block: "center" });
+  if (!el) return;
+  const top = el.getBoundingClientRect().top - treeEl.getBoundingClientRect().top + treeEl.scrollTop;
+  treeEl.scrollTop = top - (treeEl.clientHeight - el.offsetHeight) / 2;
 }
 
 // fetchTree loads the tree, again when files were added or removed.
