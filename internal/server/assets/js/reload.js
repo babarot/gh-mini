@@ -25,13 +25,26 @@ function restoreScroll() {
 export function initReload({ onTheme, onStructure }) {
   restoreScroll();
   if (!page.reload) return;
-  const es = new EventSource("/_mini/events");
-  es.onmessage = (e) => {
-    const c = JSON.parse(e.data);
+  subscribe((c) => {
     if (c.theme) onTheme();
     if (c.structure) onStructure();
     const paths = c.paths || [];
     const hit = paths.some((p) => p === page.path || (page.kind === "dir" && dirname(p) === page.path));
     if (hit || (page.kind === "notfound" && c.structure)) reload();
-  };
+  });
+}
+
+// subscribe calls onChange with every change the server tells. The tabs
+// share one connection through a shared worker where there is one.
+function subscribe(onChange) {
+  if (!window.SharedWorker) {
+    const es = new EventSource("/_mini/events");
+    es.onmessage = (e) => onChange(JSON.parse(e.data));
+    return;
+  }
+  const worker = new SharedWorker(new URL("./events-worker.js", import.meta.url), { name: "gh-mini-events" });
+  worker.port.onmessage = (e) => onChange(JSON.parse(e.data));
+  worker.port.start();
+  window.addEventListener("pagehide", () => worker.port.postMessage("close"));
+  window.addEventListener("pageshow", (e) => { if (e.persisted) worker.port.postMessage("open"); });
 }
