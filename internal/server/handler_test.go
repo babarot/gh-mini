@@ -595,3 +595,23 @@ func TestHandlerRawSandbox(t *testing.T) {
 		t.Errorf("svg as image: %q", r.body)
 	}
 }
+
+// Headings named like the page's own parts must not share their ids.
+func TestHeadingIDsApartFromPage(t *testing.T) {
+	root, _ := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "ids.md"), []byte("# Settings\n\n## TOC\n\n## Tree\n\n## Theme\n\n[go](#settings)\n"))
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	r := get(t, srv.Handler(), "/ids.md")
+	r.expect(t, http.StatusOK, `<h1 id="settings">`, `<h2 id="toc">`, `id="mini.settings"`, `id="mini.toc"`)
+	seen := map[string]bool{}
+	for _, m := range regexp.MustCompile(` id="([^"]+)"`).FindAllStringSubmatch(r.body, -1) {
+		if seen[m[1]] {
+			t.Errorf("id %q appears twice", m[1])
+		}
+		seen[m[1]] = true
+	}
+}

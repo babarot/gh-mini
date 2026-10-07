@@ -15,7 +15,7 @@ func withSettings(json string) func(*http.Request) {
 
 func TestSettingsFromCookie(t *testing.T) {
 	h := newTestServer(t)
-	themeLink := func(name string) string { return `id="theme" href="/_mini/theme/` + name + `.css"` }
+	themeLink := func(name string) string { return `id="mini.theme" href="/_mini/theme/` + name + `.css"` }
 	for _, tt := range []struct {
 		name  string
 		edit  []func(*http.Request)
@@ -52,7 +52,7 @@ func TestSettingsDefaultThemeFromOptions(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer srv.Close()
-	get(t, srv.Handler(), "/").expect(t, http.StatusOK, `id="theme" href="/_mini/theme/sepia.css"`)
+	get(t, srv.Handler(), "/").expect(t, http.StatusOK, `id="mini.theme" href="/_mini/theme/sepia.css"`)
 }
 
 // A setting marked Attr shows on <html> for CSS; a toggle takes JSON
@@ -74,13 +74,13 @@ func TestSettingsDialog(t *testing.T) {
 	h := newTestServer(t)
 	r := get(t, h, "/", withSettings(`{"theme":"sepia","mode":"dark"}`))
 	r.expect(t, http.StatusOK,
-		`id="settings-open"`,
-		`<dialog class="settings" id="settings"`,
+		`id="mini.settings-open"`,
+		`<dialog class="settings" id="mini.settings"`,
 		`<select data-setting="theme"`,
 		`<option value="sepia" selected>sepia</option>`,
 		`data-setting="mode" data-value="dark" aria-checked="true" class="selected">Dark</button>`,
 		`data-setting="mode" data-value="" aria-checked="false">Auto</button>`,
-		`<script type="application/json" id="settings-data">{"htmlPreview":"false","mode":"dark","theme":"sepia"}</script>`,
+		`<script type="application/json" id="mini.settings-data">{"htmlPreview":"false","mode":"dark","theme":"sepia"}</script>`,
 	)
 	r.reject(t, `id="theme-select"`, `id="mode-select"`)
 }

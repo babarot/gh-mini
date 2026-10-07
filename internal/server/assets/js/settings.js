@@ -8,11 +8,11 @@ import { reload } from "./reload.js";
 
 const COOKIE = "gh-mini-settings";
 const root = document.documentElement;
-const themeLink = document.getElementById("theme");
+const themeLink = document.getElementById("mini.theme");
 
 // settings holds the value of every setting, as the server resolved them
 // and as changed since.
-export const settings = JSON.parse(document.getElementById("settings-data").textContent);
+export const settings = JSON.parse(document.getElementById("mini.settings-data").textContent);
 
 function readCookie(name) {
   const prefix = name + "=";
@@ -102,7 +102,7 @@ export function refreshTheme() {
 
 export function initSettings() {
   migrate();
-  const dialog = document.getElementById("settings");
+  const dialog = document.getElementById("mini.settings");
 
   dialog.addEventListener("change", (e) => {
     const el = e.target.closest("[data-setting]");
@@ -126,8 +126,8 @@ export function initSettings() {
     }
   });
 
-  document.getElementById("settings-open").addEventListener("click", () => dialog.showModal());
-  document.getElementById("settings-close").addEventListener("click", () => dialog.close());
+  document.getElementById("mini.settings-open").addEventListener("click", () => dialog.showModal());
+  document.getElementById("mini.settings-close").addEventListener("click", () => dialog.close());
   document.addEventListener("keydown", (e) => {
     const t = e.target;
     if (t.matches && t.matches("input, textarea, select, [contenteditable]")) return;

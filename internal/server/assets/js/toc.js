@@ -15,7 +15,7 @@ export function initToc() {
     h.insertBefore(a, h.firstChild);
   });
   if (heads.length < 2) return;
-  const toc = document.getElementById("toc");
+  const toc = document.getElementById("mini.toc");
   toc.innerHTML = "<h2>On this page</h2>" + heads.map((h) =>
     '<a class="l' + h.tagName.slice(1) + '" href="#' + esc(h.id) + '">' + esc(h.textContent) + "</a>"
   ).join("");

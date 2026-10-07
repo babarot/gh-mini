@@ -3,9 +3,9 @@
 import { page, load, save, href, dirname, isMarkdown, esc, ICON_DIR, ICON_FILE, ICON_CHEVRON } from "./util.js";
 
 const body = document.body;
-const treeEl = document.getElementById("tree");
-const filterEl = document.getElementById("tree-filter");
-const mdOnlyEl = document.getElementById("md-only");
+const treeEl = document.getElementById("mini.tree");
+const filterEl = document.getElementById("mini.tree-filter");
+const mdOnlyEl = document.getElementById("mini.md-only");
 const current = page.path;
 let tree = null;
 const open = new Set(load("open", []));
@@ -158,7 +158,7 @@ export function initTree() {
     }
   });
 
-  const toggle = document.getElementById("sidebar-toggle");
+  const toggle = document.getElementById("mini.sidebar-toggle");
   if (load("sidebarHidden", false)) body.classList.add("sidebar-hidden");
   toggle.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 767px)").matches) {
