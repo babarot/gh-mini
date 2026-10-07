@@ -37,7 +37,13 @@ func gitHubRepo(dir string) string {
 	if err != nil {
 		return ""
 	}
-	u := strings.TrimSuffix(strings.TrimSpace(string(out)), ".git")
+	return parseGitHubRepo(strings.TrimSpace(string(out)))
+}
+
+// parseGitHubRepo returns "owner/name" from a GitHub remote URL, HTTPS or
+// SSH, or "" when the URL is not GitHub's.
+func parseGitHubRepo(url string) string {
+	u := strings.TrimSuffix(url, ".git")
 	i := strings.Index(u, "github.com")
 	if i < 0 {
 		return ""
