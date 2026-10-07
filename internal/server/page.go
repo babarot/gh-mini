@@ -34,6 +34,8 @@ type page struct {
 	File *fileView
 	// Features loads the scripts the page's Markdown needs.
 	Features markdown.Features
+	// csp is the page's Content-Security-Policy
+	csp string
 }
 
 // layout is what every page shows around its content.
@@ -59,7 +61,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 	if s.watcher != nil {
 		s.watcher.WatchThemes()
 	}
-	p := &page{Kind: kind, layout: layout{
+	p := &page{Kind: kind, csp: s.contentSecurityPolicy(r), layout: layout{
 		Name:     s.opts.Name,
 		Branch:   snap.Branch,
 		Path:     rel,
@@ -84,6 +86,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 func (s *Server) render(w http.ResponseWriter, p *page) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Security-Policy", p.csp)
 	if err := s.tmpl.Execute(w, p); err != nil {
 		fmt.Fprintf(w, "<pre>%s</pre>", template.HTMLEscapeString(err.Error()))
 	}

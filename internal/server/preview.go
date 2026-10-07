@@ -104,9 +104,13 @@ func (s *Server) htmlPreview(r *http.Request, settings map[string]string) bool {
 // previewURL is the file on the preview server, on the host the browser
 // reached this server by, so that the preview cookie set here goes there.
 func (s *Server) previewURL(r *http.Request, rel string) string {
+	return s.previewOrigin(r) + href(rel)
+}
+
+func (s *Server) previewOrigin(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.Host)
 	if err != nil {
 		host = r.Host
 	}
-	return "http://" + net.JoinHostPort(host, strconv.Itoa(s.opts.PreviewPort)) + href(rel)
+	return "http://" + net.JoinHostPort(host, strconv.Itoa(s.opts.PreviewPort))
 }

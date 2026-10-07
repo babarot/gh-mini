@@ -5,23 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}}</title>
 <link rel="icon" href="{{.Static}}/assets/favicon.svg">
-<script>
-  // Follow the OS until a mode is picked, before anything is painted
-  (function () {
-    var root = document.documentElement;
-    if (root.dataset.mode) return;
-    var mq = window.matchMedia("(prefers-color-scheme: dark)");
-    var apply = function () { root.dataset.auto = "1"; root.dataset.mode = mq.matches ? "dark" : "light"; };
-    apply();
-    mq.addEventListener("change", function () { if (root.dataset.auto) apply(); });
-  })();
-</script>
+<script src="{{.Static}}/assets/js/early.js"></script>
 <link rel="stylesheet" href="{{.Static}}/assets/markdown.css">
 <link rel="stylesheet" href="{{.Static}}/chroma.css">
 <link rel="stylesheet" href="{{.Static}}/assets/app.css">
 <link rel="stylesheet" id="theme" href="/_mini/theme/{{.Settings.theme}}.css">
 {{- if .Features.Math}}
-<script>MathJax = { options: { a11y: { backgroundOpacity: 0 }, enableMenu: false }, output: { fontPath: "[mathjax]/../mathjax-newcm-font" } };</script>
+<script src="{{.Static}}/assets/js/mathjax-config.js"></script>
 <script src="{{.Static}}/assets/vendor/mathjax/tex-mml-chtml.js" defer></script>
 {{- end}}
 {{- if .Features.Mermaid}}
