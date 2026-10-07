@@ -69,7 +69,25 @@ func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request, rel string, in
 	}
 	defer f.Close()
 	w.Header().Set("Cache-Control", "no-cache")
+	if runsScripts(rel) {
+		// Opened as a page, from here or from a link on any site, a file's
+		// scripts would run as gh-mini and could read every file through
+		// it. A sandbox gives the document an origin of its own and no
+		// scripts; it does nothing to a file loaded as an image or a style
+		w.Header().Set("Content-Security-Policy", "sandbox")
+	}
 	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
+}
+
+// runsScripts tells the files a browser runs scripts in when it opens them
+// as a page. Others, such as PDF, are left alone: a sandbox also stops the
+// browser's PDF viewer.
+func runsScripts(name string) bool {
+	switch strings.ToLower(path.Ext(name)) {
+	case ".html", ".htm", ".xhtml", ".svg", ".xml":
+		return true
+	}
+	return false
 }
 
 func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspace.Snapshot, rel string, info fs.FileInfo) {

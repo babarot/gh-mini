@@ -565,3 +565,28 @@ func TestHandlerRenderAfterChange(t *testing.T) {
 	get(t, h, "/docs/guide.md").expect(t, http.StatusOK, ">Guide v2</h1>")
 	get(t, h, "/docs/").expect(t, http.StatusOK, ">Docs v2</h1>")
 }
+
+func TestHandlerRawSandbox(t *testing.T) {
+	root, _ := newTestRepo(t)
+	for name, body := range map[string]string{
+		"page.html": "<script>1</script>", "pic.svg": "<svg/>", "doc.pdf": "%PDF-1.4", "notes.md": "# x",
+	} {
+		writeFile(t, filepath.Join(root, name), []byte(body))
+	}
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+	for name, want := range map[string]bool{"page.html": true, "pic.svg": true, "doc.pdf": false, "notes.md": false, "img.png": false} {
+		r := get(t, h, "/"+name+"?raw")
+		if got := r.header.Get("Content-Security-Policy") == "sandbox"; got != want || r.code != http.StatusOK {
+			t.Errorf("%s: status %d, sandboxed %v, want %v", name, r.code, got, want)
+		}
+	}
+	// Loaded as an image, an SVG is the same bytes
+	if r := get(t, h, "/pic.svg", withHeader("Sec-Fetch-Dest", "image")); r.body != "<svg/>" {
+		t.Errorf("svg as image: %q", r.body)
+	}
+}
