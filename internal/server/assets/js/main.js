@@ -6,10 +6,19 @@ import { initReload } from "./reload.js";
 import { initCopy } from "./copy.js";
 import { initMermaid } from "./mermaid.js";
 
-initTree();
-initSettings();
-initLangs();
-initToc();
-initCopy();
-initMermaid();
-initReload({ onTheme: refreshTheme, onStructure: fetchTree });
+// Each part starts on its own, so that one failing leaves the rest working
+for (const init of [
+  initTree,
+  initSettings,
+  initLangs,
+  initToc,
+  initCopy,
+  initMermaid,
+  () => initReload({ onTheme: refreshTheme, onStructure: fetchTree }),
+]) {
+  try {
+    init();
+  } catch (e) {
+    console.error(e);
+  }
+}

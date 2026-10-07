@@ -25,7 +25,7 @@ export function initToc() {
   // because the page stops scrolling first. At the bottom, the heading
   // the reader jumped to stays active while it is in view; otherwise the
   // last heading is.
-  let jumped = heads.findIndex((h) => "#" + h.id === decodeURIComponent(location.hash));
+  let jumped = heads.findIndex((h) => "#" + h.id === decodedHash());
   toc.addEventListener("click", (e) => {
     const a = e.target.closest("a");
     if (a) jumped = links.indexOf(a);
@@ -36,6 +36,9 @@ export function initToc() {
   ["wheel", "touchmove", "keydown"].forEach((type) => {
     window.addEventListener(type, () => { jumped = -1; }, { passive: true });
   });
+  // A heading counts as reached once it is where a jump puts it: below
+  // the top bar, by the page's scroll padding
+  const reached = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) + 8 || 120;
   const spy = () => {
     const root = document.documentElement;
     const atBottom = window.innerHeight + window.scrollY >= root.scrollHeight - 2;
@@ -44,10 +47,20 @@ export function initToc() {
       const top = jumped >= 0 ? heads[jumped].getBoundingClientRect().top : -1;
       idx = top >= 0 && top < window.innerHeight ? jumped : heads.length - 1;
     } else {
-      heads.forEach((h, i) => { if (h.getBoundingClientRect().top < 120) idx = i; });
+      heads.forEach((h, i) => { if (h.getBoundingClientRect().top < reached) idx = i; });
     }
     links.forEach((a, i) => { a.classList.toggle("active", i === idx); });
   };
   document.addEventListener("scroll", spy, { passive: true });
   spy();
+}
+
+// decodedHash is the URL's fragment, decoded when it can be: a malformed
+// one is compared as it is.
+function decodedHash() {
+  try {
+    return decodeURIComponent(location.hash);
+  } catch (e) {
+    return location.hash;
+  }
 }

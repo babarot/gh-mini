@@ -13,6 +13,10 @@
   --mini-radius: 6px;
 }
 
+/* A jump to an anchor, a heading or a line, lands below the sticky top
+   bar instead of under it */
+html { scroll-padding-top: calc(var(--mini-topbar-height) + 16px); }
+
 * { box-sizing: border-box; }
 
 html, body {
