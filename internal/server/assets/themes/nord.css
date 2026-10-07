@@ -12,15 +12,25 @@
   --fgColor-muted: #4c566a;
   --fgColor-accent: #5e81ac;
   --focus-outlineColor: #5e81ac;
-  --md-8250df-2: #b48ead;
-  --md-8250df-3: #8f6a88;
-  --md-9a6700: #ebcb8b;
-  --md-9a6700-2: #a07a2c;
-  --md-1a7f37: #a3be8c;
-  --md-1a7f37-2: #6e8a55;
-  --md-cf222e-3: #bf616a;
-  --md-d1242f: #bf616a;
-  --md-fff8c5: #ebcb8b55;
+  --fgColor-success: #6e8a55;
+  --fgColor-attention: #a07a2c;
+  --fgColor-danger: #bf616a;
+  --fgColor-done: #8f6a88;
+
+  --syntax-comment: #7b88a1;
+  --syntax-keyword: #5e81ac;
+  --syntax-string: #6e8a55;
+  --syntax-number: #8f6a88;
+  --syntax-function: #3b7a8c;
+  --syntax-type: #4f8a89;
+  --syntax-constant: #5e81ac;
+  --syntax-tag: #5e81ac;
+  --syntax-operator: #5e81ac;
+  --syntax-variable: #2e3440;
+  --syntax-inserted: #6e8a55;
+  --syntax-deleted: #bf616a;
+  --syntax-inserted-bg: #a3be8c40;
+  --syntax-deleted-bg: #bf616a33;
 }
 
 :root[data-mode="dark"] {
@@ -33,50 +43,23 @@
   --fgColor-muted: #d8dee9;
   --fgColor-accent: #88c0d0;
   --focus-outlineColor: #88c0d0;
-  --md-8250df-2: #b48ead;
-  --md-8250df-3: #b48ead;
-  --md-9a6700: #ebcb8b;
-  --md-9a6700-2: #ebcb8b;
-  --md-1a7f37: #a3be8c;
-  --md-1a7f37-2: #a3be8c;
-  --md-cf222e-3: #bf616a;
-  --md-d1242f: #bf616a;
-  --md-fff8c5: #ebcb8b33;
-}
+  --fgColor-success: #a3be8c;
+  --fgColor-attention: #ebcb8b;
+  --fgColor-danger: #bf616a;
+  --fgColor-done: #b48ead;
 
-:root[data-mode="light"] {
-  --theme-comment: #7b88a1;
-  --theme-keyword: #5e81ac;
-  --theme-string: #6e8a55;
-  --theme-number: #8f6a88;
-  --theme-function: #3b7a8c;
-  --theme-type: #4f8a89;
-  --theme-builtin: #5e81ac;
-  --theme-tag: #5e81ac;
-  --theme-operator: #5e81ac;
-  --theme-variable: #2e3440;
+  --syntax-comment: #616e88;
+  --syntax-keyword: #81a1c1;
+  --syntax-string: #a3be8c;
+  --syntax-number: #b48ead;
+  --syntax-function: #88c0d0;
+  --syntax-type: #8fbcbb;
+  --syntax-constant: #81a1c1;
+  --syntax-tag: #81a1c1;
+  --syntax-operator: #81a1c1;
+  --syntax-variable: #d8dee9;
+  --syntax-inserted: #a3be8c;
+  --syntax-deleted: #bf616a;
+  --syntax-inserted-bg: #a3be8c26;
+  --syntax-deleted-bg: #bf616a26;
 }
-
-:root[data-mode="dark"] {
-  --theme-comment: #616e88;
-  --theme-keyword: #81a1c1;
-  --theme-string: #a3be8c;
-  --theme-number: #b48ead;
-  --theme-function: #88c0d0;
-  --theme-type: #8fbcbb;
-  --theme-builtin: #81a1c1;
-  --theme-tag: #81a1c1;
-  --theme-operator: #81a1c1;
-  --theme-variable: #d8dee9;
-}
-
-:root[data-mode] .chroma :is(.c, .ch, .cm, .c1, .cs, .cp, .cpf) { color: var(--theme-comment); font-style: italic; }
-:root[data-mode] .chroma :is(.k, .kc, .kd, .kn, .kp, .kr) { color: var(--theme-keyword); }
-:root[data-mode] .chroma :is(.kt, .nc, .nn) { color: var(--theme-type); }
-:root[data-mode] .chroma :is(.s, .sa, .sb, .sc, .dl, .sd, .s2, .sh, .s1, .sx, .ss) { color: var(--theme-string); }
-:root[data-mode] .chroma :is(.se, .si, .sr, .m, .mb, .mf, .mh, .mi, .il, .mo) { color: var(--theme-number); }
-:root[data-mode] .chroma :is(.nf, .fm) { color: var(--theme-function); }
-:root[data-mode] .chroma :is(.nb, .bp, .no, .nd) { color: var(--theme-builtin); }
-:root[data-mode] .chroma :is(.nt, .na) { color: var(--theme-tag); }
-:root[data-mode] .chroma :is(.o, .ow) { color: var(--theme-operator); }
-:root[data-mode] .chroma :is(.n, .nv, .vc, .vg, .vi, .p) { color: var(--theme-variable); }

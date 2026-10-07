@@ -340,9 +340,7 @@ func TestHandlerIgnoredFileFirst(t *testing.T) {
 
 func TestHandlerThemes(t *testing.T) {
 	h := newTestServer(t)
-	if r := get(t, h, "/_mini/theme/github.css"); r.code != http.StatusOK || r.body != "" {
-		t.Errorf("github theme: %d %q", r.code, r.body)
-	}
+	get(t, h, "/_mini/theme/github.css").expect(t, http.StatusOK, "--borderColor-success-emphasis: #238636")
 	get(t, h, "/_mini/theme/sepia.css").expect(t, http.StatusOK, "--sepia: 1")
 	get(t, h, "/_mini/theme/nope.css").expect(t, http.StatusNotFound)
 	get(t, h, "/_mini/theme/nord.css").expect(t, http.StatusOK, "--bgColor-default: #2e3440")

@@ -8,41 +8,13 @@
   --borderColor-default: #d1d9e0;
   --borderColor-muted: #d1d9e0b3;
   --fgColor-accent: #0969da;
+  --fgColor-attention: #9a6700;
+  --fgColor-danger: #d1242f;
   --fgColor-default: #1f2328;
+  --fgColor-done: #8250df;
   --fgColor-muted: #59636e;
+  --fgColor-success: #1a7f37;
   --focus-outlineColor: #0969da;
-  --md-0550ae: #0550ae;
-  --md-0550ae-2: #0550ae;
-  --md-0550ae-3: #0550ae;
-  --md-0550ae-4: #0550ae;
-  --md-0a3069: #0a3069;
-  --md-116329: #116329;
-  --md-116329-2: #116329;
-  --md-1a7f37: #1a7f37;
-  --md-1a7f37-2: #1a7f37;
-  --md-3b2300: #3b2300;
-  --md-6639ba: #6639ba;
-  --md-818b98: #818b98;
-  --md-82071e: #82071e;
-  --md-82071e-2: #82071e;
-  --md-82071e-3: #82071e;
-  --md-8250df: #8250df;
-  --md-8250df-2: #8250df;
-  --md-8250df-3: #8250df;
-  --md-953800: #953800;
-  --md-953800-2: #953800;
-  --md-9a6700: #9a6700;
-  --md-9a6700-2: #9a6700;
-  --md-cf222e: #cf222e;
-  --md-cf222e-2: #cf222e;
-  --md-cf222e-3: #cf222e;
-  --md-d1242f: #d1242f;
-  --md-d1d9e0: #d1d9e0;
-  --md-dafbe1: #dafbe1;
-  --md-f6f8fa: #f6f8fa;
-  --md-ffd8b5: #ffd8b5;
-  --md-ffebe9: #ffebe9;
-  --md-fff8c5: #fff8c5;
 }
 
 :root[data-mode="dark"] {
@@ -53,41 +25,13 @@
   --borderColor-default: #3d444d;
   --borderColor-muted: #3d444db3;
   --fgColor-accent: #4493f8;
+  --fgColor-attention: #d29922;
+  --fgColor-danger: #f85149;
   --fgColor-default: #f0f6fc;
+  --fgColor-done: #ab7df8;
   --fgColor-muted: #9198a1;
+  --fgColor-success: #3fb950;
   --focus-outlineColor: #1f6feb;
-  --md-0550ae: #79c0ff;
-  --md-0550ae-2: #7ee787;
-  --md-0550ae-3: #1f6feb;
-  --md-0550ae-4: #1158c7;
-  --md-0a3069: #a5d6ff;
-  --md-116329: #7ee787;
-  --md-116329-2: #aff5b4;
-  --md-1a7f37: #238636;
-  --md-1a7f37-2: #3fb950;
-  --md-3b2300: #f2cc60;
-  --md-6639ba: #d2a8ff;
-  --md-818b98: #3d444d;
-  --md-82071e: #f85149;
-  --md-82071e-2: #8e1519;
-  --md-82071e-3: #ffdcd7;
-  --md-8250df: #d2a8ff;
-  --md-8250df-2: #8957e5;
-  --md-8250df-3: #ab7df8;
-  --md-953800: #ffa657;
-  --md-953800-2: #ffdfb6;
-  --md-9a6700: #9e6a03;
-  --md-9a6700-2: #d29922;
-  --md-cf222e: #ff7b72;
-  --md-cf222e-2: #b62324;
-  --md-cf222e-3: #da3633;
-  --md-d1242f: #f85149;
-  --md-d1d9e0: #f0f6fc;
-  --md-dafbe1: #033a16;
-  --md-f6f8fa: #f0f6fc;
-  --md-ffd8b5: #5a1e02;
-  --md-ffebe9: #67060c;
-  --md-fff8c5: #bb800926;
 }
 
 .markdown-body {
@@ -167,7 +111,7 @@
 }
 
 .markdown-body mark {
-  background-color: var(--md-fff8c5);
+  background-color: var(--bgColor-attention-muted, color-mix(in srgb, var(--fgColor-attention) 20%, transparent));
   color: var(--fgColor-default);
 }
 
@@ -481,10 +425,6 @@
 .markdown-body a:not([href]) {
   color: inherit;
   text-decoration: none;
-}
-
-.markdown-body .absent {
-  color: var(--md-d1242f);
 }
 
 .markdown-body .anchor {
@@ -927,126 +867,6 @@
   padding-right: var(--dialog-scrollgutter) !important;
 }
 
-.markdown-body .pl-c {
-  color: var(--fgColor-muted);
-}
-
-.markdown-body .pl-c1,
-.markdown-body .pl-s .pl-v {
-  color: var(--md-0550ae);
-}
-
-.markdown-body .pl-e,
-.markdown-body .pl-en {
-  color: var(--md-6639ba);
-}
-
-.markdown-body .pl-smi,
-.markdown-body .pl-s .pl-s1 {
-  color: var(--fgColor-default);
-}
-
-.markdown-body .pl-ent {
-  color: var(--md-0550ae-2);
-}
-
-.markdown-body .pl-k {
-  color: var(--md-cf222e);
-}
-
-.markdown-body .pl-s,
-.markdown-body .pl-pds,
-.markdown-body .pl-s .pl-pse .pl-s1,
-.markdown-body .pl-sr,
-.markdown-body .pl-sr .pl-cce,
-.markdown-body .pl-sr .pl-sre,
-.markdown-body .pl-sr .pl-sra {
-  color: var(--md-0a3069);
-}
-
-.markdown-body .pl-v,
-.markdown-body .pl-smw {
-  color: var(--md-953800);
-}
-
-.markdown-body .pl-bu {
-  color: var(--md-82071e);
-}
-
-.markdown-body .pl-ii {
-  color: var(--md-f6f8fa);
-  background-color: var(--md-82071e-2);
-}
-
-.markdown-body .pl-c2 {
-  color: var(--md-f6f8fa);
-  background-color: var(--md-cf222e-2);
-}
-
-.markdown-body .pl-sr .pl-cce {
-  font-weight: bold;
-  color: var(--md-116329);
-}
-
-.markdown-body .pl-ml {
-  color: var(--md-3b2300);
-}
-
-.markdown-body .pl-mh,
-.markdown-body .pl-mh .pl-en,
-.markdown-body .pl-ms {
-  font-weight: bold;
-  color: var(--md-0550ae-3);
-}
-
-.markdown-body .pl-mi {
-  font-style: italic;
-  color: var(--fgColor-default);
-}
-
-.markdown-body .pl-mb {
-  font-weight: bold;
-  color: var(--fgColor-default);
-}
-
-.markdown-body .pl-md {
-  color: var(--md-82071e-3);
-  background-color: var(--md-ffebe9);
-}
-
-.markdown-body .pl-mi1 {
-  color: var(--md-116329-2);
-  background-color: var(--md-dafbe1);
-}
-
-.markdown-body .pl-mc {
-  color: var(--md-953800-2);
-  background-color: var(--md-ffd8b5);
-}
-
-.markdown-body .pl-mi2 {
-  color: var(--md-d1d9e0);
-  background-color: var(--md-0550ae-4);
-}
-
-.markdown-body .pl-mdr {
-  font-weight: bold;
-  color: var(--md-8250df);
-}
-
-.markdown-body .pl-ba {
-  color: var(--fgColor-muted);
-}
-
-.markdown-body .pl-sg {
-  color: var(--md-818b98);
-}
-
-.markdown-body .pl-corl {
-  text-decoration: underline;
-  color: var(--md-0a3069);
-}
-
 .markdown-body [role=button]:focus:not(:focus-visible),
 .markdown-body [role=tabpanel][tabindex="0"]:focus:not(:focus-visible),
 .markdown-body button:focus:not(:focus-visible),
@@ -1154,35 +974,35 @@
 }
 
 .markdown-body .markdown-alert.markdown-alert-important {
-  border-left-color: var(--md-8250df-2);
+  border-left-color: var(--borderColor-done-emphasis, var(--fgColor-done));
 }
 
 .markdown-body .markdown-alert.markdown-alert-important .markdown-alert-title {
-  color: var(--md-8250df-3);
+  color: var(--fgColor-done);
 }
 
 .markdown-body .markdown-alert.markdown-alert-warning {
-  border-left-color: var(--md-9a6700);
+  border-left-color: var(--borderColor-attention-emphasis, var(--fgColor-attention));
 }
 
 .markdown-body .markdown-alert.markdown-alert-warning .markdown-alert-title {
-  color: var(--md-9a6700-2);
+  color: var(--fgColor-attention);
 }
 
 .markdown-body .markdown-alert.markdown-alert-tip {
-  border-left-color: var(--md-1a7f37);
+  border-left-color: var(--borderColor-success-emphasis, var(--fgColor-success));
 }
 
 .markdown-body .markdown-alert.markdown-alert-tip .markdown-alert-title {
-  color: var(--md-1a7f37-2);
+  color: var(--fgColor-success);
 }
 
 .markdown-body .markdown-alert.markdown-alert-caution {
-  border-left-color: var(--md-cf222e-3);
+  border-left-color: var(--borderColor-danger-emphasis, var(--fgColor-danger));
 }
 
 .markdown-body .markdown-alert.markdown-alert-caution .markdown-alert-title {
-  color: var(--md-d1242f);
+  color: var(--fgColor-danger);
 }
 
 .markdown-body>*:first-child>.heading-element:first-child {

@@ -13,13 +13,14 @@ import (
 
 const builtinTheme = "github"
 
-// builtinThemes lists the themes that come with gh-mini: the default, which
-// adds nothing, and the ones under assets/themes.
+// builtinThemes lists the themes under assets/themes, the default first.
 func builtinThemes() []string {
 	list := []string{builtinTheme}
 	matches, _ := fs.Glob(assets, "assets/themes/*.css")
 	for _, m := range matches {
-		list = append(list, strings.TrimSuffix(path.Base(m), ".css"))
+		if name := strings.TrimSuffix(path.Base(m), ".css"); name != builtinTheme {
+			list = append(list, name)
+		}
 	}
 	return list
 }
@@ -43,12 +44,12 @@ func (s *Server) themes() []string {
 
 // serveTheme serves a theme's CSS, read on every request so that editing a
 // theme shows on the next reload. The viewer's own theme wins over a
-// built-in one of the same name, and the default theme adds nothing.
+// built-in one of the same name.
 func (s *Server) serveTheme(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	name := strings.TrimSuffix(path.Base(r.URL.Path), ".css")
-	if name == builtinTheme || strings.ContainsAny(name, `/\`) {
+	if strings.ContainsAny(name, `/\`) {
 		return
 	}
 	if s.opts.ThemesDir != "" {

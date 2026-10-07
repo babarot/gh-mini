@@ -1,0 +1,19 @@
+/*
+ * GitHub. The base colors are the defaults in markdown.css; this sets the
+ * ones GitHub does not derive from them.
+ */
+:root[data-mode="light"] {
+  --borderColor-success-emphasis: #1a7f37;
+  --borderColor-attention-emphasis: #9a6700;
+  --borderColor-danger-emphasis: #cf222e;
+  --borderColor-done-emphasis: #8250df;
+  --bgColor-attention-muted: #fff8c5;
+}
+
+:root[data-mode="dark"] {
+  --borderColor-success-emphasis: #238636;
+  --borderColor-attention-emphasis: #9e6a03;
+  --borderColor-danger-emphasis: #da3633;
+  --borderColor-done-emphasis: #8957e5;
+  --bgColor-attention-muted: #bb800926;
+}

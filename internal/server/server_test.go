@@ -152,3 +152,38 @@ func TestRenderCodeLexer(t *testing.T) {
 		}
 	}
 }
+
+func TestChromaCSSSyntaxVars(t *testing.T) {
+	css := chromaCSS()
+	for _, want := range []string{
+		// Each mode keeps GitHub's color as the fallback
+		".chroma .k { color: var(--syntax-keyword, #cf222e) }",
+		".chroma .k { color: var(--syntax-keyword, #ff7b72) }",
+		".chroma .c1 { color: var(--syntax-comment, #57606a) }",
+		// Inserted and deleted lines read a variable for the background too
+		".chroma .gi { color: var(--syntax-inserted, #116329); background-color: var(--syntax-inserted-bg, #dafbe1) }",
+		".chroma .gd { color: var(--syntax-deleted, #ffa198); background-color: var(--syntax-deleted-bg, #490202) }",
+		// Plain text takes the page's text color
+		".chroma .p { color: var(--fgColor-default) }",
+		// The block takes the page's colors from markdown.css
+		".chroma { -webkit-text-size-adjust: none; }",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("chromaCSS() does not contain %q", want)
+		}
+	}
+	if strings.Contains(css, "#0d1117") {
+		t.Error("chromaCSS() has github-dark's background")
+	}
+}
+
+// Every color in markdown.css has a name a theme can set.
+func TestMarkdownCSSNamedColors(t *testing.T) {
+	b, err := assets.ReadFile("assets/markdown.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "--md-") {
+		t.Error("markdown.css has unnamed --md-* colors")
+	}
+}

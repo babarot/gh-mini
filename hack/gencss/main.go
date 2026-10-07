@@ -19,10 +19,10 @@ import (
 
 var colorRe = regexp.MustCompile(`#[0-9a-fA-F]{3,8}\b`)
 
-// Names for the colors a theme is most likely to change, by their light and
-// dark values: the same light color can stand for different things, such as
-// #f6f8fa for the muted background and for a syntax color. The rest are
-// named after their light value.
+// Names for the colors, by their light and dark values: the same light color
+// can stand for different things, such as #0969da for the accent and for the
+// focus ring. Every color must have a name, so that a new color upstream is
+// named before it reaches a theme.
 var names = map[[2]string]string{
 	{"#1f2328", "#f0f6fc"}:     "fgColor-default",
 	{"#ffffff", "#0d1117"}:     "bgColor-default",
@@ -33,14 +33,38 @@ var names = map[[2]string]string{
 	{"#d1d9e0", "#3d444d"}:     "borderColor-default",
 	{"#d1d9e0b3", "#3d444db3"}: "borderColor-muted",
 	{"#818b981f", "#656c7633"}: "bgColor-neutral-muted",
+	{"#1a7f37", "#3fb950"}:     "fgColor-success",
+	{"#9a6700", "#d29922"}:     "fgColor-attention",
+	{"#d1242f", "#f85149"}:     "fgColor-danger",
+	{"#8250df", "#ab7df8"}:     "fgColor-done",
+	{"#1a7f37", "#238636"}:     "borderColor-success-emphasis",
+	{"#9a6700", "#9e6a03"}:     "borderColor-attention-emphasis",
+	{"#cf222e", "#da3633"}:     "borderColor-danger-emphasis",
+	{"#8250df", "#8957e5"}:     "borderColor-done-emphasis",
+	{"#fff8c5", "#bb800926"}:   "bgColor-attention-muted",
 }
+
+// derived colors are left out of the palettes and fall back to a base color,
+// so that a theme setting only the base color changes them too. GitHub's
+// own values for them are in themes/github.css.
+var derived = map[string]string{
+	"borderColor-success-emphasis":   "var(--fgColor-success)",
+	"borderColor-attention-emphasis": "var(--fgColor-attention)",
+	"borderColor-danger-emphasis":    "var(--fgColor-danger)",
+	"borderColor-done-emphasis":      "var(--fgColor-done)",
+	"bgColor-attention-muted":        "color-mix(in srgb, var(--fgColor-attention) 20%, transparent)",
+}
+
+// deadRule matches a rule for GitHub's syntax classes (.pl-*) or .absent,
+// which gh-mini never emits: code is highlighted by chroma.
+var deadRule = regexp.MustCompile(`(?m)^(?:\.markdown-body (?:\.pl-[\w-]+|\.absent)(?: \.pl-[\w-]+)*(?:,\n| \{))+[^{}]*\}\n+`)
 
 func main() {
 	if len(os.Args) != 4 {
 		log.Fatal("usage: gencss LIGHT DARK OUT")
 	}
-	light := read(os.Args[1])
-	dark := read(os.Args[2])
+	light := deadRule.ReplaceAllString(read(os.Args[1]), "")
+	dark := deadRule.ReplaceAllString(read(os.Args[2]), "")
 
 	lightColors := colorRe.FindAllString(light, -1)
 	darkColors := colorRe.FindAllString(dark, -1)
@@ -55,22 +79,15 @@ func main() {
 	// gets one variable per pair
 	vars := map[string][2]string{}
 	varFor := func(l, d string) string {
-		base, ok := names[[2]string{strings.ToLower(l), strings.ToLower(d)}]
+		name, ok := names[[2]string{strings.ToLower(l), strings.ToLower(d)}]
 		if !ok {
-			base = "md-" + strings.TrimPrefix(strings.ToLower(l), "#")
+			log.Fatalf("no name for the color %s (light) / %s (dark)", l, d)
 		}
-		name := base
-		for i := 2; ; i++ {
-			v, ok := vars[name]
-			if !ok {
-				vars[name] = [2]string{l, d}
-				return name
-			}
-			if v[1] == d {
-				return name
-			}
-			name = fmt.Sprintf("%s-%d", base, i)
+		vars[name] = [2]string{l, d}
+		if fallback, ok := derived[name]; ok {
+			return name + ", " + fallback
 		}
+		return name
 	}
 
 	i := 0
@@ -84,7 +101,9 @@ func main() {
 
 	keys := make([]string, 0, len(vars))
 	for k := range vars {
-		keys = append(keys, k)
+		if _, ok := derived[k]; !ok {
+			keys = append(keys, k)
+		}
 	}
 	sort.Strings(keys)
 

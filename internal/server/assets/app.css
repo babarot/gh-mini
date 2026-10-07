@@ -294,12 +294,12 @@ body.sidebar-hidden .sidebar { display: none; }
 }
 .markdown-body .highlight:hover .copy-btn, .copy-btn:focus-visible, .copy-btn.copied { opacity: 1; }
 .copy-btn:hover { color: var(--fgColor-default); }
-.copy-btn.copied { color: var(--md-1a7f37-2); }
+.copy-btn.copied { color: var(--fgColor-success); }
 
 /* Mermaid diagrams, shown once drawn */
 .markdown-body .mermaid { position: relative; opacity: 0; transition: opacity .15s ease-in; }
 .markdown-body .mermaid.rendered { opacity: 1; }
-.markdown-body .mermaid.mermaid-error { color: var(--md-d1242f); white-space: pre-wrap; }
+.markdown-body .mermaid.mermaid-error { color: var(--fgColor-danger); white-space: pre-wrap; }
 .mermaid-viewport { overflow: hidden; }
 .mermaid-viewport svg { display: block; margin: 0 auto; }
 .mermaid-controls {
@@ -338,7 +338,7 @@ body.sidebar-hidden .sidebar { display: none; }
 .code .lntd:first-child a { color: var(--fgColor-muted); padding: 0 10px 0 16px; }
 .code .lntd:first-child a:hover { color: var(--fgColor-default); text-decoration: none; }
 .code .lntd:last-child { padding-left: 6px; width: 100%; }
-.code .lnt:target { background: var(--md-fff8c5); }
+.code .lnt:target { background: var(--bgColor-attention-muted, color-mix(in srgb, var(--fgColor-attention) 20%, transparent)); }
 
 /* Table of contents */
 .toc {

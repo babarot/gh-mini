@@ -76,11 +76,19 @@ Colors are CSS variables, so a theme usually only sets them. Set them under `:ro
 }
 ```
 
-The main variables are `--bgColor-default`, `--bgColor-muted`, `--fgColor-default`, `--fgColor-muted`, `--fgColor-accent`, `--focus-outlineColor` (the ring around a focused or linked-to element) and `--borderColor-default`; the full list is at the top of [markdown.css](internal/server/assets/markdown.css), and the layout ones (`--mini-sidebar-width`, `--mini-content-width`, ...) at the top of [app.css](internal/server/assets/app.css). See [examples/themes/sepia.css](examples/themes/sepia.css), and the built-in themes in [internal/server/assets/themes](internal/server/assets/themes), which also recolor code.
+The variables come in three groups. A theme mostly sets the first; the other two follow it unless set too.
+
+| Group | Variables |
+|---|---|
+| Base | `--bgColor-default`, `--bgColor-muted`, `--bgColor-neutral-muted` (inline code and the selected file), `--fgColor-default`, `--fgColor-muted`, `--fgColor-accent`, `--borderColor-default`, `--borderColor-muted`, `--focus-outlineColor` (the ring around a focused or linked-to element), and `--fgColor-success`, `--fgColor-attention`, `--fgColor-danger`, `--fgColor-done` for alerts and states |
+| Derived | `--borderColor-success-emphasis`, `--borderColor-attention-emphasis`, `--borderColor-danger-emphasis`, `--borderColor-done-emphasis` (alert borders, default: the `--fgColor-*` of the same name) and `--bgColor-attention-muted` (`<mark>` and linked-to lines, default: `--fgColor-attention` at 20%) |
+| Syntax | `--syntax-comment`, `--syntax-keyword`, `--syntax-string`, `--syntax-number`, `--syntax-function`, `--syntax-type`, `--syntax-constant`, `--syntax-tag`, `--syntax-operator`, `--syntax-variable`, `--syntax-inserted`, `--syntax-deleted`, and `--syntax-inserted-bg`, `--syntax-deleted-bg` for the lines' backgrounds (default: GitHub's colors) |
+
+The layout variables (`--mini-sidebar-width`, `--mini-content-width`, ...) are at the top of [app.css](internal/server/assets/app.css). See [examples/themes/sepia.css](examples/themes/sepia.css) and the built-in themes in [internal/server/assets/themes](internal/server/assets/themes).
 
 ## Development
 
-`internal/server/assets/markdown.css` is generated from the vendored github-markdown-css light and dark files, turning their colors into variables:
+`internal/server/assets/markdown.css` is generated from the vendored github-markdown-css light and dark files, turning their colors into the variables above. A color without a name in [hack/gencss](hack/gencss/main.go) stops it:
 
 ```sh
 go run ./hack/gencss internal/server/assets/vendor/github-markdown-light.css \
