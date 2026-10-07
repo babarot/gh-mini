@@ -276,3 +276,20 @@ func TestRunMissingTarget(t *testing.T) {
 		t.Errorf("err = %v, want one for a missing file", err)
 	}
 }
+
+func TestBrowserAddr(t *testing.T) {
+	for addr, want := range map[string]string{
+		"127.0.0.1:6419": "127.0.0.1:6419",
+		"0.0.0.0:6419":   "localhost:6419",
+		"[::]:6419":      "localhost:6419",
+		"[::1]:6419":     "[::1]:6419",
+	} {
+		a, err := net.ResolveTCPAddr("tcp", addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := browserAddr(a); got != want {
+			t.Errorf("browserAddr(%s) = %s, want %s", addr, got, want)
+		}
+	}
+}
