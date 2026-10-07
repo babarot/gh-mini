@@ -13,10 +13,11 @@ It opens `http://localhost:6419/` with:
 - a file tree in the sidebar, with a file finder (press `t`) and a "Markdown only" filter
 - directory pages that list their files and show their README, as GitHub does
 - Markdown rendered as GitHub renders it: alerts, task lists, footnotes, Mermaid, math, emoji, heading anchors, `#123` links to the repository's issues
-- source files highlighted with line numbers you can link to (`#L10`), and a Preview / Code switch for Markdown
+- source files highlighted with line numbers you can link to (`#L10`), and a Preview / Code switch for Markdown and HTML
+- HTML files previewed as a browser shows them, scripts included (see [HTML previews](#html-previews))
 - every file on disk, including what git ignores; those are marked `local`
 - translations side by side: `guide.md` and `guide.ja.md` get a language switch, and a language picked on a README stays picked
-- settings behind the gear button (or press `,`): built-in `github`, `nord` and `tokyo-night` themes or ones you write as CSS, and a light, dark or automatic mode. They are kept per browser
+- settings behind the gear button (or press `,`): built-in `github`, `nord` and `tokyo-night` themes or ones you write as CSS, a light, dark or automatic mode, and whether HTML files open as a preview. They are kept per browser
 - live reload of the page you are reading when its file changes. Directories git ignores are watched only while you look at a page in them, so files added there show in the tree later
 
 Rendering uses [goldmark](https://github.com/yuin/goldmark) and the stylesheet of [github-markdown-css](https://github.com/sindresorhus/github-markdown-css).
@@ -37,7 +38,23 @@ go install github.com/babarot/gh-mini@latest
 | `--no-reload` | | Do not reload pages when files change |
 | `--theme` | `$GH_MINI_THEME` | Theme until one is picked in the settings |
 | `--themes` | `~/.config/gh-mini/themes` | Directory of themes |
+| `--preview-port` | a free one | Port HTML previews are served on, printed at start |
 | `--skip` | `.git,node_modules,.DS_Store` | Names left out of the tree |
+
+## HTML previews
+
+An HTML file's Preview shows it as a browser does, with its styles, images and scripts, module scripts and `fetch` included. Turn on HTML preview in the settings to open HTML files that way; the Preview / Code switch works either way.
+
+The preview comes from a second server on its own port, so the file's scripts run in an origin of their own and cannot reach gh-mini's pages. That server answers only the gh-mini pages that show a preview, through a cookie a page on another site cannot send. A path in the file starting with `/` resolves against the directory gh-mini serves.
+
+What a previewed file's scripts can still do, as with `python -m http.server`:
+
+- read the files under the directory gh-mini serves, and send them anywhere
+- read and write the cookies of the host, those of other servers on `localhost` included, but not HttpOnly ones
+
+So preview only files you trust. Through an SSH tunnel, forward the preview port too; set it with `--preview-port`.
+
+Opening an HTML or SVG file raw does not run its scripts.
 
 ## Themes
 
