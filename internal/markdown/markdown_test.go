@@ -274,6 +274,7 @@ func TestInlineDoubleDollarMath(t *testing.T) {
 	for src, want := range map[string]string{
 		"$$x$$ inline start\n":    `<span class="math-inline">\(x\)</span> inline start`,
 		"It costs $$10 or so\n":   "It costs $$10 or so",
+		"$$10 or $$20\n":          "$$10 or $$20",
 		"a $$y^2$$ b and $z$ c\n": `a <span class="math-inline">\(y^2\)</span> b and <span class="math-inline">\(z\)</span> c`,
 	} {
 		out, _ := render(t, "", src)

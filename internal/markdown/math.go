@@ -59,8 +59,13 @@ func (inlineMathParser) Parse(parent ast.Node, block text.Reader, pc parser.Cont
 		return nil
 	}
 	if len(line) > 2 && line[1] == '$' {
+		// As with $, the math may not start or end with a space, nor its
+		// closing be followed by a digit: "$$10 or $$20" is money
 		end := bytes.Index(line[2:], []byte("$$"))
-		if end <= 0 {
+		if end <= 0 || isSpace(line[2]) || isSpace(line[2+end-1]) {
+			return nil
+		}
+		if after := 2 + end + 2; after < len(line) && line[after] >= '0' && line[after] <= '9' {
 			return nil
 		}
 		block.Advance(2 + end + 2)
