@@ -49,7 +49,11 @@ func (s *Server) servePath(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		s.render(w, s.newPage(r, snap, rel, "notfound"))
 	case info.IsDir() && !strings.HasSuffix(r.URL.Path, "/"):
-		http.Redirect(w, r, dirHref(rel), http.StatusMovedPermanently)
+		http.Redirect(w, r, withQuery(dirHref(rel), r), http.StatusMovedPermanently)
+	case !info.IsDir() && strings.HasSuffix(r.URL.Path, "/"):
+		// A file's page at a directory's URL would resolve its relative
+		// links one level too deep
+		http.Redirect(w, r, withQuery(href(rel), r), http.StatusMovedPermanently)
 	case info.IsDir():
 		s.follow(snap, rel, rel)
 		s.serveDir(w, r, snap, rel)
@@ -219,4 +223,13 @@ func countLines(b []byte) int {
 		n++
 	}
 	return n
+}
+
+// withQuery is a URL with the request's query, so that a redirect keeps
+// ?plain=1 and the like.
+func withQuery(u string, r *http.Request) string {
+	if r.URL.RawQuery == "" {
+		return u
+	}
+	return u + "?" + r.URL.RawQuery
 }

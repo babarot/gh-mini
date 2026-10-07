@@ -668,3 +668,17 @@ func TestTreeOfIgnoredDir(t *testing.T) {
 		get(t, h, "/_mini/api/tree?path="+bad).expect(t, http.StatusNotFound)
 	}
 }
+
+func TestHandlerFileWithSlash(t *testing.T) {
+	h := newTestServer(t)
+	for target, want := range map[string]string{
+		"/docs/guide.md/":         "/docs/guide.md",
+		"/docs/guide.md/?plain=1": "/docs/guide.md?plain=1",
+		"/docs?lang=ja":           "/docs/?lang=ja",
+	} {
+		r := get(t, h, target)
+		if r.code != http.StatusMovedPermanently || r.header.Get("Location") != want {
+			t.Errorf("%s: %d to %q, want 301 to %q", target, r.code, r.header.Get("Location"), want)
+		}
+	}
+}
