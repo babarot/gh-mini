@@ -41,11 +41,23 @@ func (s *Server) servePath(w http.ResponseWriter, r *http.Request) {
 	case info.IsDir() && !strings.HasSuffix(r.URL.Path, "/"):
 		http.Redirect(w, r, dirHref(rel), http.StatusMovedPermanently)
 	case info.IsDir():
+		s.follow(snap, rel, rel)
 		s.serveDir(w, r, snap, rel)
 	case wantsRaw(r):
 		s.serveRaw(w, r, rel, info)
 	default:
+		s.follow(snap, rel, path.Dir(rel))
 		s.serveFile(w, r, snap, rel, info)
+	}
+}
+
+// follow makes sure the page of an ignored path reloads when it changes:
+// directories git ignores are only watched while someone looks at them.
+// The directory is watched rather than the file, which editors replace on
+// saving.
+func (s *Server) follow(snap *workspace.Snapshot, rel, dir string) {
+	if s.watcher != nil && snap.Ignored(rel) {
+		s.watcher.WatchDir(dir)
 	}
 }
 

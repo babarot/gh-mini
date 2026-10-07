@@ -329,58 +329,88 @@ func TestHandlerThemes(t *testing.T) {
 	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark">`)
 }
 
-func TestHandlerEvents(t *testing.T) {
-	root, themes := newTestRepo(t)
+// events reads the server's event stream and sends each change on.
+func events(t *testing.T, url string) <-chan change {
+	t.Helper()
+	res, err := http.Get(url + "/_mini/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { res.Body.Close() })
+	sc := bufio.NewScanner(res.Body)
+	if !sc.Scan() || sc.Text() != ": connected" {
+		t.Fatalf("first line = %q", sc.Text())
+	}
+	out := make(chan change, 16)
+	go func() {
+		defer close(out)
+		for sc.Scan() {
+			if data, ok := strings.CutPrefix(sc.Text(), "data: "); ok {
+				var c change
+				if json.Unmarshal([]byte(data), &c) == nil {
+					out <- c
+				}
+			}
+		}
+	}()
+	return out
+}
+
+func newReloadServer(t *testing.T) (root, themes, url string) {
+	t.Helper()
+	root, themes = newTestRepo(t)
 	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git"}, ThemesDir: themes, Reload: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	ts := httptest.NewServer(srv.Handler())
-	defer func() {
+	t.Cleanup(func() {
 		ts.CloseClientConnections()
 		ts.Close()
 		srv.Close()
-	}()
+	})
+	return root, themes, ts.URL
+}
 
-	res, err := http.Get(ts.URL + "/_mini/events")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer res.Body.Close()
-	lines := make(chan string)
-	go func() {
-		sc := bufio.NewScanner(res.Body)
-		for sc.Scan() {
-			lines <- sc.Text()
-		}
-		close(lines)
-	}()
-	if l := <-lines; l != ": connected" {
-		t.Fatalf("first line = %q", l)
-	}
-
-	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Changed\n"))
-	writeFile(t, filepath.Join(themes, "sepia.css"), []byte(":root {}\n"))
+// waitFor collects changes until want returns true for what was collected.
+func waitFor(t *testing.T, ch <-chan change, want func(change) bool) {
+	t.Helper()
 	var got change
 	timeout := time.After(5 * time.Second)
-	for !(got.Theme && slices.Contains(got.Paths, "docs/guide.md")) {
+	for !want(got) {
 		select {
-		case l, ok := <-lines:
+		case c, ok := <-ch:
 			if !ok {
 				t.Fatal("stream closed")
 			}
-			if data, ok := strings.CutPrefix(l, "data: "); ok {
-				var c change
-				if err := json.Unmarshal([]byte(data), &c); err != nil {
-					t.Fatal(err)
-				}
-				got.Theme = got.Theme || c.Theme
-				got.Paths = append(got.Paths, c.Paths...)
-			}
+			got.Theme = got.Theme || c.Theme
+			got.Structure = got.Structure || c.Structure
+			got.Paths = append(got.Paths, c.Paths...)
 		case <-timeout:
-			t.Fatalf("got %+v, want docs/guide.md and the theme", got)
+			t.Fatalf("got %+v", got)
 		}
 	}
+}
+
+func TestHandlerEvents(t *testing.T) {
+	root, themes, url := newReloadServer(t)
+	ch := events(t, url)
+	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Changed\n"))
+	writeFile(t, filepath.Join(themes, "sepia.css"), []byte(":root {}\n"))
+	waitFor(t, ch, func(c change) bool { return c.Theme && slices.Contains(c.Paths, "docs/guide.md") })
+}
+
+// A directory git ignores is watched once its page is looked at.
+func TestHandlerEventsInIgnoredDir(t *testing.T) {
+	root, _, url := newReloadServer(t)
+	ch := events(t, url)
+	res, err := http.Get(url + "/local-only/note.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	writeFile(t, filepath.Join(root, "local-only", "note.md"), []byte("# Changed\n"))
+	waitFor(t, ch, func(c change) bool { return slices.Contains(c.Paths, "local-only/note.md") })
 }
 
 func TestHandlerStaticFiles(t *testing.T) {
