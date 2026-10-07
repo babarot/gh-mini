@@ -7,8 +7,10 @@ import (
 	"embed"
 	"encoding/json"
 	"html/template"
+	"log"
 	"net/http"
 	"path"
+	"slices"
 	"time"
 
 	"github.com/babarot/gh-mini/internal/markdown"
@@ -82,6 +84,12 @@ func New(opts Options) (*Server, error) {
 	}
 	if opts.PreviewPort != 0 {
 		s.previewToken = newPreviewToken()
+	}
+	// A default theme that does not exist would leave pages unstyled
+	// with nothing to say why
+	if opts.Theme != "" && !slices.Contains(s.themes(), opts.Theme) {
+		log.Printf("gh-mini: no theme %q in %s; using %s", opts.Theme, opts.ThemesDir, builtinTheme)
+		s.opts.Theme = ""
 	}
 	if opts.Reload {
 		s.watcher, err = workspace.Watch(ws, opts.ThemesDir, s.notify)
