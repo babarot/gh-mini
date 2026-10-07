@@ -67,14 +67,37 @@ function render() {
   treeEl.innerHTML = listHTML(data.children || []);
 }
 
-// scrollToCurrent centers the current file in the tree. It scrolls the tree
-// alone: scrollIntoView also scrolls the page, by a little more on every
-// load, as the browser restores the scroll position before it runs.
-function scrollToCurrent() {
+// Every page builds the tree anew, so where it was scrolled is kept for the
+// next page of this tab: a file picked in the tree stays where it was
+// clicked. Only when the current file is out of sight, as after following
+// a link or the file finder, does the tree scroll to it.
+const scrollKey = "gh-mini-tree-scroll:" + (body.dataset.name || "");
+
+function keepScroll() {
+  try {
+    // A filtered list is gone on the next page, and so is its position
+    if (filterEl.value.trim()) sessionStorage.removeItem(scrollKey);
+    else sessionStorage.setItem(scrollKey, String(treeEl.scrollTop));
+  } catch (e) {}
+}
+
+function restoreScroll() {
+  try {
+    const top = sessionStorage.getItem(scrollKey);
+    if (top !== null) treeEl.scrollTop = Number(top);
+  } catch (e) {}
+}
+
+// revealCurrent centers the current file in the tree if it is out of
+// sight. It scrolls the tree alone: scrollIntoView would scroll the page
+// too, by a little more on every load.
+function revealCurrent() {
   const el = treeEl.querySelector(".row.current");
   if (!el) return;
-  const top = el.getBoundingClientRect().top - treeEl.getBoundingClientRect().top + treeEl.scrollTop;
-  treeEl.scrollTop = top - (treeEl.clientHeight - el.offsetHeight) / 2;
+  const t = treeEl.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  if (r.top >= t.top && r.bottom <= t.bottom) return;
+  treeEl.scrollTop += r.top - t.top - (treeEl.clientHeight - el.offsetHeight) / 2;
 }
 
 // fetchTree loads the tree, again when files were added or removed.
@@ -146,5 +169,9 @@ export function initTree() {
     save("sidebarHidden", body.classList.contains("sidebar-hidden"));
   });
 
-  fetchTree().then(scrollToCurrent);
+  window.addEventListener("pagehide", keepScroll);
+  fetchTree().then(() => {
+    restoreScroll();
+    revealCurrent();
+  });
 }
