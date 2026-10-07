@@ -7,13 +7,10 @@ import (
 	"embed"
 	"encoding/json"
 	"html/template"
-	"io"
-	"io/fs"
 	"net/http"
 	"path"
 
 	"github.com/babarot/gh-mini/internal/workspace"
-	"github.com/chrishrb/go-grip/defaults"
 	"github.com/yuin/goldmark"
 )
 
@@ -44,6 +41,7 @@ type Server struct {
 	md      goldmark.Markdown
 	tmpl    *template.Template
 	hub     *hub
+	static  *staticFiles
 }
 
 // New opens the root and, when reloading is on, starts watching it.
@@ -67,11 +65,12 @@ func New(opts Options) (*Server, error) {
 		return nil, err
 	}
 	s := &Server{
-		opts: opts,
-		ws:   ws,
-		md:   newMarkdown(ws.Repo()),
-		tmpl: tmpl,
-		hub:  &hub{subs: map[chan change]struct{}{}},
+		opts:   opts,
+		ws:     ws,
+		md:     newMarkdown(ws.Repo()),
+		tmpl:   tmpl,
+		hub:    &hub{subs: map[chan change]struct{}{}},
+		static: newStaticFiles(),
 	}
 	if opts.Reload {
 		s.watcher, err = workspace.Watch(ws, opts.ThemesDir, s.notify)
@@ -95,15 +94,7 @@ func (s *Server) Close() error {
 // to the files under the root.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	static, _ := fs.Sub(assets, "assets")
-	mux.Handle("/_mini/assets/", http.StripPrefix("/_mini/assets/", http.FileServer(http.FS(static))))
-	grip, _ := fs.Sub(defaults.StaticFiles, "static")
-	mux.Handle("/_mini/grip/", http.StripPrefix("/_mini/grip/", http.FileServer(http.FS(grip))))
-	chroma := chromaCSS()
-	mux.HandleFunc("/_mini/chroma.css", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-		io.WriteString(w, chroma)
-	})
+	mux.Handle("/_mini/static/", s.static)
 	mux.HandleFunc("/_mini/theme/", s.serveTheme)
 	mux.HandleFunc("/_mini/api/tree", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

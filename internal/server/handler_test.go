@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -376,5 +377,32 @@ func TestHandlerEvents(t *testing.T) {
 		case <-timeout:
 			t.Fatalf("got %+v, want docs/guide.md and the theme", got)
 		}
+	}
+}
+
+func TestHandlerStaticFiles(t *testing.T) {
+	h := newTestServer(t)
+	page := get(t, h, "/")
+	m := regexp.MustCompile(`href="(/_mini/static/[0-9a-f]{12})/assets/app.css"`).FindStringSubmatch(page.body)
+	if m == nil {
+		t.Fatal("the page does not link a versioned app.css")
+	}
+	prefix := m[1]
+	for _, p := range []string{"/assets/app.css", "/assets/js/main.js", "/assets/js/util.js", "/grip/js/mermaid-init.js", "/chroma.css"} {
+		r := get(t, h, prefix+p)
+		if r.code != http.StatusOK || r.body == "" {
+			t.Errorf("%s: status %d, %d bytes", p, r.code, len(r.body))
+		}
+		if cc := r.header.Get("Cache-Control"); !strings.Contains(cc, "immutable") {
+			t.Errorf("%s: Cache-Control = %q", p, cc)
+		}
+	}
+	old := get(t, h, "/_mini/static/000000000000/assets/app.css")
+	if old.code != http.StatusOK || old.header.Get("Cache-Control") != "no-cache" {
+		t.Errorf("another version: status %d, Cache-Control %q", old.code, old.header.Get("Cache-Control"))
+	}
+	get(t, h, prefix+"/nope/x").expect(t, http.StatusNotFound)
+	if cc := get(t, h, "/_mini/theme/sepia.css").header.Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("theme Cache-Control = %q", cc)
 	}
 }

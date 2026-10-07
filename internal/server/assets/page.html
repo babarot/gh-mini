@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}}</title>
-<link rel="icon" href="/_mini/grip/images/favicon.ico">
+<link rel="icon" href="{{.Static}}/grip/images/favicon.ico">
 <script>
   // Follow the OS until a mode is picked, before anything is painted
   (function () {
@@ -16,20 +16,20 @@
     mq.addEventListener("change", function () { if (root.dataset.auto) apply(); });
   })();
 </script>
-<link rel="stylesheet" href="/_mini/assets/markdown.css">
-<link rel="stylesheet" href="/_mini/chroma.css">
-<link rel="stylesheet" href="/_mini/grip/css/github-clipboard.css">
-<link rel="stylesheet" href="/_mini/grip/css/github-mermaid.css">
-<link rel="stylesheet" href="/_mini/assets/app.css">
+<link rel="stylesheet" href="{{.Static}}/assets/markdown.css">
+<link rel="stylesheet" href="{{.Static}}/chroma.css">
+<link rel="stylesheet" href="{{.Static}}/grip/css/github-clipboard.css">
+<link rel="stylesheet" href="{{.Static}}/grip/css/github-mermaid.css">
+<link rel="stylesheet" href="{{.Static}}/assets/app.css">
 <link rel="stylesheet" id="theme" href="/_mini/theme/{{.Theme}}.css">
-<script src="/_mini/grip/js/clipboard-copy.js" defer></script>
+<script src="{{.Static}}/grip/js/clipboard-copy.js" defer></script>
 {{- if .Markdown}}
-<script src="/_mini/grip/js/mathjax-options.js"></script>
-<script src="/_mini/grip/js/tex-mml-chtml.js" defer></script>
-<script src="/_mini/grip/js/mermaid.min.js" defer></script>
-<script src="/_mini/grip/js/mermaid-init.js" defer></script>
+<script src="{{.Static}}/grip/js/mathjax-options.js"></script>
+<script src="{{.Static}}/grip/js/tex-mml-chtml.js" defer></script>
+<script src="{{.Static}}/grip/js/mermaid.min.js" defer></script>
+<script src="{{.Static}}/grip/js/mermaid-init.js" defer></script>
 {{- end}}
-<script type="module" src="/_mini/assets/js/main.js"></script>
+<script type="module" src="{{.Static}}/assets/js/main.js"></script>
 </head>
 <body data-path="{{.Path}}" data-kind="{{.Kind}}" data-name="{{.Name}}"{{if .Reload}} data-reload="1"{{end}}>
 <script>document.body.dataset.theme = document.documentElement.dataset.mode;</script>

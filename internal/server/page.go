@@ -47,6 +47,8 @@ type layout struct {
 	Theme   string
 	Mode    string
 	Reload  bool
+	// Static is the URL of the server's own files.
+	Static string
 }
 
 func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind string) *page {
@@ -58,6 +60,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 		Theme:  s.currentTheme(r),
 		Mode:   cookie(r, "gh-mini-mode"),
 		Reload: s.opts.Reload,
+		Static: s.static.prefix(),
 	}}
 	if p.Mode != "light" && p.Mode != "dark" {
 		p.Mode = ""
