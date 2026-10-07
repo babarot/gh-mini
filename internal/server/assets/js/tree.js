@@ -28,7 +28,7 @@ function rowHTML(node) {
   const cls = "row" + (node.path === current ? " current" : "");
   const icon = node.dir ? ICON_CHEVRON + ICON_DIR : '<span class="indent"></span>' + ICON_FILE;
   return '<a class="' + cls + '" href="' + href(node.path, node.dir) + '" data-path="' + esc(node.path) + '"' +
-    (node.dir ? ' data-dir="1"' : "") + ">" + icon + '<span class="label">' + esc(node.name) + "</span></a>";
+    (node.dir ? ' data-dir="1"' : "") + ' title="' + esc(node.name) + '">' + icon + '<span class="label">' + esc(node.name) + "</span></a>";
 }
 
 function listHTML(nodes) {
@@ -53,25 +53,65 @@ function flatten(node, out) {
   return out;
 }
 
+// rank orders a file found by the words typed: the name equal to them,
+// starting with them, holding them all, then the path holding them; then
+// shallower paths, then earlier matches. A lower rank comes first.
+function rank(n, q, words) {
+  const name = n.name.toLowerCase();
+  const p = n.path.toLowerCase();
+  const kind = name === q ? 0 : name.startsWith(words[0]) ? 1 : words.every((w) => name.includes(w)) ? 2 : 3;
+  return [kind, n.path.split("/").length, p.indexOf(words[0]), p.length, p];
+}
+
+function before(a, b) {
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  }
+  return 0;
+}
+
+// hits are the files found, and selected the one Enter opens.
+let hits = [];
+let selected = 0;
+
 function render() {
   if (!tree) return;
   const data = mdOnlyEl.checked ? prune(tree) || { children: [] } : tree;
   const q = filterEl.value.trim().toLowerCase();
   if (q) {
     const words = q.split(/\s+/);
-    const hits = flatten(data, []).filter((n) => {
-      const p = n.path.toLowerCase();
-      return words.every((w) => p.indexOf(w) >= 0);
-    }).slice(0, 300);
-    treeEl.innerHTML = hits.length ? "<ul>" + hits.map((n) => {
+    hits = flatten(data, [])
+      .filter((n) => words.every((w) => n.path.toLowerCase().includes(w)))
+      .map((n) => [rank(n, q, words), n])
+      .sort((a, b) => before(a[0], b[0]))
+      .slice(0, 300)
+      .map((x) => x[1]);
+    selected = Math.min(selected, Math.max(hits.length - 1, 0));
+    // The name first, so that a deep path cuts the directory, not it
+    treeEl.innerHTML = hits.length ? "<ul>" + hits.map((n, i) => {
       const d = dirname(n.path);
-      return '<li class="' + (n.ignored ? "ignored" : "") + '"><a class="row' + (n.path === current ? " current" : "") +
-        '" href="' + href(n.path) + '">' + ICON_FILE + '<span class="label">' +
-        (d === "." ? "" : '<span class="dir-path">' + esc(d) + "/</span>") + esc(n.name) + "</span></a></li>";
+      const cls = "row" + (n.path === current ? " current" : "") + (i === selected ? " selected" : "");
+      return '<li class="' + (n.ignored ? "ignored" : "") + '"><a class="' + cls + '" href="' + href(n.path) +
+        '" title="' + esc(n.path) + '">' + ICON_FILE + '<span class="label">' + esc(n.name) +
+        (d === "." ? "" : ' <span class="dir-path">' + esc(d) + "</span>") + "</span></a></li>";
     }).join("") + "</ul>" : '<div class="empty">No matching files</div>';
     return;
   }
+  hits = [];
   treeEl.innerHTML = listHTML(data.children || []);
+}
+
+// select moves the choice among the files found, keeping it in sight.
+function select(i) {
+  if (!hits.length) return;
+  selected = (i + hits.length) % hits.length;
+  const rows = treeEl.querySelectorAll(".row");
+  rows.forEach((r, k) => r.classList.toggle("selected", k === selected));
+  const row = rows[selected];
+  const t = treeEl.getBoundingClientRect();
+  const r = row.getBoundingClientRect();
+  if (r.top < t.top) treeEl.scrollTop -= t.top - r.top;
+  else if (r.bottom > t.bottom) treeEl.scrollTop += r.bottom - t.bottom;
 }
 
 // Every page builds the tree anew, so where it was scrolled is kept for the
@@ -184,11 +224,17 @@ export function initTree() {
     save("open", Array.from(open));
   });
 
-  filterEl.addEventListener("input", render);
+  filterEl.addEventListener("input", () => {
+    selected = 0;
+    render();
+  });
   filterEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const first = treeEl.querySelector(".row");
-      if (first) location.href = first.href;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      select(selected + (e.key === "ArrowDown" ? 1 : -1));
+    } else if (e.key === "Enter") {
+      // Nothing typed, nothing to open
+      if (hits.length) location.href = href(hits[selected].path);
     } else if (e.key === "Escape") {
       filterEl.value = "";
       render();
@@ -207,6 +253,8 @@ export function initTree() {
     if (e.key === "t" || e.key === "/") {
       e.preventDefault();
       body.classList.remove("sidebar-hidden");
+      // A narrow screen shows the tree over the page instead
+      if (window.matchMedia("(max-width: 767px)").matches) body.classList.add("sidebar-shown");
       filterEl.focus();
       filterEl.select();
     }

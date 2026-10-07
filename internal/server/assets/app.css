@@ -139,6 +139,7 @@ body.sidebar-hidden .sidebar { display: none; }
 }
 .tree .row:hover { background: var(--mini-selected); text-decoration: none; }
 .tree .row.current { background: var(--mini-selected); font-weight: 600; }
+.tree .row.selected { outline: 2px solid var(--focus-outlineColor); outline-offset: -2px; }
 .tree .row .chevron { width: 12px; color: var(--fgColor-muted); transition: transform .1s; }
 .tree li.open > .row .chevron { transform: rotate(90deg); }
 .tree li:not(.open) > ul { display: none; }
