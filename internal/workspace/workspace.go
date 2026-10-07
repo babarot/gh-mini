@@ -51,6 +51,11 @@ type Workspace struct {
 	mu    sync.Mutex // serializes rebuilds
 	snap  atomic.Pointer[Snapshot]
 	dirty atomic.Uint32
+	// gen counts invalidations. A snapshot records the one it was built
+	// at, and is current while that is still the count: dirty alone is
+	// cleared when a rebuild starts, and a request then would take the
+	// old snapshot instead of waiting for the new one
+	gen atomic.Uint64
 	// watched is set once a Watcher invalidates the snapshot on changes.
 	// Until then, every Snapshot is rebuilt from scratch.
 	watched atomic.Bool
@@ -71,6 +76,7 @@ type Snapshot struct {
 	// "" when there is none.
 	Repo    string
 	ignored map[string]bool
+	gen     uint64
 	// dirs are the tree's directories by path, "." for the root
 	dirs  map[string]*Node
 	built time.Time
@@ -129,29 +135,38 @@ func (w *Workspace) Invalidate(c Change) {
 		bits |= dirtyGitHead
 	}
 	w.dirty.Or(bits)
+	w.gen.Add(1)
 }
 
 // Snapshot returns the current state, rebuilding the parts that changed.
 func (w *Workspace) Snapshot() *Snapshot {
 	if !w.watched.Load() {
 		if s := w.snap.Load(); s == nil || time.Since(s.built) >= w.opts.MaxAge {
-			w.dirty.Store(dirtyAll)
+			w.Invalidate(Change{Structure: true, GitHead: true})
 		}
 	}
-	if s := w.snap.Load(); s != nil && w.dirty.Load() == 0 {
+	if s := w.snap.Load(); s != nil && s.gen == w.gen.Load() {
 		return s
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	prev := w.snap.Load()
+	// The count is read before the parts to rebuild: an invalidation in
+	// between leaves the new snapshot out of date, to be rebuilt again
+	gen := w.gen.Load()
 	// Another request may have rebuilt it while this one waited
-	bits := w.dirty.Swap(0)
-	if prev != nil && bits == 0 {
+	if prev != nil && prev.gen == gen {
 		return prev
 	}
+	bits := w.dirty.Swap(0)
 	next := &Snapshot{Repo: w.repo}
 	if prev != nil {
 		*next = *prev
+	}
+	next.gen = gen
+	if prev != nil && bits == 0 {
+		w.snap.Store(next)
+		return next
 	}
 	next.Version++
 	next.built = time.Now()
