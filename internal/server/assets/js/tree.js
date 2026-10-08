@@ -292,15 +292,23 @@ export function initTree() {
     setCookie("gh-mini-sidebar", "hidden");
     body.classList.add("sidebar-hidden");
   }
+  const expanded = () => {
+    const narrow = window.matchMedia("(max-width: 767px)").matches;
+    const shown = narrow ? body.classList.contains("sidebar-shown") : !body.classList.contains("sidebar-hidden");
+    toggle.setAttribute("aria-expanded", String(shown));
+  };
   toggle.addEventListener("click", () => {
     if (window.matchMedia("(max-width: 767px)").matches) {
       body.classList.toggle("sidebar-shown");
-      return;
+    } else {
+      const hidden = body.classList.toggle("sidebar-hidden");
+      setCookie("gh-mini-sidebar", hidden ? "hidden" : "shown");
+      save("sidebarHidden", hidden);
     }
-    const hidden = body.classList.toggle("sidebar-hidden");
-    setCookie("gh-mini-sidebar", hidden ? "hidden" : "shown");
-    save("sidebarHidden", hidden);
+    expanded();
   });
+  window.matchMedia("(max-width: 767px)").addEventListener("change", expanded);
+  expanded();
 
   window.addEventListener("pagehide", keepScroll);
   window.addEventListener("pagehide", keepFilter);

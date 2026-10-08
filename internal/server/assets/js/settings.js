@@ -109,14 +109,31 @@ export function initSettings() {
     if (!el) return;
     set(el.dataset.setting, el.type === "checkbox" ? el.checked : el.value);
   });
+  // A group of buttons is one stop of Tab, chosen with the arrow keys, as
+  // radio buttons are
+  const choose = (button) => {
+    for (const b of dialog.querySelectorAll(`button[data-setting="${button.dataset.setting}"]`)) {
+      b.classList.toggle("selected", b === button);
+      b.setAttribute("aria-checked", String(b === button));
+      b.tabIndex = b === button ? 0 : -1;
+    }
+    set(button.dataset.setting, button.dataset.value);
+  };
+  dialog.addEventListener("keydown", (e) => {
+    const button = e.target.closest("button[role=radio]");
+    if (!button) return;
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const group = Array.from(dialog.querySelectorAll(`button[data-setting="${button.dataset.setting}"]`));
+    const next = group[(group.indexOf(button) + step + group.length) % group.length];
+    choose(next);
+    next.focus();
+  });
   dialog.addEventListener("click", (e) => {
     const button = e.target.closest("button[data-setting]");
     if (button) {
-      for (const b of dialog.querySelectorAll(`button[data-setting="${button.dataset.setting}"]`)) {
-        b.classList.toggle("selected", b === button);
-        b.setAttribute("aria-checked", String(b === button));
-      }
-      set(button.dataset.setting, button.dataset.value);
+      choose(button);
       return;
     }
     // A click on the backdrop lands on the dialog itself, outside its box

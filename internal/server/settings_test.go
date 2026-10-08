@@ -78,8 +78,8 @@ func TestSettingsDialog(t *testing.T) {
 		`<dialog class="settings" id="mini.settings"`,
 		`<select data-setting="theme"`,
 		`<option value="sepia" selected>sepia</option>`,
-		`data-setting="mode" data-value="dark" aria-checked="true" class="selected">Dark</button>`,
-		`data-setting="mode" data-value="" aria-checked="false">Auto</button>`,
+		`data-setting="mode" data-value="dark" aria-checked="true" tabindex="0" class="selected">Dark</button>`,
+		`data-setting="mode" data-value="" aria-checked="false" tabindex="-1">Auto</button>`,
 		`<script type="application/json" id="mini.settings-data">{"htmlPreview":"false","mode":"dark","theme":"sepia"}</script>`,
 	)
 	r.reject(t, `id="theme-select"`, `id="mode-select"`)

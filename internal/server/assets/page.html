@@ -22,7 +22,7 @@
 <body data-path="{{.Path}}" data-kind="{{.Kind}}" data-name="{{.Name}}"{{if .Reload}} data-reload="1"{{end}}{{if .SidebarHidden}} class="sidebar-hidden"{{end}}>
 
 <header class="topbar">
-  <button class="icon-btn" id="mini.sidebar-toggle" title="Toggle file tree" aria-label="Toggle file tree">
+  <button class="icon-btn" id="mini.sidebar-toggle" title="Toggle file tree" aria-label="Toggle file tree" aria-controls="mini.sidebar" aria-expanded="{{if .SidebarHidden}}false{{else}}true{{end}}">
     <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"></path></svg>
   </button>
   <a class="repo" href="/">
@@ -66,7 +66,7 @@
     {{- else if eq $s.Control "segmented"}}
     <div class="segmented" role="radiogroup" aria-labelledby="mini.setting-{{$s.Key}}">
       {{- range $s.Options}}
-      <button type="button" role="radio" data-setting="{{$s.Key}}" data-value="{{.Value}}" aria-checked="{{if eq .Value $s.Value}}true{{else}}false{{end}}"{{if eq .Value $s.Value}} class="selected"{{end}}>{{.Label}}</button>
+      <button type="button" role="radio" data-setting="{{$s.Key}}" data-value="{{.Value}}" aria-checked="{{if eq .Value $s.Value}}true{{else}}false{{end}}" tabindex="{{if eq .Value $s.Value}}0{{else}}-1{{end}}"{{if eq .Value $s.Value}} class="selected"{{end}}>{{.Label}}</button>
       {{- end}}
     </div>
     {{- else if eq $s.Control "toggle"}}
@@ -80,7 +80,7 @@
 <div class="layout">
   <aside class="sidebar" id="mini.sidebar">
     <div class="sidebar-tools">
-      <input type="search" id="mini.tree-filter" placeholder="Go to file  (t)" autocomplete="off" spellcheck="false">
+      <input type="search" id="mini.tree-filter" aria-label="Go to file" placeholder="Go to file  (t)" autocomplete="off" spellcheck="false">
       <label class="md-only"><input type="checkbox" id="mini.md-only"> Markdown only</label>
     </div>
     <nav id="mini.tree" class="tree" aria-label="Files"></nav>

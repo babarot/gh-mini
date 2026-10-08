@@ -15,7 +15,7 @@
 <body data-path="docs/guide.ja.md" data-kind="markdown" data-name="repo">
 
 <header class="topbar">
-  <button class="icon-btn" id="mini.sidebar-toggle" title="Toggle file tree" aria-label="Toggle file tree">
+  <button class="icon-btn" id="mini.sidebar-toggle" title="Toggle file tree" aria-label="Toggle file tree" aria-controls="mini.sidebar" aria-expanded="true">
     <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M1 2.75A.75.75 0 0 1 1.75 2h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 2.75Zm0 5A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 7.75ZM1.75 12h12.5a.75.75 0 0 1 0 1.5H1.75a.75.75 0 0 1 0-1.5Z"></path></svg>
   </button>
   <a class="repo" href="/">
@@ -58,9 +58,9 @@
       <div class="setting-description">Auto follows the system</div>
     </div>
     <div class="segmented" role="radiogroup" aria-labelledby="mini.setting-mode">
-      <button type="button" role="radio" data-setting="mode" data-value="" aria-checked="true" class="selected">Auto</button>
-      <button type="button" role="radio" data-setting="mode" data-value="light" aria-checked="false">Light</button>
-      <button type="button" role="radio" data-setting="mode" data-value="dark" aria-checked="false">Dark</button>
+      <button type="button" role="radio" data-setting="mode" data-value="" aria-checked="true" tabindex="0" class="selected">Auto</button>
+      <button type="button" role="radio" data-setting="mode" data-value="light" aria-checked="false" tabindex="-1">Light</button>
+      <button type="button" role="radio" data-setting="mode" data-value="dark" aria-checked="false" tabindex="-1">Dark</button>
     </div>
   </div>
   <div class="setting">
@@ -76,7 +76,7 @@
 <div class="layout">
   <aside class="sidebar" id="mini.sidebar">
     <div class="sidebar-tools">
-      <input type="search" id="mini.tree-filter" placeholder="Go to file  (t)" autocomplete="off" spellcheck="false">
+      <input type="search" id="mini.tree-filter" aria-label="Go to file" placeholder="Go to file  (t)" autocomplete="off" spellcheck="false">
       <label class="md-only"><input type="checkbox" id="mini.md-only"> Markdown only</label>
     </div>
     <nav id="mini.tree" class="tree" aria-label="Files"></nav>
