@@ -8,6 +8,7 @@
   --borderColor-danger-emphasis: #cf222e;
   --borderColor-done-emphasis: #8250df;
   --bgColor-attention-muted: #fff8c5;
+  --mini-folder-color: #54aeff;
 }
 
 :root[data-mode="dark"] {
@@ -16,4 +17,5 @@
   --borderColor-danger-emphasis: #da3633;
   --borderColor-done-emphasis: #8957e5;
   --bgColor-attention-muted: #bb800926;
+  --mini-folder-color: #9198a1;
 }
