@@ -16,6 +16,20 @@ export function initMenu() {
     const item = e.target.closest("[data-open]");
     if (item) open(document.getElementById(item.dataset.open));
   });
+  // As a menu does: the focus goes to its first item, and the arrow keys
+  // move it through them
+  const items = () => Array.from(menu.querySelectorAll("button"));
+  menu.addEventListener("toggle", (e) => {
+    if (e.newState === "open") items()[0]?.focus();
+  });
+  menu.addEventListener("keydown", (e) => {
+    const all = items();
+    const i = all.indexOf(document.activeElement);
+    const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: all.length - 1 }[e.key];
+    if (to === undefined) return;
+    e.preventDefault();
+    all[(to + all.length) % all.length].focus();
+  });
 
   for (const id of ["mini.about", "mini.shortcuts"]) {
     const dialog = document.getElementById(id);
