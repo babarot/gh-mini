@@ -262,6 +262,8 @@ func TestHeadingIDsFromText(t *testing.T) {
 		"## Release :tada:\n":                  `id="release-tada"`,
 		"## Use `go test`\n":                   `id="use-go-test"`,
 		"## 日本語の見出し\n":                         `id="日本語の見出し"`,
+		"## See https://example.com now\n":     `id="see-httpsexamplecom-now"`,
+		"## Mail <a@example.com>\n":            `id="mail-aexamplecom"`,
 	} {
 		out, _ := render(t, src)
 		if !strings.Contains(string(out), want) {

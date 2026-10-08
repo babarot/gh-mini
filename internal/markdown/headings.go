@@ -56,6 +56,10 @@ func nodeText(n ast.Node, src []byte, shortcodes bool) string {
 			}
 		case *ast.String:
 			b.WriteString(html.UnescapeString(string(c.Value)))
+		case *ast.AutoLink:
+			// Its text is its label, not a child
+			b.Write(c.Label(src))
+			return ast.WalkSkipChildren, nil
 		case *emojiast.Emoji:
 			if shortcodes {
 				b.WriteString(":" + string(c.ShortName) + ":")
