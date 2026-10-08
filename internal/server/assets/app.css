@@ -565,7 +565,16 @@ body[data-kind="html"] .main > .box {
 .mermaid-controls .left { grid-area: 2 / 1; }
 .mermaid-controls .right { grid-area: 2 / 3; }
 
-@media print { .copy-btn, .mermaid-controls { display: none; } }
+@media print {
+  .copy-btn, .mermaid-controls { display: none; }
+  /* The file alone, as a document: none of the page around it */
+  .topbar, .sidebar, .toc, .crumbs, .commit, .box-header, .notice, .toc-toggle { display: none !important; }
+  .layout { display: block; }
+  .main { padding: 0; max-width: none; }
+  .box { border: 0; }
+  .markdown-body { padding: 0; }
+  .code .line.selected { background: none; }
+}
 
 .empty { padding: 32px; text-align: center; color: var(--fgColor-muted); }
 .image { padding: 32px; text-align: center; background: var(--bgColor-muted); }
