@@ -133,3 +133,28 @@ func TestHandlerChangesSinceBase(t *testing.T) {
 	t.Cleanup(func() { srv.Close() })
 	get(t, srv.Handler(), "/_mini/changes").reject(t, `aria-label="Since when"`, "Since main")
 }
+
+// Behind the base, the count is in another color, and untracked files left
+// out are left out of the changes since the base too.
+func TestHandlerBranchBehind(t *testing.T) {
+	root, _ := newBranchServer(t, Options{})
+	git(t, root, "checkout", "-q", "-b", "feature")
+	git(t, root, "checkout", "-q", "main")
+	writeFile(t, filepath.Join(root, "main.md"), []byte("# Main\n"))
+	commitAll(t, root, "main moves on")
+	git(t, root, "update-ref", "refs/remotes/origin/main", "HEAD")
+	git(t, root, "checkout", "-q", "feature")
+	writeFile(t, filepath.Join(root, "untracked.md"), []byte("# U\n"))
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { srv.Close() })
+	h := srv.Handler()
+
+	get(t, h, "/").expect(t, 200, `<span data-behind title="Commits behind main" class="behind">↓1</span>`)
+	get(t, h, "/_mini/api/status").expect(t, 200, `"untracked.md":{`, `"base":"main"`)
+	r := get(t, h, "/_mini/api/status", withSettings(`{"untracked":false}`))
+	r.expect(t, 200, `"base":"main"`)
+	r.reject(t, "untracked.md")
+}
