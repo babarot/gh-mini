@@ -26,10 +26,25 @@ const (
 	maxPageLines = 20000
 )
 
+// maxBranchCommits is the most commits since the base the Changes page
+// lists.
+const maxBranchCommits = 100
+
 // changeList is the Changes page: the diffs of the files changed since
-// the last commit.
+// the last commit, or on a branch other than the base, since it left it.
 type changeList struct {
-	// Show is which changes: all, staged, unstaged or untracked
+	// Scope is, on a branch other than the base, which changes: branch,
+	// those since the base, or uncommitted, those since the last commit;
+	// Scopes are the tabs that pick one. Off such a branch it is ""
+	Scope  string
+	Scopes []showTab
+	// BaseRef is the base on origin, such as origin/main, and Commits
+	// the commits since the branch left it, of Ahead in all
+	BaseRef string
+	Commits []*commitView
+	Ahead   int
+	// Show is which changes: all, staged, unstaged or untracked. Since
+	// the base, all are shown, without Tabs to pick
 	Show  string
 	Tabs  []showTab
 	Files []*changedFile
@@ -56,12 +71,16 @@ type changedFile struct {
 	Letter string
 	Label  string
 	// Staged and Unstaged tell which of the two a file has changes in,
-	// when all changes are shown
-	Staged   bool
-	Unstaged bool
-	Added    int
-	Deleted  int
-	Binary   bool
+	// when all changes are shown, and Committed and Uncommitted, since
+	// the base, whether the commits since have changes and the working
+	// tree more
+	Staged      bool
+	Unstaged    bool
+	Committed   bool
+	Uncommitted bool
+	Added       int
+	Deleted     int
+	Binary      bool
 	// Blocks are the five squares of the bar GitHub draws: g added, r
 	// deleted, or neither
 	Blocks []string
@@ -114,6 +133,36 @@ func (s *Server) serveChangesPage(w http.ResponseWriter, r *http.Request) {
 	}
 	v := &changeList{Show: show}
 	p.ChangeList = v
+	// On a branch, the page shows what changed since the base, or since
+	// the last commit as it does on the base. The top bar and the page's
+	// status stay those since the base either way
+	if st.Base != "" {
+		head := s.headStatusFor(snap, p.Settings)
+		v.Scope = "branch"
+		if q.Get("scope") == "uncommitted" {
+			v.Scope = "uncommitted"
+		}
+		v.Scopes = []showTab{
+			{Label: "Since " + st.Base, Href: changesHref("", "all", ""), Count: len(st.Files), Current: v.Scope == "branch"},
+			{Label: "Uncommitted", Href: changesHref("uncommitted", "all", ""), Count: len(head.Files), Current: v.Scope == "uncommitted"},
+		}
+		if v.Scope == "uncommitted" {
+			st = head
+		} else {
+			show, v.Show = "all", "all"
+			v.BaseRef = "origin/" + st.Base
+			if b := s.ws.Branch(); b != nil {
+				v.Ahead = b.Ahead
+			}
+			for _, c := range s.ws.BranchCommits(maxBranchCommits) {
+				cv := s.commitView(&c)
+				if p.Settings["avatars"] == "false" {
+					cv.Avatar = ""
+				}
+				v.Commits = append(v.Commits, cv)
+			}
+		}
+	}
 	var paths []string
 	for _, x := range shows {
 		n := 0
@@ -125,7 +174,9 @@ func (s *Server) serveChangesPage(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		v.Tabs = append(v.Tabs, showTab{Label: x.label, Href: changesHref(x.key, ""), Count: n, Current: x.key == show})
+		if v.Scope != "branch" {
+			v.Tabs = append(v.Tabs, showTab{Label: x.label, Href: changesHref(v.Scope, x.key, ""), Count: n, Current: x.key == show})
+		}
 	}
 	slices.Sort(paths)
 	// One file, folded on the list for its length; it must be one listed,
@@ -138,10 +189,10 @@ func (s *Server) serveChangesPage(w http.ResponseWriter, r *http.Request) {
 		}
 		paths = []string{one}
 		v.One = true
-		v.All = changesHref(show, "")
+		v.All = changesHref(v.Scope, show, "")
 	}
 
-	o := diffOptions{show: show, which: workspace.DiffAll, ignoreSpace: p.Settings["ignoreWhitespace"] == "true"}
+	o := diffOptions{scope: v.Scope, show: show, which: workspace.DiffAll, ignoreSpace: p.Settings["ignoreWhitespace"] == "true"}
 	switch show {
 	case "staged":
 		o.which = workspace.DiffStaged
@@ -169,6 +220,8 @@ func (s *Server) serveChangesPage(w http.ResponseWriter, r *http.Request) {
 
 // diffOptions are what a diff is of, and how it is read.
 type diffOptions struct {
+	// scope is which changes the page shows, as changeList has it
+	scope string
 	// show is which changes are listed, as the Changes page's tabs tell
 	// them, and which the diff they are of
 	show  string
@@ -191,7 +244,10 @@ func (s *Server) changedFile(st *workspace.Status, o diffOptions, rel string, pa
 		Label:  strings.ToUpper(statusLabels[f.Letter][:1]) + statusLabels[f.Letter][1:],
 		Anchor: diffAnchor(rel),
 	}
-	if show == "all" {
+	switch {
+	case st.Base != "":
+		cf.Committed, cf.Uncommitted = f.Committed, f.Uncommitted
+	case show == "all":
 		cf.Staged = inShow(f, "staged")
 		cf.Unstaged = inShow(f, "unstaged")
 	}
@@ -225,7 +281,7 @@ func (s *Server) changedFile(st *workspace.Status, o diffOptions, rel string, pa
 		case len(df.Hunks) == 0:
 			cf.Notice = "Empty file."
 		case fold && (lines > maxDiffLines || lines > *budget):
-			cf.Load = changesHref(show, rel)
+			cf.Load = changesHref(o.scope, show, rel)
 		default:
 			*budget -= lines
 			cf.Diff = s.diffTable(st, which, df)
@@ -256,8 +312,14 @@ func filePathspecs(st *workspace.Status, rel string) []string {
 	return specs
 }
 
-func changesHref(show, file string) string {
+// changesHref is the Changes page of a scope, which shows changes, and
+// one file of them with file. The scope since the base is the page's
+// own, and needs no parameter.
+func changesHref(scope, show, file string) string {
 	q := url.Values{}
+	if scope == "uncommitted" {
+		q.Set("scope", scope)
+	}
 	if show != "all" {
 		q.Set("show", show)
 	}
@@ -362,7 +424,7 @@ func (s *Server) readSides(st *workspace.Status, which string, df *diff.File) si
 		b, ok := s.ws.Blob(st, rev, rel)
 		return b, ok && len(b) <= maxRender
 	}
-	oldRev, newRev := "HEAD", "worktree"
+	oldRev, newRev := st.Rev(), "worktree"
 	switch which {
 	case workspace.DiffStaged:
 		newRev = ""
@@ -482,10 +544,14 @@ func newFileChange(rel string, f *workspace.FileStatus) *fileChange {
 		Added:   f.Added,
 		Deleted: f.Deleted,
 		Binary:  f.Binary,
-		Href:    changesHref("all", "") + "#" + diffAnchor(rel),
+		Href:    changesHref("", "all", "") + "#" + diffAnchor(rel),
 	}
 	staged, unstaged := inShow(f, "staged"), inShow(f, "unstaged")
 	switch {
+	case f.Committed && f.Uncommitted:
+		c.Where = "committed on this branch, and changed since"
+	case f.Committed:
+		c.Where = "committed on this branch"
 	case f.Unmerged:
 		c.Where = "in a merge conflict"
 	case f.X == "?":

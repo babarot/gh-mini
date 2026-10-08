@@ -34,21 +34,24 @@ function icon(name) {
 
 const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
 
-// row is one line of the panel: an icon, what it tells, and a note under.
-function row(iconName, title, note, cls) {
-  return el("div", { class: "branch-row" + (cls ? " " + cls : "") }, icon(iconName),
+// row is one line of the panel: an icon, what it tells, and a note under,
+// leading to a page with href.
+function row(iconName, title, note, cls, href) {
+  const attrs = { class: "branch-row" + (cls ? " " + cls : "") };
+  if (href) attrs.href = href;
+  return el(href ? "a" : "div", attrs, icon(iconName),
     el("span", {}, title, note ? el("small", {}, note) : null));
 }
 
-// standing tells the commits ahead and behind as words.
+// standing tells the commits ahead and behind as words: 2 ahead of main,
+// 1 behind.
 function standing(b) {
-  if (!b.ahead && !b.behind) return el("span", {}, "Same as ", el("b", {}, b.base));
-  const parts = [];
-  if (b.ahead) parts.push(b.ahead + " ahead");
-  if (b.behind) parts.push(el("span", { class: "behind" }, b.behind + " behind"));
-  const out = el("span", {});
-  parts.forEach((p, i) => out.append(...(i ? [", ", p] : [p])));
-  out.append(" ", el("b", {}, b.base));
+  const base = el("b", {}, b.base);
+  if (!b.ahead && !b.behind) return el("span", {}, "Same as ", base);
+  const behind = (text) => el("span", { class: "behind" }, text);
+  if (!b.ahead) return el("span", {}, behind(b.behind + " behind"), " ", base);
+  const out = el("span", {}, b.ahead + " ahead of ", base);
+  if (b.behind) out.append(", ", behind(b.behind + " behind"));
   return out;
 }
 
@@ -61,7 +64,11 @@ function render(b) {
   behind.textContent = "↓" + b.behind;
   behind.classList.toggle("behind", b.behind > 0);
 
-  const rows = [row("branch", standing(b), `Left ${b.base} at ${b.mergeBase}, as of the last fetch`)];
+  // The changes since the base are on the Changes page, unless changes
+  // are not shown
+  const changes = document.getElementById("mini.changes") ? "/_mini/changes" : "";
+  const note = `Left ${b.base} at ${b.mergeBase}, as of the last fetch` + (changes ? ". Show the changes since" : "");
+  const rows = [row("branch", standing(b), note, "", changes)];
   if (!b.detached) {
     if (!b.upstream) rows.push(row("upload", "Not pushed", "No branch on a remote yet"));
     else if (b.unpushed) rows.push(row("upload", plural(b.unpushed, "commit", "commits") + " not pushed", "to " + b.upstream, "attention"));

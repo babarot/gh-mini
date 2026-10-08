@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // BranchInfo is where the branch checked out stands against its base, the
@@ -109,4 +110,33 @@ func (c *branchCache) get(dir string) *BranchInfo {
 		c.key, c.info = key, gitBranchInfo(dir)
 	}
 	return c.info
+}
+
+// BranchCommits lists the commits since the branch left its base, the
+// latest first, as many as limit, each telling whether a remote branch
+// has it.
+func (w *Workspace) BranchCommits(limit int) []Commit {
+	b := w.Branch()
+	if b == nil || b.OnBase {
+		return nil
+	}
+	dir := w.opts.Root
+	out := gitOutput(dir, "log", "-n", strconv.Itoa(limit), "--format=%H%x00%an%x00%ae%x00%at%x00%s", b.mergeBase+"..HEAD")
+	if out == "" {
+		return nil
+	}
+	unpushed := map[string]bool{}
+	for _, sha := range strings.Fields(gitOutput(dir, "rev-list", b.mergeBase+"..HEAD", "--not", "--remotes")) {
+		unpushed[sha] = true
+	}
+	var commits []Commit
+	for _, line := range strings.Split(out, "\n") {
+		f := strings.SplitN(line, "\x00", 5)
+		if len(f) != 5 {
+			continue
+		}
+		sec, _ := strconv.ParseInt(f[3], 10, 64)
+		commits = append(commits, Commit{SHA: f[0], Author: f[1], Email: f[2], Time: time.Unix(sec, 0), Subject: f[4], Pushed: !unpushed[f[0]]})
+	}
+	return commits
 }

@@ -50,7 +50,7 @@
   {{- end}}
   {{- end}}
   {{- with .Changes}}
-  <a class="changes" id="mini.changes" href="/_mini/changes" title="Uncommitted changes"{{if not .Files}} hidden{{end}}{{if eq $.Kind "changes"}} aria-current="page"{{end}}>
+  <a class="changes" id="mini.changes" href="/_mini/changes" title="{{if .Base}}Changes since {{.Base}}{{else}}Uncommitted changes{{end}}"{{if not .Files}} hidden{{end}}{{if eq $.Kind "changes"}} aria-current="page"{{end}}>
     <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M1 1.75C1 .784 1.784 0 2.75 0h7.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 15H2.75A1.75 1.75 0 0 1 1 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073ZM8 3.25a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0V7h-1.5a.75.75 0 0 1 0-1.5h1.5V4A.75.75 0 0 1 8 3.25Zm-3 8a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z"></path></svg>
     <span data-files>{{.Files}} {{if eq .Files 1}}change{{else}}changes{{end}}</span>
     <span class="added" data-added>+{{.Added}}</span>
@@ -287,18 +287,59 @@
     {{- with .ChangeList}}
     <div class="changes-head">
       <h2>Changes</h2>
-      <span class="meta">{{if eq .Show "unstaged"}}the working tree against the index{{else if eq .Show "staged"}}the index against the last commit{{else}}the working tree against the last commit{{end}}</span>
+      <span class="meta">{{if eq .Scope "branch"}}the working tree against where the branch left {{.BaseRef}}{{else if eq .Show "unstaged"}}the working tree against the index{{else if eq .Show "staged"}}the index against the last commit{{else}}the working tree against the last commit{{end}}</span>
     </div>
     <div class="changes-toolbar">
-      <div class="segmented" aria-label="Which changes">
-        {{- range .Tabs}}
+      {{- with .Scopes}}
+      <div class="segmented" aria-label="Since when">
+        {{- range .}}
         <a href="{{.Href}}"{{if .Current}} class="selected" aria-current="page"{{end}}>{{.Label}} <span class="counter">{{.Count}}</span></a>
         {{- end}}
       </div>
+      {{- end}}
+      {{- with .Tabs}}
+      <div class="segmented" aria-label="Which changes">
+        {{- range .}}
+        <a href="{{.Href}}"{{if .Current}} class="selected" aria-current="page"{{end}}>{{.Label}} <span class="counter">{{.Count}}</span></a>
+        {{- end}}
+      </div>
+      {{- end}}
       {{- if .One}}
       <a class="link-btn" href="{{.All}}">All changed files</a>
       {{- end}}
     </div>
+    {{- if and .Commits (not .One)}}
+    <div class="box commits">
+      <div class="box-header">
+        <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"></path></svg>
+        <strong>{{.Ahead}} {{if eq .Ahead 1}}commit{{else}}commits{{end}}</strong>
+        <span class="meta">since the branch left {{.BaseRef}}{{if gt .Ahead (len .Commits)}}, the latest {{len .Commits}} listed{{end}}</span>
+      </div>
+      {{- range .Commits}}
+      <div class="commit">
+        {{- with .Avatar}}
+        <img class="avatar" src="{{.}}" alt="" width="20" height="20">
+        {{- end}}
+        <span class="commit-author">{{.Author}}</span>
+        {{- if .URL}}
+        <a class="commit-subject" href="{{.URL}}">{{.Subject}}</a>
+        {{- else}}
+        <span class="commit-subject">{{.Subject}}</span>
+        {{- end}}
+        <span class="spacer"></span>
+        {{- if .Unpushed}}
+        <span class="unpushed" title="No remote branch has it">not pushed</span>
+        {{- end}}
+        {{- if .URL}}
+        <a class="meta commit-sha" href="{{.URL}}">{{.Short}}</a>
+        {{- else}}
+        <span class="meta commit-sha">{{.Short}}</span>
+        {{- end}}
+        <span class="meta" title="{{.Date}}">{{.Ago}}</span>
+      </div>
+      {{- end}}
+    </div>
+    {{- end}}
     {{- if .Files}}
     <p class="changes-summary">{{len .Files}} {{if eq (len .Files) 1}}file{{else}}files{{end}} changed, with <span class="added">{{.Added}} {{if eq .Added 1}}addition{{else}}additions{{end}}</span> and <span class="deleted">{{.Deleted}} {{if eq .Deleted 1}}deletion{{else}}deletions{{end}}</span></p>
     {{- range .Files}}
@@ -309,6 +350,8 @@
         <span class="status-badge">{{.Label}}</span>
         {{- if .Staged}}<span class="stage">staged</span>{{end}}
         {{- if .Unstaged}}<span class="stage">unstaged</span>{{end}}
+        {{- if .Committed}}<span class="stage stage-committed">committed</span>{{end}}
+        {{- if .Uncommitted}}<span class="stage stage-uncommitted">uncommitted</span>{{end}}
         <span class="spacer"></span>
         {{- if .Binary}}
         <span class="meta">binary</span>

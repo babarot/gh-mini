@@ -22,10 +22,7 @@ func (w *Workspace) Diff(st *Status, which string, ignoreSpace bool, paths ...st
 	if !w.git {
 		return nil
 	}
-	base := "HEAD"
-	if !st.head {
-		base = emptyTree
-	}
+	base := st.rev
 	// Paths names are taken literally; the root's own pathspecs keep what
 	// is skipped out
 	args := []string{"--no-optional-locks", "-c", "core.quotePath=false", "-C", w.opts.Root}
@@ -55,10 +52,10 @@ func (w *Workspace) Diff(st *Status, which string, ignoreSpace bool, paths ...st
 	return out
 }
 
-// Blob returns a file under the root as HEAD has it, or as the index has
-// it for rev "".
+// Blob returns a file under the root as a commit has it, such as the one
+// the status compares with, or as the index has it for rev "".
 func (w *Workspace) Blob(st *Status, rev, rel string) ([]byte, bool) {
-	if !w.git || (rev == "HEAD" && !st.head) {
+	if !w.git || rev == emptyTree || (rev == "HEAD" && !st.head) {
 		return nil, false
 	}
 	// ./ makes the path relative to the root rather than the repository

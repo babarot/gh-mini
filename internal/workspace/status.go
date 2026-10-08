@@ -22,7 +22,8 @@ const (
 	maxCountSize = 1 << 20
 )
 
-// Status is what changed in the working tree since HEAD.
+// Status is what changed in the working tree since HEAD, or on a branch,
+// since it left its base: the commits since and what is not committed.
 type Status struct {
 	// Git is false outside a git repository, where nothing is listed.
 	Git   bool                   `json:"git"`
@@ -30,8 +31,19 @@ type Status struct {
 	// Added and Deleted are the lines of all the files.
 	Added   int `json:"added"`
 	Deleted int `json:"deleted"`
+	// Base is the base the changes are counted from, such as "main", or
+	// "" for those since HEAD.
+	Base string `json:"base,omitempty"`
 	// head is set when HEAD has a commit to compare with.
 	head bool
+	// rev is the commit compared with: HEAD, where the branch left the
+	// base, or the empty tree before the first commit
+	rev string
+}
+
+// Rev is the commit the working tree is compared with.
+func (st *Status) Rev() string {
+	return st.rev
 }
 
 // FileStatus is how a file differs from HEAD, as git status tells it.
@@ -56,6 +68,10 @@ type FileStatus struct {
 	Binary  bool `json:"binary,omitempty"`
 	// Uncounted is set on an untracked file whose lines were not counted.
 	Uncounted bool `json:"uncounted,omitempty"`
+	// Committed and Uncommitted tell, of the changes since the base,
+	// whether a commit since has some and the working tree some more.
+	Committed   bool `json:"committed,omitempty"`
+	Uncommitted bool `json:"uncommitted,omitempty"`
 }
 
 // WithoutUntracked is the status with the files git does not track left
@@ -169,12 +185,12 @@ func gitStatus(root, prefix string, skip []string, untracked func(dir string) []
 	}
 
 	st.head = head
-	base := "HEAD"
+	st.rev = "HEAD"
 	if !head {
-		base = emptyTree
+		st.rev = emptyTree
 	}
 	out, err = exec.Command("git", append([]string{"--no-optional-locks", "-C", root,
-		"diff-index", "--numstat", "-z", "-M", "--relative", base, "--"}, specs...)...).Output()
+		"diff-index", "--numstat", "-z", "-M", "--relative", st.rev, "--"}, specs...)...).Output()
 	if err == nil {
 		addNumstat(out, st.Files)
 	}
@@ -185,6 +201,87 @@ func gitStatus(root, prefix string, skip []string, untracked func(dir string) []
 		st.Deleted += f.Deleted
 	}
 	return st
+}
+
+// gitBaseStatus reads what changed under root since the branch left its
+// base at mb, as a pull request shows it: the working tree against mb,
+// with the files git does not track yet. head is what changed since the
+// last commit, which tells the changes not committed. A file committed
+// and then changed back has no change to show, and is not listed.
+func gitBaseStatus(root, base, mb string, skip []string, head *Status) *Status {
+	st := &Status{Git: true, Files: map[string]*FileStatus{}, Base: base, head: true, rev: mb}
+	specs := append([]string{"."}, skipPathspecs(skip)...)
+	git := func(args ...string) ([]byte, error) {
+		return exec.Command("git", append(append([]string{"--no-optional-locks", "-C", root}, args...), append([]string{"--"}, specs...)...)...).Output()
+	}
+	out, err := git("diff-index", "--name-status", "-z", "-M", "--relative", mb)
+	if err != nil {
+		return nil
+	}
+	parseNameStatus(out, st.Files)
+	if out, err := git("diff-index", "--numstat", "-z", "-M", "--relative", mb); err == nil {
+		addNumstat(out, st.Files)
+	}
+	committed := map[string]bool{}
+	if out, err := git("diff-tree", "-r", "--name-only", "-z", "-M", "--relative", mb, "HEAD"); err == nil {
+		for _, p := range strings.Split(string(out), "\x00") {
+			committed[p] = p != ""
+		}
+	}
+	for p, f := range head.Files {
+		if f.X == "?" {
+			c := *f
+			st.Files[p] = &c
+		}
+	}
+	for p, f := range st.Files {
+		f.Committed = committed[p]
+		f.X, f.Y = ".", "."
+		if hf := head.Files[p]; hf != nil {
+			f.X, f.Y, f.Unmerged, f.Uncommitted = hf.X, hf.Y, hf.Unmerged, true
+		}
+		if f.Unmerged {
+			f.Letter = "C"
+		}
+		st.Added += f.Added
+		st.Deleted += f.Deleted
+	}
+	return st
+}
+
+// parseNameStatus reads git diff-index --name-status -z into files, by
+// the letters a file tree shows. A rename or a copy comes with a score,
+// as R100, and the old path before the new.
+func parseNameStatus(out []byte, files map[string]*FileStatus) {
+	recs := strings.Split(string(out), "\x00")
+	for i := 0; i+1 < len(recs); i += 2 {
+		l, p := recs[i], recs[i+1]
+		if l == "" {
+			break
+		}
+		f := &FileStatus{}
+		switch l[0] {
+		case 'R', 'C':
+			if i+2 >= len(recs) {
+				return
+			}
+			f.From, p = p, recs[i+2]
+			i++
+			f.Letter = "R"
+			if l[0] == 'C' {
+				// A copy is a file added
+				f.Letter = "A"
+			}
+		case 'T':
+			f.Letter = "M"
+		case 'A', 'D', 'M':
+			f.Letter = l[:1]
+		default:
+			// U, an unmerged path, which the status tells
+			f.Letter = "M"
+		}
+		files[p] = f
+	}
 }
 
 // parseStatus reads git status --porcelain=v2 -z --branch into files,

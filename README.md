@@ -23,7 +23,7 @@ It opens `http://localhost:6419/` with:
 - HTML files previewed as a browser shows them, scripts included
 - translations side by side, such as `guide.md` and `guide.ja.md`
 - themes, built in or written as CSS, each in light and dark
-- what changed since the last commit, in the tree and as diffs
+- what changed since the last commit, in the tree and as diffs, and on a branch, since it left the default branch
 - live reload when files change
 
 <picture>

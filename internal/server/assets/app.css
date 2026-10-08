@@ -853,6 +853,13 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
 .diff-path { min-width: 0; overflow-wrap: anywhere; font-family: var(--mini-font-mono); font-size: 12px; font-weight: 600; }
 .diff-path .from { font-weight: 400; color: var(--fgColor-muted); }
 .stage { padding: 0 7px; color: var(--fgColor-muted); font-size: 12px; line-height: 18px; border: 1px dashed var(--borderColor-default); border-radius: 2em; }
+.stage-committed { border-style: solid; }
+.stage-uncommitted { color: var(--fgColor-attention); border-color: var(--fgColor-attention); }
+/* The commits since the base, as a pull request lists them */
+.commits .commit { padding: 8px 16px; }
+.commits .commit + .commit { border-top: 1px solid var(--borderColor-muted); }
+.commits .commit-subject { color: var(--fgColor-default); }
+.unpushed { padding: 0 6px; color: var(--fgColor-attention); font-size: 11px; white-space: nowrap; border: 1px dashed currentColor; border-radius: 2em; }
 .diff-stat { font-family: var(--mini-font-mono); font-size: 12px; white-space: nowrap; }
 .blocks { display: inline-flex; gap: 1px; }
 .blocks i { width: 8px; height: 8px; border-radius: 1px; background: var(--bgColor-neutral-muted); }

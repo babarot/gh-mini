@@ -465,7 +465,10 @@ func (w *Watcher) flush(b burst) {
 	// git writes its index for other reasons too, such as a status run
 	// by an editor: only a change of status is told
 	if status {
-		e.Status = w.ws.Snapshot().StatusETag != snap.StatusETag
+		now := w.ws.Snapshot()
+		// What changed since the base changes alone when the base is
+		// merged, or a commit is amended with nothing left uncommitted
+		e.Status = now.StatusETag != snap.StatusETag || now.BaseStatusETag != snap.BaseStatusETag
 	}
 	e.Paths, e.Dirs = limitPaths(snap, b.paths)
 	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.GitHead && !e.Status && !e.Theme && !e.Resync {
