@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,10 +11,13 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/babarot/gh-mini/internal/server"
 	"github.com/babarot/gh-mini/internal/version"
@@ -176,9 +180,12 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	defer srv.Close()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	if pln != nil {
 		go func() {
-			if err := http.Serve(pln, srv.PreviewHandler()); err != nil {
+			if err := serve(ctx, pln, srv.PreviewHandler()); err != nil {
 				fmt.Fprintln(stderr, "gh-mini: HTML previews stopped:", err)
 			}
 		}()
@@ -197,7 +204,35 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if !c.noOpen {
 		openBrowser(url)
 	}
-	return http.Serve(ln, srv.Handler())
+	return serve(ctx, ln, srv.Handler())
+}
+
+// serve serves h on ln until ctx is done, then lets the requests being
+// answered finish. A page's event stream would never finish, so the
+// requests' context is done too.
+func serve(ctx context.Context, ln net.Listener, h http.Handler) error {
+	base, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	hs := &http.Server{
+		Handler: h,
+		// A client sending its headers slowly, or keeping a connection
+		// idle, must not hold the server's connections for good, as on a
+		// LAN with --host 0.0.0.0
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       2 * time.Minute,
+		BaseContext:       func(net.Listener) context.Context { return base },
+	}
+	done := make(chan error, 1)
+	go func() { done <- hs.Serve(ln) }()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+	}
+	cancel()
+	shutdown, stop := context.WithTimeout(context.Background(), 3*time.Second)
+	defer stop()
+	return hs.Shutdown(shutdown)
 }
 
 // resolve returns the directory to serve and the URL path to open.

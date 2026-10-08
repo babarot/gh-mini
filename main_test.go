@@ -1,16 +1,19 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/babarot/gh-mini/internal/version"
 )
@@ -388,5 +391,38 @@ func TestResolveFromHome(t *testing.T) {
 	}
 	if want := filepath.Join(home, "a", "b"); root != want || open != "/c.md" {
 		t.Errorf("got %q, %q, want %q, /c.md", root, open, want)
+	}
+}
+
+// On an interrupt the server stops at once, an open event stream and all.
+func TestServeStops(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	streaming := make(chan struct{})
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		close(streaming)
+		<-r.Context().Done()
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- serve(ctx, ln, h) }()
+	resp, err := http.Get("http://" + ln.Addr().String() + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	<-streaming
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("serve: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("serve waits on the stream")
 	}
 }
