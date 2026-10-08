@@ -53,6 +53,7 @@ go install github.com/babarot/gh-mini@latest
 | `--host` | `localhost` | Address to listen on |
 | `--no-open` | | Do not open the browser |
 | `--no-reload` | | Do not reload pages when files change |
+| `--no-changes` | | Do not read what changed since the last commit |
 | `--theme` | `$GH_MINI_THEME` | Theme until one is picked in the settings |
 | `--theme-dir` | `~/.config/gh-mini/themes` | Directory of themes |
 | `--preview-port` | a free one | Port HTML previews are served on, printed at start |

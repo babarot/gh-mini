@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -83,7 +84,7 @@ func TestSettingsDialog(t *testing.T) {
 		`<option value="sepia" selected>sepia</option>`,
 		`data-setting="mode" data-value="dark" aria-checked="true" tabindex="0" class="selected">Dark</button>`,
 		`data-setting="mode" data-value="" aria-checked="false" tabindex="-1">Auto</button>`,
-		`<script type="application/json" id="mini.settings-data">{"avatars":"true","hideIgnoredDirs":"false","htmlPreview":"false","languageSwitch":"true","mode":"dark","theme":"sepia","wide":"false","wrap":"false"}</script>`,
+		`<script type="application/json" id="mini.settings-data">{"avatars":"true","changedWords":"true","changes":"true","hideIgnoredDirs":"false","htmlPreview":"false","ignoreWhitespace":"false","languageSwitch":"true","mode":"dark","openChanged":"file","theme":"sepia","treeMarks":"letter","untracked":"true","wide":"false","wrap":"false"}</script>`,
 	)
 	r.reject(t, `id="theme-select"`, `id="mode-select"`)
 }
@@ -158,4 +159,81 @@ func TestHideIgnoredDirs(t *testing.T) {
 	if row := get(t, h, "/local-only/").row(t, "sub"); strings.Contains(row, "hideable") {
 		t.Errorf("a directory in an ignored one is marked to hide: %s", row)
 	}
+}
+
+// changedRepo serves a repository with a file modified, one untracked,
+// one deleted and one changed in its whitespace alone.
+func changedRepo(t *testing.T, opts Options) http.Handler {
+	t.Helper()
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "main.go"), []byte("package main\n\nfunc main() { println() }\n"))
+	writeFile(t, filepath.Join(root, "docs", "new.md"), []byte("# New\n"))
+	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("#  Guide\n\n## Install\n"))
+	if err := os.Remove(filepath.Join(root, "docs", "math.md")); err != nil {
+		t.Fatal(err)
+	}
+	opts.Root, opts.Name, opts.ThemesDir = root, "repo", themes
+	opts.Skip = []string{".git", "node_modules"}
+	srv, err := New(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { srv.Close() })
+	return srv.Handler()
+}
+
+// With Changes off, nothing tells what changed.
+func TestSettingChangesOff(t *testing.T) {
+	h := changedRepo(t, Options{})
+	off := withSettings(`{"changes":false}`)
+	r := get(t, h, "/", off)
+	r.reject(t, `id="mini.changes"`, "mini.changed-only", "status-badge")
+	// The settings under it are shown doing nothing
+	r.expect(t, http.StatusOK, `class="setting child disabled" data-parent="changes"`)
+	get(t, h, "/main.go", off).reject(t, "uncommitted", ">Diff")
+	for _, target := range []string{"/_mini/changes", "/docs/math.md"} {
+		if r := get(t, h, target, off); r.code != http.StatusNotFound {
+			t.Errorf("%s: %d", target, r.code)
+		}
+	}
+	get(t, h, "/_mini/api/status", off).expect(t, http.StatusOK, `"files":{}`)
+}
+
+// --no-changes reads nothing from git, and the setting says why it is off.
+func TestNoChangesFlag(t *testing.T) {
+	h := changedRepo(t, Options{NoChanges: true})
+	r := get(t, h, "/")
+	r.reject(t, `id="mini.changes"`)
+	r.expect(t, http.StatusOK, "gh-mini was started with --no-changes", `class="setting child disabled" data-parent="changes"`)
+	get(t, h, "/_mini/api/status").expect(t, http.StatusOK, `"git":false`)
+}
+
+func TestSettingUntracked(t *testing.T) {
+	h := changedRepo(t, Options{})
+	off := withSettings(`{"untracked":false}`)
+	r := get(t, h, "/_mini/api/status", off)
+	r.reject(t, "docs/new.md")
+	r.expect(t, http.StatusOK, "main.go")
+	if on := get(t, h, "/_mini/api/status"); on.header.Get("ETag") == r.header.Get("ETag") {
+		t.Error("the same ETag with untracked files and without")
+	}
+	get(t, h, "/", off).expect(t, http.StatusOK, "3 changes")
+	get(t, h, "/_mini/changes", off).reject(t, "docs/new.md")
+}
+
+func TestSettingIgnoreWhitespace(t *testing.T) {
+	h := changedRepo(t, Options{})
+	get(t, h, "/docs/guide.md?diff=1").expect(t, http.StatusOK, `class="text add"`)
+	get(t, h, "/docs/guide.md?diff=1", withSettings(`{"ignoreWhitespace":true}`)).expect(t, http.StatusOK, "Only whitespace changed.")
+}
+
+func TestSettingOpenChanged(t *testing.T) {
+	h := changedRepo(t, Options{})
+	diff := withSettings(`{"openChanged":"diff"}`)
+	r := get(t, h, "/main.go", diff)
+	r.expect(t, http.StatusOK, `data-kind="diff"`, `href="?diff=0">Code`)
+	get(t, h, "/main.go?diff=0", diff).expect(t, http.StatusOK, `data-kind="code"`)
+	// A file not changed opens as it is
+	get(t, h, "/README.md", diff).expect(t, http.StatusOK, `data-kind="markdown"`)
+	get(t, h, "/main.go").expect(t, http.StatusOK, `data-kind="code"`)
 }

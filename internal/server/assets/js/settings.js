@@ -93,7 +93,32 @@ const appliers = {
     // The server picks the README and the language switch
     if (page.kind === "dir" || /\.(md|markdown|mdx)$/i.test(page.path)) reload();
   },
+  // What changed since the last commit is in what the server renders, all
+  // over the page
+  changes() {
+    reload();
+  },
+  untracked() {
+    reload();
+  },
+  ignoreWhitespace() {
+    if (page.kind === "changes" || page.kind === "diff") reload();
+  },
+  openChanged() {
+    // The server picks the view of a changed file, unless the URL does
+    const q = new URLSearchParams(location.search);
+    if (page.kind !== "dir" && page.kind !== "changes" && !q.has("diff") && !q.has("plain") && !q.has("preview")) reload();
+  },
 };
+
+// enableChildren shows the settings under a toggle as doing something or
+// not, as it is on or off.
+function enableChildren(dialog, key, on) {
+  for (const row of dialog.querySelectorAll(`.setting[data-parent="${key}"]`)) {
+    row.classList.toggle("disabled", !on);
+    row.querySelectorAll("[data-setting]").forEach((el) => { el.disabled = !on; });
+  }
+}
 
 function set(key, value) {
   save({ [key]: value });
@@ -148,6 +173,7 @@ export function initSettings() {
     const el = e.target.closest("[data-setting]");
     if (!el) return;
     set(el.dataset.setting, el.type === "checkbox" ? el.checked : el.value);
+    if (el.type === "checkbox") enableChildren(dialog, el.dataset.setting, el.checked);
   });
   // A group of buttons is one stop of Tab, chosen with the arrow keys, as
   // radio buttons are

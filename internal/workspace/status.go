@@ -58,6 +58,23 @@ type FileStatus struct {
 	Uncounted bool `json:"uncounted,omitempty"`
 }
 
+// WithoutUntracked is the status with the files git does not track left
+// out, and the lines counted without them.
+func (st *Status) WithoutUntracked() *Status {
+	out := *st
+	out.Files = make(map[string]*FileStatus, len(st.Files))
+	out.Added, out.Deleted = 0, 0
+	for p, f := range st.Files {
+		if f.X == "?" {
+			continue
+		}
+		out.Files[p] = f
+		out.Added += f.Added
+		out.Deleted += f.Deleted
+	}
+	return &out
+}
+
 func (f *FileStatus) letter() string {
 	switch {
 	case f.Unmerged:

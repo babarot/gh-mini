@@ -27,6 +27,9 @@ type Options struct {
 	// MaxAge is how long a snapshot is used when no Watcher invalidates
 	// it. Zero rebuilds it every time.
 	MaxAge time.Duration
+	// NoStatus leaves out what changed since the last commit, which is
+	// then never read from git.
+	NoStatus bool
 }
 
 // Change tells which parts of a snapshot are out of date.
@@ -105,7 +108,9 @@ func Open(opts Options) (*Workspace, error) {
 		return nil, err
 	}
 	w := &Workspace{opts: opts, root: root, repo: gitHubRepo(opts.Root)}
-	w.prefix, w.git = gitPrefix(opts.Root)
+	if !opts.NoStatus {
+		w.prefix, w.git = gitPrefix(opts.Root)
+	}
 	w.dirty.Store(dirtyAll)
 	return w, nil
 }

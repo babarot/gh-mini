@@ -16,7 +16,9 @@ const (
 
 // Diff returns the patches of the files changed under the root, or of the
 // files at paths, as git diff gives them. Untracked files are not in it.
-func (w *Workspace) Diff(st *Status, which string, paths ...string) []byte {
+// With ignoreSpace, changes of whitespace alone are left out, as git diff
+// -w leaves them.
+func (w *Workspace) Diff(st *Status, which string, ignoreSpace bool, paths ...string) []byte {
 	if !w.git {
 		return nil
 	}
@@ -35,6 +37,9 @@ func (w *Workspace) Diff(st *Status, which string, paths ...string) []byte {
 	// Plumbing, which reads no diff.* settings of the user's, such as
 	// diff.noprefix
 	diff := []string{"-p", "-M", "--relative", "--no-color", "--no-ext-diff"}
+	if ignoreSpace {
+		diff = append(diff, "--ignore-all-space")
+	}
 	switch which {
 	case DiffStaged:
 		args = append(append(append(args, "diff-index", "--cached"), diff...), base)

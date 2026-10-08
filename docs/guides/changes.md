@@ -37,6 +37,10 @@ A binary file is listed without its diff. A diff longer than 1500 lines, or past
 
 Untracked is not ignored: a file git ignores is marked `local` (see [Files and live reload](files.md)) and is never counted as changed.
 
+## Settings
+
+The Changes section of the settings turns all this off, and tells how it shows: the marks in the tree, whether untracked files count, the words marked in a line, whitespace left out of diffs, and whether a changed file opens at its diff (see [Settings](settings.md)). `--no-changes` keeps gh-mini from reading the changes at all, as for a repository too large for `git status` to be quick.
+
 ## What is counted
 
 The lines are those `git diff HEAD` counts, what is staged and what is not together, and those of untracked files. A binary file is counted as changed, without lines. Of untracked files, the lines of the first 2000 are counted, and none of a file over 1 MB.

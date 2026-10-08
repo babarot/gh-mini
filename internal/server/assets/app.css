@@ -397,6 +397,11 @@ body[data-kind="html"] .main > .box {
 .setting.unavailable .setting-label { color: var(--fgColor-muted); }
 .setting-reason { color: var(--fgColor-attention); font-size: 12px; }
 .setting :disabled { cursor: not-allowed; }
+/* A setting that tells more of the one above it, and does nothing while
+   that is off */
+.setting.child { padding-left: 32px; }
+.setting.disabled .setting-label { color: var(--fgColor-muted); }
+.setting.disabled .setting-description { opacity: .7; }
 
 /* The settings dialog has a page per section, listed on the left */
 .settings:has(.settings-body) { width: min(680px, calc(100vw - 32px)); }
@@ -796,3 +801,11 @@ body[data-kind="html"] .main > .box {
 }
 .uncommitted .octicon { color: var(--mini-status-color); }
 .uncommitted strong { color: var(--mini-status-color); }
+
+/* The marks of changes in the tree, as the viewer likes them */
+[data-treemarks="color"] .tree .status-letter,
+[data-treemarks="none"] .tree .status-letter,
+[data-treemarks="none"] .tree .status-dot,
+[data-treemarks="none"] .tree li:has(> .row.gone) { display: none; }
+[data-treemarks="none"] .tree .row.changed .label { color: inherit; }
+[data-changedwords="false"] .diff mark { background: none; }

@@ -90,7 +90,7 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 			plainReadme = d.Name()
 		}
 	}
-	changed := childStatus(snap.Status, rel)
+	changed := childStatus(p.status, rel)
 	listed := map[string]bool{}
 	for i := range v.Entries {
 		e := &v.Entries[i]

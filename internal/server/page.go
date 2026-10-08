@@ -43,6 +43,9 @@ type page struct {
 	Features markdown.Features
 	// csp is the page's Content-Security-Policy
 	csp string
+	// status is what changed since the last commit as the viewer's
+	// settings show it, nil when nothing is shown
+	status *workspace.Status
 }
 
 // layout is what every page shows around its content.
@@ -89,7 +92,6 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 	p := &page{Kind: kind, csp: s.contentSecurityPolicy(r), layout: layout{
 		Name:     s.opts.Name,
 		Branch:   snap.Branch,
-		Changes:  newChangesView(snap),
 		Path:     rel,
 		Settings: s.settings(r),
 		Reload:   s.opts.Reload,
@@ -107,6 +109,9 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 		full = p.Owner + "/" + p.Repo
 	}
 	p.Title = full
+	var etag string
+	p.status, _, etag = s.statusFor(snap, p.Settings)
+	p.Changes = newChangesView(p.status, etag)
 	p.SettingAttrs = settingAttrs(p.Settings)
 	p.SidebarHidden = cookie(r, sidebarCookie) == "hidden"
 	p.SettingSections = s.settingSections(p.Settings)

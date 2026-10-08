@@ -99,13 +99,13 @@ func inShow(f *workspace.FileStatus, show string) bool {
 func (s *Server) serveChangesPage(w http.ResponseWriter, r *http.Request) {
 	r = s.withSeq(r)
 	snap := s.ws.Snapshot()
-	st := snap.Status
-	if st == nil || !st.Git {
+	p := s.newPage(r, snap, ".", "changes")
+	st := p.status
+	if st == nil {
 		w.WriteHeader(http.StatusNotFound)
 		s.render(w, s.newPage(r, snap, "_mini/changes", "notfound"))
 		return
 	}
-	p := s.newPage(r, snap, ".", "changes")
 	p.Title = "Changes · " + p.Title
 	q := r.URL.Query()
 	show := q.Get("show")
@@ -141,12 +141,12 @@ func (s *Server) serveChangesPage(w http.ResponseWriter, r *http.Request) {
 		v.All = changesHref(show, "")
 	}
 
-	which := workspace.DiffAll
+	o := diffOptions{show: show, which: workspace.DiffAll, ignoreSpace: p.Settings["ignoreWhitespace"] == "true"}
 	switch show {
 	case "staged":
-		which = workspace.DiffStaged
+		o.which = workspace.DiffStaged
 	case "unstaged":
-		which = workspace.DiffUnstaged
+		o.which = workspace.DiffUnstaged
 	}
 	var patches map[string]*diff.File
 	if show != "untracked" {
@@ -154,12 +154,12 @@ func (s *Server) serveChangesPage(w http.ResponseWriter, r *http.Request) {
 		if v.One {
 			specs = filePathspecs(st, paths[0])
 		}
-		patches = s.patchesOf(st, which, specs...)
+		patches = s.patchesOf(st, o, specs...)
 	}
 
 	budget := maxPageLines
 	for _, rel := range paths {
-		cf := s.changedFile(st, show, which, rel, patches, &budget, !v.One)
+		cf := s.changedFile(st, o, rel, patches, &budget, !v.One)
 		v.Added += cf.Added
 		v.Deleted += cf.Deleted
 		v.Files = append(v.Files, cf)
@@ -167,11 +167,22 @@ func (s *Server) serveChangesPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, p)
 }
 
+// diffOptions are what a diff is of, and how it is read.
+type diffOptions struct {
+	// show is which changes are listed, as the Changes page's tabs tell
+	// them, and which the diff they are of
+	show  string
+	which string
+	// ignoreSpace leaves out changes of whitespace alone
+	ignoreSpace bool
+}
+
 // changedFile makes a file's diff, from the patches of the files read
 // from git, or for an untracked one, from the file. budget is how many
 // lines of diffs the page may still show; with fold, a diff past it, or
 // too long, is folded.
-func (s *Server) changedFile(st *workspace.Status, show, which, rel string, patches map[string]*diff.File, budget *int, fold bool) *changedFile {
+func (s *Server) changedFile(st *workspace.Status, o diffOptions, rel string, patches map[string]*diff.File, budget *int, fold bool) *changedFile {
+	show, which := o.show, o.which
 	f := st.Files[rel]
 	cf := &changedFile{
 		Path:   rel,
@@ -192,6 +203,10 @@ func (s *Server) changedFile(st *workspace.Status, show, which, rel string, patc
 		df = s.untrackedPatch(rel, cf)
 	} else if df = patches[rel]; df == nil {
 		cf.Notice = "No change in the content to show."
+		if o.ignoreSpace {
+			// git leaves out a file changed in its whitespace alone
+			cf.Notice = "Only whitespace changed."
+		}
 	}
 	if df != nil {
 		cf.Added, cf.Deleted = df.Stat()
@@ -205,6 +220,8 @@ func (s *Server) changedFile(st *workspace.Status, show, which, rel string, patc
 			cf.Notice = "Binary file not shown."
 		case len(df.Hunks) == 0 && df.OldMode != "":
 			cf.Notice = "File mode changed from " + df.OldMode + " to " + df.NewMode + "."
+		case len(df.Hunks) == 0 && o.ignoreSpace && df.OldPath != "" && df.NewPath != "":
+			cf.Notice = "Only whitespace changed."
 		case len(df.Hunks) == 0:
 			cf.Notice = "Empty file."
 		case fold && (lines > maxDiffLines || lines > *budget):
@@ -220,9 +237,9 @@ func (s *Server) changedFile(st *workspace.Status, show, which, rel string, patc
 
 // patchesOf reads the patches of files from git: those at paths, or with
 // none, all those changed.
-func (s *Server) patchesOf(st *workspace.Status, which string, paths ...string) map[string]*diff.File {
+func (s *Server) patchesOf(st *workspace.Status, o diffOptions, paths ...string) map[string]*diff.File {
 	patches := map[string]*diff.File{}
-	parsed := diff.Parse(s.ws.Diff(st, which, paths...))
+	parsed := diff.Parse(s.ws.Diff(st, o.which, o.ignoreSpace, paths...))
 	for i := range parsed {
 		patches[parsed[i].Path()] = &parsed[i]
 	}
@@ -483,28 +500,39 @@ func newFileChange(rel string, f *workspace.FileStatus) *fileChange {
 	return c
 }
 
-// changeOf is how a file changed since the last commit, or nil.
-func (s *Server) changeOf(snap *workspace.Snapshot, rel string) *workspace.FileStatus {
-	if snap.Status == nil || snap.Ignored(rel) {
+// changeOf is how a file changed since the last commit, as the page
+// shows changes, or nil.
+func changeOf(p *page, snap *workspace.Snapshot, rel string) *workspace.FileStatus {
+	if p.status == nil || snap.Ignored(rel) {
 		return nil
 	}
-	return snap.Status.Files[rel]
+	return p.status.Files[rel]
 }
 
-// diffView tells a request for a changed file's diff.
-func (s *Server) diffView(r *http.Request, snap *workspace.Snapshot, rel string) bool {
-	return r.URL.Query().Get("diff") == "1" && s.changeOf(snap, rel) != nil
+// diffView tells a request for a changed file's diff: asked for, or as
+// the viewer opens changed files, unless another view is asked for.
+func diffView(r *http.Request, p *page, snap *workspace.Snapshot, rel string) bool {
+	if changeOf(p, snap, rel) == nil {
+		return false
+	}
+	q := r.URL.Query()
+	if q.Has("diff") {
+		return q.Get("diff") == "1"
+	}
+	return p.Settings["openChanged"] == "diff" && !q.Has("plain") && !q.Has("preview")
 }
 
 // fileDiff makes a file's page show its diff against the last commit.
-func (s *Server) fileDiff(p *page, st *workspace.Status, rel string) {
+func (s *Server) fileDiff(p *page, rel string) {
 	p.Kind = "diff"
+	st := p.status
+	o := diffOptions{show: "all", which: workspace.DiffAll, ignoreSpace: p.Settings["ignoreWhitespace"] == "true"}
 	var patches map[string]*diff.File
 	if st.Files[rel].X != "?" {
-		patches = s.patchesOf(st, workspace.DiffAll, filePathspecs(st, rel)...)
+		patches = s.patchesOf(st, o, filePathspecs(st, rel)...)
 	}
 	budget := math.MaxInt
-	cf := s.changedFile(st, "all", workspace.DiffAll, rel, patches, &budget, false)
+	cf := s.changedFile(st, o, rel, patches, &budget, false)
 	p.File.Content = cf.Diff
 	if cf.Notice != "" {
 		p.File.Content = template.HTML(`<div class="diff-notice">` + template.HTMLEscapeString(cf.Notice) + `</div>`)
@@ -512,10 +540,16 @@ func (s *Server) fileDiff(p *page, st *workspace.Status, rel string) {
 }
 
 // serveDeleted serves the page of a file deleted since the last commit:
-// its diff, the deletion.
+// its diff, the deletion. It is not found when the page shows no changes.
 func (s *Server) serveDeleted(w http.ResponseWriter, r *http.Request, snap *workspace.Snapshot, rel string) {
 	p := s.newPage(r, snap, rel, "diff")
-	f := snap.Status.Files[rel]
+	f := changeOf(p, snap, rel)
+	if f == nil || f.Letter != "D" {
+		w.WriteHeader(http.StatusNotFound)
+		p.Kind = "notfound"
+		s.render(w, p)
+		return
+	}
 	v := &fileView{Gone: true, Change: newFileChange(rel, f)}
 	p.File = v
 	v.Commit = s.lastCommit(rel)
@@ -523,12 +557,6 @@ func (s *Server) serveDeleted(w http.ResponseWriter, r *http.Request, snap *work
 		v.Commit.Avatar = ""
 	}
 	v.Views = []viewTab{{Label: "Diff", Href: "?diff=1", Current: true, Stat: v.Change}}
-	s.fileDiff(p, snap.Status, rel)
+	s.fileDiff(p, rel)
 	s.render(w, p)
-}
-
-// deleted tells a file deleted since the last commit, which git still has.
-func (s *Server) deleted(snap *workspace.Snapshot, rel string) bool {
-	f := s.changeOf(snap, rel)
-	return f != nil && f.Letter == "D"
 }

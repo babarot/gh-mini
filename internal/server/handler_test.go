@@ -492,7 +492,7 @@ func TestHandlerThemes(t *testing.T) {
 		`href="/_mini/theme/sepia.css"`, `<option value="sepia" selected>`)
 	get(t, h, "/", withCookie("gh-mini-theme", "unknown")).expect(t, http.StatusOK,
 		`href="/_mini/theme/github.css"`)
-	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark" data-wide="false" data-wrap="false" data-hideIgnoredDirs="false">`)
+	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark" data-wide="false" data-wrap="false" data-hideIgnoredDirs="false" data-treeMarks="letter" data-changedWords="true">`)
 }
 
 // A theme of the viewer's own replaces the built-in one of the same name.

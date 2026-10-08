@@ -86,7 +86,8 @@ func (s *Server) servePath(w http.ResponseWriter, r *http.Request) {
 	snap := s.ws.Snapshot()
 	info, err := s.ws.FS().Stat(rel)
 	switch {
-	case err != nil && errors.Is(err, fs.ErrNotExist) && !wantsRaw(r) && s.deleted(snap, rel):
+	case err != nil && errors.Is(err, fs.ErrNotExist) && !wantsRaw(r):
+		// Deleted since the last commit, or not found
 		s.serveDeleted(w, r, snap, rel)
 	case err != nil && !errors.Is(err, fs.ErrPermission):
 		// Missing, or out of the root through a symlink
@@ -205,7 +206,7 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 	if isHTML(rel) && s.opts.PreviewPort != 0 {
 		preview := s.htmlPreview(r, p.Settings)
 		v.Views = []viewTab{{Label: "Preview", Href: "?preview=1", Current: preview}, {Label: "Code", Href: "?plain=1", Current: !preview}}
-		if preview && !s.diffView(r, snap, rel) {
+		if preview && !diffView(r, p, snap, rel) {
 			p.Kind = "html"
 			v.PreviewURL = s.previewURL(r, rel)
 			http.SetCookie(w, &http.Cookie{
@@ -222,17 +223,25 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 	if isMarkdown(rel) {
 		v.Views = []viewTab{{Label: "Preview", Href: "?", Current: !plain}, {Label: "Code", Href: "?plain=1", Current: plain}}
 	}
-	if f := s.changeOf(snap, rel); f != nil {
+	if f := changeOf(p, snap, rel); f != nil {
 		v.Change = newFileChange(rel, f)
 		if len(v.Views) == 0 {
 			v.Views = []viewTab{{Label: "Code", Href: "?", Current: true}}
 		}
 		v.Views = append(v.Views, viewTab{Label: "Diff", Href: "?diff=1", Stat: v.Change})
-		if s.diffView(r, snap, rel) {
+		if p.Settings["openChanged"] == "diff" {
+			// The file's own views must ask for it, or the diff opens
+			for i := range v.Views {
+				if v.Views[i].Href == "?" {
+					v.Views[i].Href = "?diff=0"
+				}
+			}
+		}
+		if diffView(r, p, snap, rel) {
 			for i := range v.Views {
 				v.Views[i].Current = v.Views[i].Label == "Diff"
 			}
-			s.fileDiff(p, snap.Status, rel)
+			s.fileDiff(p, rel)
 			s.render(w, p)
 			return
 		}

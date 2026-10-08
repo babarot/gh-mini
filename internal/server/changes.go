@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/babarot/gh-mini/internal/workspace"
@@ -18,12 +19,27 @@ type changesView struct {
 	ETag string
 }
 
-func newChangesView(snap *workspace.Snapshot) *changesView {
-	st := snap.Status
-	if st == nil || !st.Git {
+func newChangesView(st *workspace.Status, etag string) *changesView {
+	if st == nil {
 		return nil
 	}
-	return &changesView{Files: len(st.Files), Added: st.Added, Deleted: st.Deleted, ETag: strings.Trim(snap.StatusETag, `"`)}
+	return &changesView{Files: len(st.Files), Added: st.Added, Deleted: st.Deleted, ETag: strings.Trim(etag, `"`)}
+}
+
+// statusFor is what changed since the last commit as the viewer's settings
+// show it, encoded, and an ETag of that: nil outside a git repository and
+// with Changes off, and without untracked files when those are left out.
+func (s *Server) statusFor(snap *workspace.Snapshot, settings map[string]string) (*workspace.Status, []byte, string) {
+	st := snap.Status
+	if st == nil || !st.Git || settings["changes"] == "false" {
+		return nil, nil, ""
+	}
+	if settings["untracked"] != "false" {
+		return st, snap.StatusJSON, snap.StatusETag
+	}
+	st = st.WithoutUntracked()
+	b, _ := json.Marshal(st)
+	return st, b, strings.TrimSuffix(snap.StatusETag, `"`) + `-tracked"`
 }
 
 // statusLabels name the letters of workspace.FileStatus.

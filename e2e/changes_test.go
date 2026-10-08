@@ -135,3 +135,25 @@ func TestChangedFilePage(t *testing.T) {
 	run(t, ctx, chromedp.Click(`.tree .row.gone[data-path="b.md"]`, chromedp.ByQuery))
 	waitFor(t, ctx, `document.body.dataset.path === "b.md" && document.querySelector(".diff .text.del")?.textContent.includes("# B")`)
 }
+
+// The settings of Changes: the marks in the tree change at once, and
+// turning Changes off takes it all away, and the settings under it.
+func TestChangesSettings(t *testing.T) {
+	a := newRepoApp(t, map[string]string{"a.md": "# A\n"})
+	a.write("a.md", "# A\n\nOne.\n")
+	ctx := tab(t)
+	open(t, ctx, a.URL("/"))
+	waitFor(t, ctx, `(`+letter+`)("a.md") === "M"`)
+	visible := `(sel) => { const el = document.querySelector(sel); return !!el && getComputedStyle(el).display !== "none" }`
+
+	run(t, ctx, chromedp.KeyEvent(","))
+	waitFor(t, ctx, `document.getElementById("mini.settings").open`)
+	run(t, ctx, chromedp.Click(`[id="mini.settings-tab-changes"]`, chromedp.ByQuery))
+	run(t, ctx, chromedp.Click(`button[data-setting="treeMarks"][data-value="none"]`, chromedp.ByQuery))
+	waitFor(t, ctx, `!(`+visible+`)('.tree .row[data-path="a.md"] .status-letter')`)
+
+	run(t, ctx, chromedp.Click(`input[data-setting="changes"]`, chromedp.ByQuery))
+	waitFor(t, ctx, count+` === null && document.querySelector(".tree .status-letter") === null`)
+	// The page came back with the dialog open, the settings under it off
+	waitFor(t, ctx, `document.getElementById("mini.settings").open && document.querySelector('input[data-setting="untracked"]').disabled`)
+}
