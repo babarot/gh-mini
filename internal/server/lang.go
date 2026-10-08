@@ -139,3 +139,13 @@ func (s *Server) langTabs(rel string) []langTab {
 	})
 	return tabs
 }
+
+// isPlainReadme tells a README that is not Markdown, such as README or
+// README.txt, which GitHub shows too.
+func isPlainReadme(name string) bool {
+	switch strings.ToLower(name) {
+	case "readme", "readme.txt", "readme.rst", "readme.adoc", "readme.org":
+		return true
+	}
+	return false
+}

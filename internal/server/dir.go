@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -41,6 +42,8 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		return
 	}
 	var readmes []string
+	// A README that is not Markdown, shown as text when there is no other
+	var plainReadme string
 	for _, d := range dirents {
 		if s.ws.Skipped(d.Name()) {
 			continue
@@ -63,6 +66,9 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		v.Entries = append(v.Entries, e)
 		if !e.Dir && isReadme(d.Name()) {
 			readmes = append(readmes, d.Name())
+		}
+		if !e.Dir && plainReadme == "" && isPlainReadme(d.Name()) {
+			plainReadme = d.Name()
 		}
 	}
 	sort.SliceStable(v.Entries, func(i, j int) bool {
@@ -96,6 +102,11 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 			if len(v.Langs) < 2 {
 				v.Langs = nil
 			}
+		}
+	} else if plainReadme != "" {
+		if b, err := s.ws.FS().ReadFile(path.Join(rel, plainReadme)); err == nil && isText(b) {
+			v.Readme = plainReadme
+			v.Content = template.HTML("<pre>" + template.HTMLEscapeString(string(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")))) + "</pre>")
 		}
 	}
 	s.render(w, p)

@@ -722,3 +722,20 @@ func TestHandlerPermissionDenied(t *testing.T) {
 	}
 	get(t, h, "/nope.md").expect(t, http.StatusNotFound, `data-kind="notfound"`)
 }
+
+func TestPlainReadme(t *testing.T) {
+	root, _ := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "plain", "README"), []byte("Plain <text>\n"))
+	writeFile(t, filepath.Join(root, "both", "README.txt"), []byte("not this\n"))
+	writeFile(t, filepath.Join(root, "both", "README.md"), []byte("# This\n"))
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+	get(t, h, "/plain/").expect(t, http.StatusOK, `>README</a>`, "<pre>Plain &lt;text&gt;\n</pre>")
+	r := get(t, h, "/both/")
+	r.expect(t, http.StatusOK, `<h1 id="this">This</h1>`)
+	r.reject(t, "not this")
+}
