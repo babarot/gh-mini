@@ -24,6 +24,14 @@ It opens `http://localhost:6419/` with:
 
 ## Install
 
+As a [gh](https://cli.github.com/) extension, run as `gh mini`:
+
+```sh
+gh extension install babarot/gh-mini
+```
+
+Or with Go, run as `gh-mini`:
+
 ```sh
 go install github.com/babarot/gh-mini@latest
 ```
