@@ -38,7 +38,9 @@ function rowHTML(node) {
   const cls = "row" + (node.path === current ? " current" : "");
   const icon = node.dir ? ICON_CHEVRON + ICON_DIR : '<span class="indent"></span>' + ICON_FILE;
   return '<a class="' + cls + '" href="' + href(node.path, node.dir) + '" data-path="' + esc(node.path) + '"' +
-    (node.dir ? ' data-dir="1"' : "") + ' title="' + esc(node.name) + '">' + icon + '<span class="label">' + esc(node.name) + "</span></a>";
+    (node.dir ? ' data-dir="1" aria-expanded="' + open.has(node.path) + '"' : "") +
+    (node.path === current ? ' aria-current="page"' : "") +
+    ' title="' + esc(node.name) + '">' + icon + '<span class="label">' + esc(node.name) + "</span></a>";
 }
 
 function listHTML(nodes, parentIgnored) {
@@ -82,6 +84,15 @@ function before(a, b) {
   return 0;
 }
 
+// fold opens or folds a directory in the tree, reading it first if it
+// came without its entries.
+function fold(path, opening) {
+  if (opening) open.add(path); else open.delete(path);
+  save("open", Array.from(open));
+  const n = find(path);
+  (n && n.lazy && !n.children && opening ? readDir(path) : Promise.resolve()).then(render);
+}
+
 // unpeek puts away the tree shown for the moment, once initTree has run.
 let unpeek = () => {};
 
@@ -89,7 +100,17 @@ let unpeek = () => {};
 let hits = [];
 let selected = 0;
 
+// render draws the tree, or the files found, keeping the focus on the row
+// it was on.
 function render() {
+  const focused = treeEl.contains(document.activeElement) ? document.activeElement.dataset.path : undefined;
+  draw();
+  if (focused === undefined) return;
+  const row = Array.from(treeEl.querySelectorAll(".row")).find((r) => r.dataset.path === focused);
+  if (row) row.focus({ preventScroll: true });
+}
+
+function draw() {
   if (!tree) return;
   const data = mdOnlyEl.checked ? prune(tree) || { children: [] } : tree;
   const q = filterEl.value.trim().toLowerCase();
@@ -107,7 +128,7 @@ function render() {
       const d = dirname(n.path);
       const cls = "row" + (n.path === current ? " current" : "") + (i === selected ? " selected" : "");
       return '<li class="' + (n.ignored ? "ignored" : "") + '"><a class="' + cls + '" href="' + href(n.path) +
-        '" title="' + esc(n.path) + '">' + ICON_FILE + '<span class="label">' + esc(n.name) +
+        '" data-path="' + esc(n.path) + '" title="' + esc(n.path) + '"' + (n.path === current ? ' aria-current="page"' : "") + '>' + ICON_FILE + '<span class="label">' + esc(n.name) +
         (d === "." ? "" : ' <span class="dir-path">' + esc(d) + "</span>") + "</span></a></li>";
     }).join("") + "</ul>" : '<div class="empty">No matching files</div>';
     return;
@@ -255,13 +276,39 @@ export function initTree() {
     const path = row.dataset.path;
     if (e.target.closest(".chevron")) {
       e.preventDefault();
-      if (open.has(path)) open.delete(path); else open.add(path);
-      const n = find(path);
-      (n && n.lazy && !n.children && open.has(path) ? readDir(path) : Promise.resolve()).then(render);
+      fold(path, !open.has(path));
     } else {
       open.add(path);
+      save("open", Array.from(open));
     }
-    save("open", Array.from(open));
+  });
+  // The keys of a tree view: up and down move between the rows, right
+  // opens a directory or moves into it, left folds it or moves out of it
+  treeEl.addEventListener("keydown", (e) => {
+    const row = e.target.closest(".row");
+    if (!row || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    const rows = Array.from(treeEl.querySelectorAll(".row")).filter((r) => r.offsetParent !== null);
+    const i = rows.indexOf(row);
+    const path = row.dataset.path;
+    const go = (r) => { if (r) r.focus(); };
+    switch (e.key) {
+      case "ArrowDown": go(rows[i + 1]); break;
+      case "ArrowUp": go(rows[i - 1]); break;
+      case "Home": go(rows[0]); break;
+      case "End": go(rows[rows.length - 1]); break;
+      case "ArrowRight":
+        if (!row.dataset.dir) return;
+        if (!open.has(path)) fold(path, true);
+        else go(row.parentElement.querySelector(":scope > ul .row"));
+        break;
+      case "ArrowLeft":
+        if (row.dataset.dir && open.has(path)) fold(path, false);
+        else go(row.parentElement.parentElement.closest("li")?.querySelector(":scope > .row"));
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
   });
 
   filterEl.addEventListener("input", () => {
