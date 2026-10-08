@@ -120,6 +120,18 @@ func TestBranchFollowsRefs(t *testing.T) {
 	}
 }
 
+// A fetch writes FETCH_HEAD, and a push packs or moves a branch of origin,
+// whose directory a first fetch may make only after the watch began.
+func TestWatchRefs(t *testing.T) {
+	dir := newRepo(t, "")
+	_, events := startWatch(t, dir)
+	git(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD")
+	write(t, filepath.Join(dir, ".git", "FETCH_HEAD"), "x\n")
+	next(t, events, func(e Event) bool { return e.GitHead })
+	git(t, dir, "pack-refs", "--all")
+	next(t, events, func(e Event) bool { return e.GitHead })
+}
+
 // A fetch writes FETCH_HEAD and moves a branch of origin, in the git
 // directory a worktree shares with its repository.
 func TestWatchRefsOfWorktree(t *testing.T) {

@@ -77,7 +77,10 @@ func TestHandlerBranch(t *testing.T) {
 func TestHandlerEventsHead(t *testing.T) {
 	root, _, url := newReloadServer(t)
 	ch := events(t, url)
+	// As a fetch does: the ref, and FETCH_HEAD, which a first fetch
+	// writes where the watcher looks, though origin's directory is new
 	git(t, root, "update-ref", "refs/remotes/origin/main", "HEAD")
+	writeFile(t, filepath.Join(root, ".git", "FETCH_HEAD"), []byte("x\n"))
 	waitFor(t, ch, func(c change) bool { return c.Head })
 }
 
