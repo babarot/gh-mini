@@ -763,6 +763,56 @@ func TestHandlerDirStatus(t *testing.T) {
 	get(t, h, "/").expect(t, http.StatusOK, `id="mini.changes"`, "3 changes", "mini.changed-only")
 }
 
+func TestHandlerChangesPage(t *testing.T) {
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "main.go"), []byte("package main\n\nfunc main() { println() }\n"))
+	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Guide\n\n## Setup\n"))
+	git(t, root, "add", "docs/guide.md")
+	writeFile(t, filepath.Join(root, "docs", "new.md"), []byte("# New\n<b>"))
+	writeFile(t, filepath.Join(root, "bin.dat"), []byte("a\x00c"))
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git", "node_modules"}, ThemesDir: themes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+
+	r := get(t, h, "/_mini/changes")
+	r.expect(t, http.StatusOK, "4 files changed", "main.go", "docs/guide.md", "docs/new.md", "Binary file not shown.",
+		// Highlighted, the line kept and the one added
+		`<span class="kd">func</span>`, `class="text add"`, `class="text del"`,
+		// Escaped, and without a newline at its end
+		"&lt;b&gt;", `class="no-newline"`,
+		`<span class="stage">staged</span>`)
+	if r := get(t, h, "/_mini/changes?show=staged"); !strings.Contains(r.body, "1 file changed") || strings.Contains(r.body, "main.go") {
+		t.Errorf("staged: %s", r.body[strings.Index(r.body, "changes-summary"):][:200])
+	}
+	get(t, h, "/_mini/changes?show=untracked").expect(t, http.StatusOK, "docs/new.md", "1 file changed")
+	get(t, h, "/_mini/changes?file=main.go").expect(t, http.StatusOK, "1 file changed", "All changed files")
+	// Only a file listed is read
+	if r := get(t, h, "/_mini/changes?file=README.md"); r.code != http.StatusNotFound {
+		t.Errorf("unchanged file: %d", r.code)
+	}
+	if r := get(t, h, "/_mini/changes?file=*.go"); r.code != http.StatusNotFound {
+		t.Errorf("pattern: %d", r.code)
+	}
+}
+
+func TestHandlerChangesPageNotRepository(t *testing.T) {
+	isolateGit(t)
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "a.md"), []byte("# A\n"))
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	if r := get(t, srv.Handler(), "/_mini/changes"); r.code != http.StatusNotFound {
+		t.Errorf("status %d", r.code)
+	}
+	get(t, srv.Handler(), "/").reject(t, `id="mini.changes"`, "mini.changed-only")
+}
+
 func TestHandlerTreeETag(t *testing.T) {
 	root, themes := newTestRepo(t)
 	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git"}, ThemesDir: themes, Reload: true})

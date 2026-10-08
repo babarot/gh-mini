@@ -30,6 +30,8 @@ type Status struct {
 	// Added and Deleted are the lines of all the files.
 	Added   int `json:"added"`
 	Deleted int `json:"deleted"`
+	// head is set when HEAD has a commit to compare with.
+	head bool
 }
 
 // FileStatus is how a file differs from HEAD, as git status tells it.
@@ -149,6 +151,7 @@ func gitStatus(root, prefix string, skip []string, untracked func(dir string) []
 		}
 	}
 
+	st.head = head
 	base := "HEAD"
 	if !head {
 		base = emptyTree

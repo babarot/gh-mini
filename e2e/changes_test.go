@@ -91,3 +91,27 @@ func TestChangesInTree(t *testing.T) {
 	waitFor(t, ctx, count+`.hidden`)
 	waitFor(t, ctx, `document.querySelector(".tree .status-letter") === null`)
 }
+
+// The Changes page follows git: a file staged moves to the staged ones,
+// and a file edited again shows its new lines, though no count changed.
+func TestChangesPage(t *testing.T) {
+	a := newRepoApp(t, map[string]string{"a.md": "# A\n", "b.md": "# B\n"})
+	a.write("a.md", "# A\n\nOne.\n")
+	ctx := tab(t)
+	open(t, ctx, a.URL("/_mini/changes"))
+	subscribed(t, ctx)
+	text := `document.querySelector(".diff-file").textContent`
+	stages := `Array.from(document.querySelectorAll(".diff-file .stage"), (e) => e.textContent).join(",")`
+	waitFor(t, ctx, text+`.includes("One.") && `+stages+` === "unstaged"`)
+
+	a.git("add", "a.md")
+	waitFor(t, ctx, stages+` === "staged"`)
+
+	a.write("a.md", "# A\n\nTwo.\n")
+	waitFor(t, ctx, text+`.includes("Two.") && `+stages+` === "staged,unstaged"`)
+
+	// The count in the top bar leads here
+	open(t, ctx, a.URL("/"))
+	run(t, ctx, chromedp.Click(`#mini\.changes`, chromedp.ByQuery))
+	waitFor(t, ctx, `document.body.dataset.kind === "changes"`)
+}

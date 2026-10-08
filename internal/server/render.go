@@ -52,6 +52,60 @@ func renderCode(name string, src []byte, highlight bool) (template.HTML, error) 
 	return template.HTML(buf.String()), nil
 }
 
+// highlightLines highlights a file line by line, for a diff to show the
+// lines it has: the file is read whole, so that a line in a comment or a
+// string that began above it is colored as one. It is nil when nothing
+// knows the language.
+func highlightLines(name string, src []byte) []template.HTML {
+	lexer := lexers.Match(name)
+	if lexer == nil {
+		lexer = lexers.Analyse(string(src))
+	}
+	if lexer == nil {
+		return nil
+	}
+	it, err := chroma.Coalesce(lexer).Tokenise(nil, string(src))
+	if err != nil {
+		return nil
+	}
+	var lines []template.HTML
+	var b strings.Builder
+	for t := it(); t != chroma.EOF; t = it() {
+		cls := tokenClass(t.Type)
+		for i, part := range strings.Split(t.Value, "\n") {
+			if i > 0 {
+				lines = append(lines, template.HTML(b.String()))
+				b.Reset()
+			}
+			if part == "" {
+				continue
+			}
+			if cls != "" {
+				b.WriteString(`<span class="` + cls + `">`)
+			}
+			b.WriteString(template.HTMLEscapeString(part))
+			if cls != "" {
+				b.WriteString("</span>")
+			}
+		}
+	}
+	if b.Len() > 0 {
+		lines = append(lines, template.HTML(b.String()))
+	}
+	return lines
+}
+
+// tokenClass is the class chroma's HTML gives a token, which chroma.css
+// colors.
+func tokenClass(t chroma.TokenType) string {
+	for ; t != 0; t = t.Parent() {
+		if cls, ok := chroma.StandardTypes[t]; ok {
+			return cls
+		}
+	}
+	return chroma.StandardTypes[t]
+}
+
 // chromaCSS is the highlighting stylesheet for both modes, each nested under
 // the mode it applies to. Its colors follow the theme: the block and plain
 // text take the page's colors, and the kinds of token a theme recolors read

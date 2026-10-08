@@ -103,6 +103,9 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--borderColor-default);
   border-radius: 2em;
 }
+.changes { color: var(--fgColor-default); }
+.changes:hover { text-decoration: none; background: var(--mini-selected); }
+.changes[aria-current="page"] { background: var(--mini-selected); }
 .changes .octicon { color: var(--fgColor-attention); }
 .changes[hidden] { display: none; }
 .branch {
@@ -552,7 +555,7 @@ body[data-kind="html"] .main > .box {
 .files .stat .dot { display: inline-block; margin: 0 2px 1px 0; vertical-align: middle; }
 .files .changed .name a { color: var(--mini-status-color); }
 .files .gone .name a { text-decoration: line-through; }
-.files .status-badge {
+.status-badge {
   padding: 0 7px;
   color: var(--mini-status-color);
   font-size: 12px;
@@ -725,3 +728,54 @@ body[data-kind="html"] .main > .box {
 :root[data-mode="dark"] .markdown-body img[src$="#gh-light-mode-only"] {
   display: none;
 }
+
+/* The Changes page: the diffs of the files changed since the last commit,
+   each folded by its header, as GitHub's pull requests show them */
+.changes-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.changes-head h2 { margin: 0; font-size: 20px; }
+.changes-toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+.changes-summary { margin: 0 0 16px; color: var(--fgColor-muted); }
+.counter {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 2em;
+  background: var(--bgColor-neutral-muted);
+  font-variant-numeric: tabular-nums;
+}
+.diff-file > summary { gap: 8px; cursor: pointer; list-style: none; }
+.diff-file > summary::-webkit-details-marker { display: none; }
+.diff-file > summary .chevron { color: var(--fgColor-muted); transition: transform .1s; }
+.diff-file[open] > summary .chevron { transform: rotate(90deg); }
+.diff-file:not([open]) > summary { border-bottom: 0; }
+.diff-path { min-width: 0; overflow-wrap: anywhere; font-family: var(--mini-font-mono); font-size: 12px; font-weight: 600; }
+.diff-path .from { font-weight: 400; color: var(--fgColor-muted); }
+.stage { padding: 0 7px; color: var(--fgColor-muted); font-size: 12px; line-height: 18px; border: 1px dashed var(--borderColor-default); border-radius: 2em; }
+.diff-stat { font-family: var(--mini-font-mono); font-size: 12px; white-space: nowrap; }
+.blocks { display: inline-flex; gap: 1px; }
+.blocks i { width: 8px; height: 8px; border-radius: 1px; background: var(--bgColor-neutral-muted); }
+.blocks i.g { background: var(--fgColor-success); }
+.blocks i.r { background: var(--fgColor-danger); }
+.diff-notice { padding: 16px; color: var(--fgColor-muted); text-align: center; }
+.diff-scroll { overflow-x: auto; }
+.diff {
+  --mini-diff-add: color-mix(in srgb, var(--fgColor-success) 15%, transparent);
+  --mini-diff-del: color-mix(in srgb, var(--fgColor-danger) 15%, transparent);
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mini-font-mono);
+  font-size: 12px;
+  line-height: 20px;
+  tab-size: 4;
+}
+.diff td { padding: 0 10px; vertical-align: top; }
+.diff .num { width: 1%; min-width: 40px; color: var(--fgColor-muted); text-align: right; white-space: nowrap; user-select: none; }
+.diff .text { white-space: pre; }
+[data-wrap="true"] .diff .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff .sign { display: inline-block; width: 1.2em; color: var(--fgColor-muted); user-select: none; }
+.diff .hunk td { color: var(--fgColor-muted); background: color-mix(in srgb, var(--fgColor-accent) 10%, transparent); }
+.diff .add { background: var(--mini-diff-add); }
+.diff .del { background: var(--mini-diff-del); }
+.diff .num.add { background: color-mix(in srgb, var(--fgColor-success) 25%, transparent); }
+.diff .num.del { background: color-mix(in srgb, var(--fgColor-danger) 25%, transparent); }
+.diff .no-newline { margin-left: 4px; color: var(--fgColor-danger); user-select: none; }

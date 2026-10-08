@@ -145,6 +145,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/_mini/theme/", s.serveTheme)
 	mux.HandleFunc("/_mini/api/tree", s.serveTree)
 	mux.HandleFunc("/_mini/api/status", s.serveStatus)
+	mux.HandleFunc("/_mini/changes", s.serveChangesPage)
 	mux.HandleFunc("/_mini/events", s.serveEvents)
 	mux.HandleFunc("/_mini/api/changes", s.serveChanges)
 	mux.HandleFunc("/", s.servePath)

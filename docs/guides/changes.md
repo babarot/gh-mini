@@ -4,7 +4,7 @@ When the directory served is in a git repository, gh-mini shows what changed sin
 
 ## Where they show
 
-The top bar counts the files changed and the lines added and removed, next to the branch. It is gone while nothing is changed.
+The top bar counts the files changed and the lines added and removed, next to the branch, and leads to the Changes page below. It is gone while nothing is changed.
 
 In the tree, a letter after a file's name tells how it changed, and the name takes its color:
 
@@ -20,6 +20,14 @@ In the tree, a letter after a file's name tells how it changed, and the name tak
 A directory with changes under it has a dot, so that a folded one tells where to look. "Changed only" leaves the tree with only the changed files, and opens the directories that hold them.
 
 A directory's page tells how many lines each file changed, and for a directory, those of the files under it. A deleted file stays listed, struck through, until the deletion is committed.
+
+## The Changes page
+
+The count in the top bar leads to the Changes page, `/_mini/changes`, which shows the diff of every file changed, as a pull request on GitHub does: highlighted, with the lines' numbers before and after. A file's header folds it, tells how many lines it changed, and leads to its page.
+
+All shows everything changed since the last commit. Staged and Unstaged show the two parts of it, what `git diff --cached` and `git diff` show, and Untracked the files git does not track. A file changed in both is tagged staged and unstaged.
+
+A binary file is listed without its diff. A diff longer than 1500 lines, or past 20000 lines on the page, is folded, and shown on a page of its own when opened. The page follows the files and git as the tree does.
 
 Untracked is not ignored: a file git ignores is marked `local` (see [Files and live reload](files.md)) and is never counted as changed.
 

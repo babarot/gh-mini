@@ -40,12 +40,12 @@
   </span>
   {{- end}}
   {{- with .Changes}}
-  <span class="changes" id="mini.changes" title="Uncommitted changes"{{if not .Files}} hidden{{end}}>
+  <a class="changes" id="mini.changes" href="/_mini/changes" title="Uncommitted changes"{{if not .Files}} hidden{{end}}{{if eq $.Kind "changes"}} aria-current="page"{{end}}>
     <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M1 1.75C1 .784 1.784 0 2.75 0h7.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 15H2.75A1.75 1.75 0 0 1 1 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073ZM8 3.25a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0V7h-1.5a.75.75 0 0 1 0-1.5h1.5V4A.75.75 0 0 1 8 3.25Zm-3 8a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z"></path></svg>
     <span data-files>{{.Files}} {{if eq .Files 1}}change{{else}}changes{{end}}</span>
     <span class="added" data-added>+{{.Added}}</span>
     <span class="deleted" data-deleted>−{{.Deleted}}</span>
-  </span>
+  </a>
   {{- end}}
   <span class="spacer"></span>
   <button class="icon-btn" id="mini.menu-open" title="Menu" aria-label="Menu" popovertarget="mini.menu">
@@ -257,6 +257,56 @@
       </div>
       <article class="markdown-body">{{.Content}}</article>
     </div>
+    {{- end}}
+    {{- end}}
+
+    {{- with .ChangeList}}
+    <div class="changes-head">
+      <h2>Changes</h2>
+      <span class="meta">{{if eq .Show "unstaged"}}the working tree against the index{{else if eq .Show "staged"}}the index against the last commit{{else}}the working tree against the last commit{{end}}</span>
+    </div>
+    <div class="changes-toolbar">
+      <div class="segmented" aria-label="Which changes">
+        {{- range .Tabs}}
+        <a href="{{.Href}}"{{if .Current}} class="selected" aria-current="page"{{end}}>{{.Label}} <span class="counter">{{.Count}}</span></a>
+        {{- end}}
+      </div>
+      {{- if .One}}
+      <a class="link-btn" href="{{.All}}">All changed files</a>
+      {{- end}}
+    </div>
+    {{- if .Files}}
+    <p class="changes-summary">{{len .Files}} {{if eq (len .Files) 1}}file{{else}}files{{end}} changed, with <span class="added">{{.Added}} {{if eq .Added 1}}addition{{else}}additions{{end}}</span> and <span class="deleted">{{.Deleted}} {{if eq .Deleted 1}}deletion{{else}}deletions{{end}}</span></p>
+    {{- range .Files}}
+    <details class="box diff-file s-{{.Letter}}" id="{{.Anchor}}"{{if not .Load}} open{{end}}>
+      <summary class="box-header">
+        <svg class="octicon chevron" viewBox="0 0 16 16" width="16" height="16"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"></path></svg>
+        <span class="diff-path">{{with .From}}<span class="from">{{.}} → </span>{{end}}{{.Path}}</span>
+        <span class="status-badge">{{.Label}}</span>
+        {{- if .Staged}}<span class="stage">staged</span>{{end}}
+        {{- if .Unstaged}}<span class="stage">unstaged</span>{{end}}
+        <span class="spacer"></span>
+        {{- if .Binary}}
+        <span class="meta">binary</span>
+        {{- else}}
+        <span class="diff-stat"><span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span></span>
+        <span class="blocks" aria-hidden="true">{{range .Blocks}}<i class="{{.}}"></i>{{end}}</span>
+        {{- end}}
+        {{- with .Href}}
+        <a class="btn" href="{{.}}">View file</a>
+        {{- end}}
+      </summary>
+      {{- if .Load}}
+      <div class="diff-notice">This diff is long. <a href="{{.Load}}">Show it</a></div>
+      {{- else if .Notice}}
+      <div class="diff-notice">{{.Notice}}</div>
+      {{- else}}
+      <div class="diff-scroll">{{.Diff}}</div>
+      {{- end}}
+    </details>
+    {{- end}}
+    {{- else}}
+    <div class="box empty"><p>{{if eq .Show "all"}}Nothing changed since the last commit.{{else}}No {{.Show}} changes.{{end}}</p></div>
     {{- end}}
     {{- end}}
 
