@@ -25,6 +25,11 @@ It opens `http://localhost:6419/` with:
 - themes, built in or written as CSS, each in light and dark
 - live reload when files change
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/demo-dark.png">
+  <img src="docs/images/demo-light.png" alt="gh-mini serving its own repository">
+</picture>
+
 ## Install
 
 As a [gh](https://cli.github.com/) extension, run as `gh mini`:
