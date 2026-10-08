@@ -45,6 +45,9 @@ func TestMain(m *testing.M) {
 		os.Exit(m.Run())
 	}
 	opts := append(chromedp.DefaultExecAllocatorOptions[:], chromedp.WindowSize(1280, 800))
+	// Chrome may take longer than chromedp's 20 seconds to start on a busy
+	// machine, as CI's runners were with the tests of the other packages
+	opts = append(opts, chromedp.WSURLReadTimeout(time.Minute))
 	// Ubuntu keeps Chrome's sandbox from starting on CI's runners; the
 	// pages opened are the tests' own
 	if os.Getenv("CI") != "" {
