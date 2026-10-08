@@ -17,4 +17,10 @@ go run ./hack/gencss internal/server/assets/vendor/github-markdown-light.css \
   internal/server/assets/vendor/github-markdown-dark.css internal/server/assets/markdown.css
 ```
 
+Mermaid and MathJax are vendored from npm, at the versions in [hack/vendorjs](hack/vendorjs/main.go), which checks each package's integrity. To update one, change its version and integrity there and run:
+
+```sh
+go run ./hack/vendorjs internal/server/assets/vendor
+```
+
 Settings are listed in [settings.go](internal/server/settings.go); adding one there adds it to the dialog, and the comment at the top of the file tells how its value reaches the page. A new setting goes in the table in [Settings](docs/guides/settings.md) too.
