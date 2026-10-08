@@ -79,6 +79,10 @@ const appliers = {
       root.dataset.mode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     }
   },
+  avatars() {
+    // The server leaves the picture out; only a file's page shows one
+    if (document.querySelector(".commit")) reload();
+  },
   htmlPreview() {
     // The server picks the view of an HTML file, unless the URL does
     const q = new URLSearchParams(location.search);

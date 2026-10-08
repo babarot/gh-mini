@@ -268,7 +268,9 @@ func TestHandlerMarkdown(t *testing.T) {
 }
 
 func TestHandlerCode(t *testing.T) {
-	get(t, newTestServer(t), "/main.go").expect(t, http.StatusOK, `data-kind="code"`, `href="#L1"`, "3 lines")
+	get(t, newTestServer(t), "/main.go").expect(t, http.StatusOK, `data-kind="code"`, "3 lines",
+		// Each line with its number, so that a wrapped one keeps it
+		`<span class="line"><span class="ln" id="L1"><a class="lnlinks" href="#L1">1</a></span><span class="cl">`)
 }
 
 func TestHandlerLastCommit(t *testing.T) {
@@ -279,6 +281,10 @@ func TestHandlerLastCommit(t *testing.T) {
 	// Not pushed, so not on GitHub to link to
 	r.reject(t, "github.com/example/repo/commit/")
 	get(t, h, "/docs/guide.ja.md").reject(t, `class="box commit"`)
+	// Avatars turned off: the commit without asking GitHub
+	r = get(t, h, "/main.go", withSettings(`{"avatars":false}`))
+	r.expect(t, http.StatusOK, `<span class="commit-subject">init</span>`)
+	r.reject(t, "avatars.githubusercontent.com")
 }
 
 func TestHandlerLastCommitPushed(t *testing.T) {
@@ -424,7 +430,7 @@ func TestHandlerThemes(t *testing.T) {
 		`href="/_mini/theme/sepia.css"`, `<option value="sepia" selected>`)
 	get(t, h, "/", withCookie("gh-mini-theme", "unknown")).expect(t, http.StatusOK,
 		`href="/_mini/theme/github.css"`)
-	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark">`)
+	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark" data-wide="false" data-wrap="false">`)
 }
 
 // A theme of the viewer's own replaces the built-in one of the same name.

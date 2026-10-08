@@ -36,8 +36,9 @@ func renderCode(name string, src []byte) (template.HTML, error) {
 	}
 	f := chromahtml.New(
 		chromahtml.WithClasses(true),
+		// Each line with its number, rather than the numbers in a column
+		// of their own, so that a line wrapped keeps its number beside it
 		chromahtml.WithLineNumbers(true),
-		chromahtml.LineNumbersInTable(true),
 		chromahtml.WithLinkableLineNumbers(true, "L"),
 	)
 	var buf bytes.Buffer

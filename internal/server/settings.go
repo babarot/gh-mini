@@ -73,6 +73,24 @@ var settingDefs = []setting{
 		Default: func(*Server) string { return "" },
 	},
 	{
+		Key:         "wide",
+		Section:     "Appearance",
+		Label:       "Full width",
+		Description: "Let the page take the width of the window rather than a column",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "false" },
+		Attr:        true,
+	},
+	{
+		Key:         "wrap",
+		Section:     "Files",
+		Label:       "Wrap code",
+		Description: "Wrap long lines of a source file rather than scroll them",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "false" },
+		Attr:        true,
+	},
+	{
 		Key:         "htmlPreview",
 		Section:     "Files",
 		Label:       "HTML preview",
@@ -88,6 +106,14 @@ var settingDefs = []setting{
 		Control:     "select",
 		Choices:     func(s *Server) []choice { return s.translationChoices },
 		Default:     func(s *Server) string { return s.opts.Translations },
+	},
+	{
+		Key:         "avatars",
+		Section:     "Privacy",
+		Label:       "Avatars",
+		Description: "Show the author of a file's last commit with their picture on GitHub, which asks GitHub for it by their email",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "true" },
 	},
 }
 

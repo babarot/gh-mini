@@ -82,7 +82,7 @@ func TestSettingsDialog(t *testing.T) {
 		`<option value="sepia" selected>sepia</option>`,
 		`data-setting="mode" data-value="dark" aria-checked="true" tabindex="0" class="selected">Dark</button>`,
 		`data-setting="mode" data-value="" aria-checked="false" tabindex="-1">Auto</button>`,
-		`<script type="application/json" id="mini.settings-data">{"htmlPreview":"false","mode":"dark","theme":"sepia","translations":"suffix"}</script>`,
+		`<script type="application/json" id="mini.settings-data">{"avatars":"true","htmlPreview":"false","mode":"dark","theme":"sepia","translations":"suffix","wide":"false","wrap":"false"}</script>`,
 	)
 	r.reject(t, `id="theme-select"`, `id="mode-select"`)
 }
@@ -128,4 +128,11 @@ func TestSettingsDialogSections(t *testing.T) {
 		`<button type="button" role="tab" id="mini.settings-tab-appearance" data-section="appearance" aria-controls="mini.settings-appearance" aria-selected="true" tabindex="0">Appearance</button>`,
 		`<section class="settings-pane" role="tabpanel" id="mini.settings-files" aria-labelledby="mini.settings-tab-files" hidden>`,
 	)
+}
+
+// Full width and wrapped code are set on <html>, for CSS.
+func TestSettingsLayoutAttrs(t *testing.T) {
+	h := newTestServer(t)
+	get(t, h, "/").expect(t, http.StatusOK, ` data-wide="false"`, ` data-wrap="false"`)
+	get(t, h, "/", withSettings(`{"wide":true,"wrap":true}`)).expect(t, http.StatusOK, ` data-wide="true"`, ` data-wrap="true"`)
 }

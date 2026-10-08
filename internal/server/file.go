@@ -135,6 +135,9 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 	p.File = v
 	if !p.Ignored {
 		v.Commit = s.lastCommit(rel)
+		if v.Commit != nil && p.Settings["avatars"] == "false" {
+			v.Commit.Avatar = ""
+		}
 	}
 	plain := r.URL.Query().Get("plain") == "1"
 	if isHTML(rel) && s.opts.PreviewPort != 0 {

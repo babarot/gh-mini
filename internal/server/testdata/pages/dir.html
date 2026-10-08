@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-wide="false" data-wrap="false">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -109,6 +109,7 @@
     <div class="settings-nav" role="tablist" aria-orientation="vertical" aria-label="Sections">
       <button type="button" role="tab" id="mini.settings-tab-appearance" data-section="appearance" aria-controls="mini.settings-appearance" aria-selected="true" tabindex="0">Appearance</button>
       <button type="button" role="tab" id="mini.settings-tab-files" data-section="files" aria-controls="mini.settings-files" aria-selected="false" tabindex="-1">Files</button>
+      <button type="button" role="tab" id="mini.settings-tab-privacy" data-section="privacy" aria-controls="mini.settings-privacy" aria-selected="false" tabindex="-1">Privacy</button>
     </div>
     <section class="settings-pane" role="tabpanel" id="mini.settings-appearance" aria-labelledby="mini.settings-tab-appearance">
       <div class="setting">
@@ -134,8 +135,22 @@
           <button type="button" role="radio" data-setting="mode" data-value="dark" aria-checked="false" tabindex="-1">Dark</button>
         </div>
       </div>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-wide">Full width</div>
+          <div class="setting-description">Let the page take the width of the window rather than a column</div>
+        </div>
+        <input type="checkbox" role="switch" data-setting="wide" aria-labelledby="mini.setting-wide">
+      </div>
     </section>
     <section class="settings-pane" role="tabpanel" id="mini.settings-files" aria-labelledby="mini.settings-tab-files" hidden>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-wrap">Wrap code</div>
+          <div class="setting-description">Wrap long lines of a source file rather than scroll them</div>
+        </div>
+        <input type="checkbox" role="switch" data-setting="wrap" aria-labelledby="mini.setting-wrap">
+      </div>
       <div class="setting">
         <div class="setting-text">
           <div class="setting-label" id="mini.setting-htmlPreview">HTML preview</div>
@@ -155,9 +170,18 @@
         </select>
       </div>
     </section>
+    <section class="settings-pane" role="tabpanel" id="mini.settings-privacy" aria-labelledby="mini.settings-tab-privacy" hidden>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-avatars">Avatars</div>
+          <div class="setting-description">Show the author of a file&#39;s last commit with their picture on GitHub, which asks GitHub for it by their email</div>
+        </div>
+        <input type="checkbox" role="switch" data-setting="avatars" aria-labelledby="mini.setting-avatars" checked>
+      </div>
+    </section>
   </div>
 </dialog>
-<script type="application/json" id="mini.settings-data">{"htmlPreview":"false","mode":"","theme":"github","translations":"suffix"}</script>
+<script type="application/json" id="mini.settings-data">{"avatars":"true","htmlPreview":"false","mode":"","theme":"github","translations":"suffix","wide":"false","wrap":"false"}</script>
 
 <div class="layout">
   <aside class="sidebar" id="mini.sidebar">
