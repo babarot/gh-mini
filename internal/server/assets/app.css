@@ -158,7 +158,15 @@ body.sidebar-hidden .sidebar { display: none; }
   padding: 12px 12px 8px;
 }
 .sidebar-tools input[type="search"] { width: 100%; }
-.md-only { color: var(--fgColor-muted); font-size: 12px; user-select: none; }
+.md-only {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fgColor-muted);
+  font-size: 12px;
+  user-select: none;
+}
+.md-only input { margin: 0; }
 
 .tree {
   flex: 1;
