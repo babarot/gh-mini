@@ -8,6 +8,7 @@
 package e2e
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"flag"
@@ -16,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,10 +50,13 @@ func TestMain(m *testing.M) {
 	if os.Getenv("CI") != "" {
 		opts = append(opts, chromedp.NoSandbox)
 	}
+	// What Chrome says, to tell why it did not start
+	var out output
+	opts = append(opts, chromedp.CombinedOutput(&out))
 	alloc, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
 	ctx, cancel := chromedp.NewContext(alloc)
 	if err := chromedp.Run(ctx); err != nil {
-		skip = "no Chrome: " + err.Error()
+		skip = "no Chrome: " + err.Error() + "\n" + out.String()
 	} else {
 		browser = ctx
 	}
@@ -59,6 +64,25 @@ func TestMain(m *testing.M) {
 	cancel()
 	cancelAlloc()
 	os.Exit(code)
+}
+
+// output keeps what Chrome writes, which it goes on writing while it is
+// read.
+type output struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (o *output) Write(p []byte) (int, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.Write(p)
+}
+
+func (o *output) String() string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.buf.String()
 }
 
 // tab opens a tab of its own, closed when the test ends, with no cookies
@@ -221,6 +245,14 @@ func (a *app) write(name, body string) {
 		a.t.Fatal(err)
 	}
 	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		a.t.Fatal(err)
+	}
+}
+
+// remove removes a file under the root.
+func (a *app) remove(name string) {
+	a.t.Helper()
+	if err := os.Remove(filepath.Join(a.root, filepath.FromSlash(name))); err != nil {
 		a.t.Fatal(err)
 	}
 }

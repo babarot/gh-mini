@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -10,9 +9,14 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// newRepoApp serves a git repository holding files, committed, with git's
-// configuration kept apart from the machine's.
-func newRepoApp(t *testing.T, files map[string]string) *app {
+// newRepoApp serves a git repository holding files, committed, and then
+// changed by change, with git's configuration kept apart from the
+// machine's.
+//
+// The changes are made before the server starts, as newApp writes its
+// files: made after, they would reach a page opened meanwhile a second or
+// so later, and reload it under what the test does to it.
+func newRepoApp(t *testing.T, files map[string]string, change func(a *app)) *app {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not found")
@@ -29,6 +33,7 @@ func newRepoApp(t *testing.T, files map[string]string) *app {
 	a.git("init", "-q", "-b", "main")
 	a.git("add", "-A")
 	a.git("commit", "-q", "-m", "init")
+	change(a)
 	// The server learns it serves a repository as it starts
 	a.skip = []string{".git"}
 	a.restart()
@@ -52,12 +57,11 @@ const (
 // counts them, and both follow git as files are edited, staged and
 // committed.
 func TestChangesInTree(t *testing.T) {
-	a := newRepoApp(t, map[string]string{"a.md": "# A\n", "docs/c.md": "# C\n", "docs/d.md": "# D\n"})
-	a.write("a.md", "# A\n\nMore.\n")
-	a.write("new.md", "# New\n")
-	if err := os.Remove(filepath.Join(a.root, "docs", "c.md")); err != nil {
-		t.Fatal(err)
-	}
+	a := newRepoApp(t, map[string]string{"a.md": "# A\n", "docs/c.md": "# C\n", "docs/d.md": "# D\n"}, func(a *app) {
+		a.write("a.md", "# A\n\nMore.\n")
+		a.write("new.md", "# New\n")
+		a.remove("docs/c.md")
+	})
 	ctx := tab(t)
 	open(t, ctx, a.URL("/"))
 	subscribed(t, ctx)
@@ -98,8 +102,9 @@ func TestChangesInTree(t *testing.T) {
 // The Changes page follows git: a file staged moves to the staged ones,
 // and a file edited again shows its new lines, though no count changed.
 func TestChangesPage(t *testing.T) {
-	a := newRepoApp(t, map[string]string{"a.md": "# A\n", "b.md": "# B\n"})
-	a.write("a.md", "# A\n\nOne.\n")
+	a := newRepoApp(t, map[string]string{"a.md": "# A\n", "b.md": "# B\n"}, func(a *app) {
+		a.write("a.md", "# A\n\nOne.\n")
+	})
 	ctx := tab(t)
 	open(t, ctx, a.URL("/_mini/changes"))
 	subscribed(t, ctx)
@@ -122,11 +127,10 @@ func TestChangesPage(t *testing.T) {
 // A changed file's page tells how it changed, as git has it now, and a
 // file deleted, found in the tree, shows its deletion.
 func TestChangedFilePage(t *testing.T) {
-	a := newRepoApp(t, map[string]string{"a.md": "# A\n", "b.md": "# B\n"})
-	a.write("a.md", "# A\n\nOne.\n")
-	if err := os.Remove(filepath.Join(a.root, "b.md")); err != nil {
-		t.Fatal(err)
-	}
+	a := newRepoApp(t, map[string]string{"a.md": "# A\n", "b.md": "# B\n"}, func(a *app) {
+		a.write("a.md", "# A\n\nOne.\n")
+		a.remove("b.md")
+	})
 	ctx := tab(t)
 	open(t, ctx, a.URL("/a.md?diff=1"))
 	subscribed(t, ctx)
@@ -142,8 +146,9 @@ func TestChangedFilePage(t *testing.T) {
 // The settings of Changes: the marks in the tree change at once, and
 // turning Changes off takes it all away, and the settings under it.
 func TestChangesSettings(t *testing.T) {
-	a := newRepoApp(t, map[string]string{"a.md": "# A\n"})
-	a.write("a.md", "# A\n\nOne.\n")
+	a := newRepoApp(t, map[string]string{"a.md": "# A\n"}, func(a *app) {
+		a.write("a.md", "# A\n\nOne.\n")
+	})
 	ctx := tab(t)
 	open(t, ctx, a.URL("/"))
 	waitFor(t, ctx, `(`+letter+`)("a.md") === "M"`)
