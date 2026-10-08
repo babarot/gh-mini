@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // What changed since the branch left its base is what a pull request
@@ -77,6 +78,16 @@ func TestBaseStatus(t *testing.T) {
 	if len(snap.Status.Files) != 2 || snap.Status.Base != "" || snap.Status.Rev() != "HEAD" {
 		t.Errorf("since HEAD: %v %q", keys(snap.Status.Files), snap.Status.Rev())
 	}
+	// Saved again as it was, as an editor or a formatter does: the index's
+	// stat of it is no longer the file's, and no commit changed it
+	git(t, dir, "update-index", "-q", "--refresh")
+	later := time.Now().Add(time.Hour)
+	if err := os.Chtimes(filepath.Join(dir, "README.md"), later, later); err != nil {
+		t.Fatal(err)
+	}
+	if f := ws.Snapshot().BaseStatus.Files["README.md"]; f != nil {
+		t.Errorf("README.md saved as it was: %+v", f)
+	}
 	if snap.BaseStatusETag == "" || snap.BaseStatusETag == snap.StatusETag {
 		t.Errorf("ETags %s %s", snap.BaseStatusETag, snap.StatusETag)
 	}
@@ -112,4 +123,26 @@ func keys(files map[string]*FileStatus) []string {
 		out = append(out, p)
 	}
 	return out
+}
+
+// A file renamed in a commit and then removed is, since the base, a file
+// deleted: its old name is listed, as the commit changed it.
+func TestBaseStatusRenamedThenRemoved(t *testing.T) {
+	dir := newRepo(t, "", "d.md")
+	git(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD")
+	git(t, dir, "checkout", "-q", "-b", "feature")
+	git(t, dir, "mv", "d.md", "e.md")
+	git(t, dir, "commit", "-q", "-m", "move")
+	if err := os.Remove(filepath.Join(dir, "e.md")); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := Open(Options{Root: dir, Name: "x", Skip: []string{".git"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { ws.Close() })
+	st := ws.Snapshot().BaseStatus
+	if f := st.Files["d.md"]; f == nil || f.Letter != "D" || !f.Committed {
+		t.Errorf("d.md = %+v, files %v", f, keys(st.Files))
+	}
 }

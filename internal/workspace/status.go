@@ -223,7 +223,8 @@ func gitBaseStatus(root, base, mb string, skip []string, head *Status) *Status {
 		addNumstat(out, st.Files)
 	}
 	committed := map[string]bool{}
-	if out, err := git("diff-tree", "-r", "--name-only", "-z", "-M", "--relative", mb, "HEAD"); err == nil {
+	// Without renames found, so that a file renamed has both its names
+	if out, err := git("diff-tree", "-r", "--name-only", "-z", "--relative", mb, "HEAD"); err == nil {
 		for _, p := range strings.Split(string(out), "\x00") {
 			committed[p] = p != ""
 		}
@@ -232,6 +233,15 @@ func gitBaseStatus(root, base, mb string, skip []string, head *Status) *Status {
 		if f.X == "?" {
 			c := *f
 			st.Files[p] = &c
+		}
+	}
+	// diff-index tells a file changed by its stat in the index alone, and
+	// gh-mini never refreshes the index: a file saved again as it was is
+	// listed, which git status, comparing contents, does not list. A file
+	// differs from mb only if a commit since or the working tree changed it
+	for p := range st.Files {
+		if !committed[p] && head.Files[p] == nil {
+			delete(st.Files, p)
 		}
 	}
 	for p, f := range st.Files {
