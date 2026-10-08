@@ -74,7 +74,10 @@ func TestChangesInTree(t *testing.T) {
 
 	// Only changed files, with the directories holding them opened, and
 	// the deleted file in its place
+	run(t, ctx, chromedp.Click(`[id="mini.tree-filters-open"]`, chromedp.ByQuery))
 	run(t, ctx, chromedp.Click(`#mini\.changed-only`, chromedp.ByQuery))
+	// The button tells that files are left out
+	waitFor(t, ctx, `!document.querySelector('[id="mini.tree-filters-open"] .filter-on').hidden`)
 	waitFor(t, ctx, `document.querySelector('.tree .row.gone[data-path="docs/c.md"]') !== null`)
 	if eval[bool](t, ctx, `document.querySelector('.tree .row[data-path="docs/d.md"]') !== null`) {
 		t.Error("an unchanged file is shown")

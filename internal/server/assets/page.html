@@ -183,13 +183,20 @@
   <aside class="sidebar" id="mini.sidebar">
     <div class="sidebar-tools">
       <input type="search" id="mini.tree-filter" aria-label="Go to file" placeholder="Go to file  (t)" autocomplete="off" spellcheck="false">
-      <div class="sidebar-row">
-        <label class="md-only"><input type="checkbox" id="mini.md-only"> Markdown only</label>
-        {{- if .Changes}}
-        <label class="md-only"><input type="checkbox" id="mini.changed-only"> Changed only</label>
-        {{- end}}
-        <button type="button" class="link-btn" id="mini.collapse-all">Collapse all</button>
-      </div>
+      <button type="button" class="icon-btn" id="mini.tree-filters-open" title="Show only some files" aria-label="Show only some files" aria-expanded="false" popovertarget="mini.tree-filters">
+        <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M.75 3h14.5a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1 0-1.5ZM3 7.75A.75.75 0 0 1 3.75 7h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 3 7.75Zm3 4a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z"></path></svg>
+        <span class="filter-on" hidden></span>
+      </button>
+      <button type="button" class="icon-btn" id="mini.collapse-all" title="Collapse all" aria-label="Collapse all">
+        <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M10.896 2H8.75V.75a.75.75 0 0 0-1.5 0V2H5.104a.25.25 0 0 0-.177.427l2.896 2.896a.25.25 0 0 0 .354 0l2.896-2.896A.25.25 0 0 0 10.896 2ZM8.75 15.25a.75.75 0 0 1-1.5 0V14H5.104a.25.25 0 0 1-.177-.427l2.896-2.896a.25.25 0 0 1 .354 0l2.896 2.896a.25.25 0 0 1-.177.427H8.75v1.25Zm-6.5-6.5a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM6 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 6 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM12 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 12 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5Z"></path></svg>
+      </button>
+    </div>
+    <div class="menu tree-filters" id="mini.tree-filters" popover>
+      <div class="menu-heading">Show only</div>
+      <label><input type="checkbox" id="mini.md-only"> Markdown files</label>
+      {{- if .Changes}}
+      <label><input type="checkbox" id="mini.changed-only"> Changed files</label>
+      {{- end}}
     </div>
     <nav id="mini.tree" class="tree" aria-label="Files"></nav>
   </aside>

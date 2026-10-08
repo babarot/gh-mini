@@ -183,23 +183,37 @@ body.sidebar-hidden .sidebar { display: none; }
 
 .sidebar-tools {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 12px 8px;
-}
-.sidebar-tools input[type="search"] { width: 100%; }
-.md-only {
-  display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--fgColor-muted);
-  font-size: 12px;
-  white-space: nowrap;
+  padding: 12px 12px 8px;
+}
+.sidebar-tools input[type="search"] { flex: 1; min-width: 0; }
+.sidebar-tools .icon-btn { flex: none; position: relative; }
+.sidebar-tools .icon-btn[aria-expanded="true"] { color: var(--fgColor-default); background: var(--mini-selected); }
+/* The files shown are filtered: a dot on the button that does it */
+.filter-on {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fgColor-accent);
+}
+/* Placed under its button as it opens; a menu is fixed to the top bar */
+.tree-filters { top: auto; right: auto; width: 200px; }
+.tree-filters label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--mini-radius);
+  cursor: pointer;
   user-select: none;
 }
-.md-only input { margin: 0; }
-.sidebar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
-.sidebar-row .link-btn { margin-left: auto; }
+.tree-filters label:hover { background: var(--mini-selected); }
+.tree-filters input { margin: 0; }
+.menu-heading { padding: 4px 8px; color: var(--fgColor-muted); font-size: 12px; font-weight: 600; }
 .link-btn { white-space: nowrap; padding: 0; color: var(--fgColor-muted); font: inherit; font-size: 12px; background: none; border: 0; cursor: pointer; }
 .link-btn:hover { color: var(--fgColor-accent); text-decoration: underline; }
 

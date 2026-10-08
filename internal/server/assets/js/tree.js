@@ -337,6 +337,24 @@ function openChanged() {
   if (changedOnly()) changedDirs().forEach((d) => open.add(d));
 }
 
+// initFilters places the menu of the filters under its button as it opens,
+// and marks the button while a filter leaves files out.
+function initFilters() {
+  const button = document.getElementById("mini.tree-filters-open");
+  const menu = document.getElementById("mini.tree-filters");
+  const dot = button.querySelector(".filter-on");
+  const mark = () => { dot.hidden = !(mdOnlyEl.checked || changedOnly()); };
+  menu.addEventListener("beforetoggle", (e) => {
+    button.setAttribute("aria-expanded", String(e.newState === "open"));
+    if (e.newState !== "open") return;
+    const r = button.getBoundingClientRect();
+    menu.style.top = r.bottom + 4 + "px";
+    menu.style.left = Math.max(8, r.right - 200) + "px";
+  });
+  menu.addEventListener("change", mark);
+  mark();
+}
+
 // collapseAll folds every directory, those down to the page shown too.
 function collapseAll() {
   kept.clear();
@@ -444,6 +462,7 @@ export function initTree() {
     openChanged();
     render();
   });
+  initFilters();
 
   // The server renders the tree closed from a cookie. It was kept in
   // localStorage before: move it over once
