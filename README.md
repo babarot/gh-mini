@@ -16,7 +16,7 @@ It opens `http://localhost:6419/` with:
 - source files highlighted with line numbers you can link to (`#L10`), and a Preview / Code switch for Markdown and HTML
 - HTML files previewed as a browser shows them, scripts included (see [HTML previews](#html-previews))
 - every file on disk, including what git ignores; those are marked `local`
-- translations side by side: `guide.md` and `guide.ja.md` get a language switch, and a language picked on a README stays picked
+- translations side by side: `guide.md` and `guide.ja.md` get a language switch, and a language picked on a README stays picked. Translations can be named otherwise, such as `ja/guide.md`, or left alone (see [Translations](#translations))
 - a menu behind the gear button, with the keyboard shortcuts (or press `?`), an About dialog that tells the version and the directory served, and the settings (or press `,`): built-in `github`, `nord` and `tokyo-night` themes or ones you write as CSS, a light, dark or automatic mode, and whether HTML files open as a preview. They are kept per browser
 - live reload of the page you are reading when its file changes, and of the tree when files are added or removed. Directories git ignores, such as a `.venv`, show in the tree without their files until you open them. On macOS the whole directory is watched through FSEvents; elsewhere directories git ignores are watched only while you look at a page in them. A new symlink shows in the tree only when its directory changes otherwise too, if it points to another directory
 
@@ -40,6 +40,7 @@ go install github.com/babarot/gh-mini@latest
 | `--themes` | `~/.config/gh-mini/themes` | Directory of themes |
 | `--preview-port` | a free one | Port HTML previews are served on, printed at start |
 | `--skip` | `.git,node_modules,.DS_Store` | Names left out of the tree |
+| `--translations` | `$GH_MINI_TRANSLATIONS`, else `suffix` | How translations are named until others are picked in the settings (see [Translations](#translations)) |
 
 ## HTML previews
 
@@ -55,6 +56,19 @@ What a previewed file's scripts can still do, as with `python -m http.server`:
 So preview only files you trust. Through an SSH tunnel, forward the preview port too; set it with `--preview-port`.
 
 Opening an HTML or SVG file raw does not run its scripts.
+
+## Translations
+
+A Markdown file and its translations get a language switch, and a directory's README is shown in the language picked last. How a translation is named is a layout:
+
+| Layout | Translations of `docs/guide.md` |
+|---|---|
+| `suffix` (the default) | `docs/guide.ja.md`, `docs/guide.zh-TW.md` |
+| `dir` | `docs/ja/guide.md`, `docs/zh-TW/guide.md` |
+
+Pick one, or Off for no switch, in the settings. `--translations` sets the layout used until one is picked, and takes templates too: the path of a translation from its original's directory, with `{name}` for the original's name and `{lang}` for the language, such as `{name}_{lang}` for `guide_ja.md` or `i18n/{lang}/{name}` for `docs/i18n/ja/guide.md`. Separate layouts with commas to use several; the first that fits a file is taken. The settings offer the value given as one more choice.
+
+A language is a two-letter code, such as `ja`, or one with a region, such as `zh-TW`. With `dir`, a directory named after a language, such as `id` or `it`, holds translations too, so pick `dir` only for a repository laid out that way.
 
 ## Themes
 

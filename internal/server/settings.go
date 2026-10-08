@@ -80,6 +80,15 @@ var settingDefs = []setting{
 		Control:     "toggle",
 		Default:     func(*Server) string { return "false" },
 	},
+	{
+		Key:         "translations",
+		Section:     "Files",
+		Label:       "Translations",
+		Description: "How translations of a Markdown file are named, for a language switch on it: {name} is the original's name and {lang} a language such as ja. --translations gives others",
+		Control:     "select",
+		Choices:     func(s *Server) []choice { return s.translationChoices },
+		Default:     func(s *Server) string { return s.opts.Translations },
+	},
 }
 
 // legacyCookies are where settings were kept before settingsCookie.

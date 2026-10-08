@@ -54,9 +54,12 @@ type config struct {
 	noOpen      bool
 	noReload    bool
 	theme       string
-	skip        []string
-	themesDir   string
-	version     bool
+	// translations are the layouts translations are named by, as
+	// --translations takes them
+	translations string
+	skip         []string
+	themesDir    string
+	version      bool
 	// target is the directory or file to serve, "" for the current
 	// directory.
 	target string
@@ -69,7 +72,7 @@ type usageError struct{ error }
 // and what is wrong with the flags are written to stderr. With -h, it
 // returns flag.ErrHelp.
 func parseArgs(args []string, stderr io.Writer) (config, error) {
-	c := config{themesDir: defaultThemesDir()}
+	c := config{themesDir: defaultThemesDir(), translations: os.Getenv("GH_MINI_TRANSLATIONS")}
 	var skip string
 	fs := flag.NewFlagSet("gh-mini", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -80,6 +83,10 @@ func parseArgs(args []string, stderr io.Writer) (config, error) {
 	fs.BoolVar(&c.noOpen, "no-open", false, "do not open the browser")
 	fs.BoolVar(&c.noReload, "no-reload", false, "do not reload pages when files change")
 	fs.StringVar(&c.theme, "theme", os.Getenv("GH_MINI_THEME"), "theme to use until one is picked in the page ($GH_MINI_THEME)")
+	fs.Func("translations", `how translations are named until others are picked in the page: "off", or by commas "suffix" (guide.ja.md, the default), "dir" (ja/guide.md) and templates such as "{name}_{lang}" ($GH_MINI_TRANSLATIONS)`, func(v string) error {
+		c.translations = v
+		return server.CheckTranslations(v)
+	})
 	fs.StringVar(&skip, "skip", ".git,node_modules,.DS_Store", "comma-separated names left out of the tree")
 	fs.StringVar(&c.themesDir, "themes", c.themesDir, "directory of themes")
 	fs.BoolVar(&c.version, "version", false, "print the version")
@@ -107,6 +114,10 @@ func parseArgs(args []string, stderr io.Writer) (config, error) {
 		return c, usageError{err}
 	}
 	c.skip = splitList(skip)
+	// --translations is checked as it is parsed, the environment's here
+	if err := server.CheckTranslations(c.translations); err != nil {
+		return c, fmt.Errorf("$GH_MINI_TRANSLATIONS: %w", err)
+	}
 	if fs.NArg() > 1 {
 		fs.Usage()
 		return c, errors.New("too many arguments")
@@ -151,9 +162,11 @@ func run(args []string, stdout, stderr io.Writer) error {
 		Skip:      c.skip,
 		Theme:     c.theme,
 		ThemesDir: c.themesDir,
-		Reload:    !c.noReload,
-		Version:   version.String(),
-		Revision:  version.Revision(),
+
+		Translations: c.translations,
+		Reload:       !c.noReload,
+		Version:      version.String(),
+		Revision:     version.Revision(),
 	}
 	if pln != nil {
 		opts.PreviewPort = pln.Addr().(*net.TCPAddr).Port

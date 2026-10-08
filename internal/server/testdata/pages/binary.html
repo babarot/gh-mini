@@ -142,10 +142,21 @@
         </div>
         <input type="checkbox" role="switch" data-setting="htmlPreview" aria-labelledby="mini.setting-htmlPreview">
       </div>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-translations">Translations</div>
+          <div class="setting-description">How translations of a Markdown file are named, for a language switch on it: {name} is the original&#39;s name and {lang} a language such as ja. --translations gives others</div>
+        </div>
+        <select data-setting="translations" aria-labelledby="mini.setting-translations">
+          <option value="off">Off</option>
+          <option value="suffix" selected>{name}.{lang}.md</option>
+          <option value="dir">{lang}/{name}.md</option>
+        </select>
+      </div>
     </section>
   </div>
 </dialog>
-<script type="application/json" id="mini.settings-data">{"htmlPreview":"false","mode":"","theme":"github"}</script>
+<script type="application/json" id="mini.settings-data">{"htmlPreview":"false","mode":"","theme":"github","translations":"suffix"}</script>
 
 <div class="layout">
   <aside class="sidebar" id="mini.sidebar">

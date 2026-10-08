@@ -85,6 +85,10 @@ const appliers = {
     const html = page.kind === "html" || (page.kind === "code" && /\.html?$/i.test(page.path));
     if (html && !q.has("plain") && !q.has("preview")) reload();
   },
+  translations() {
+    // The server picks the README and the language switch
+    if (page.kind === "dir" || /\.(md|markdown|mdx)$/i.test(page.path)) reload();
+  },
 };
 
 function set(key, value) {

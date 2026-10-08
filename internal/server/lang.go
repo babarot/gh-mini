@@ -1,9 +1,12 @@
 package server
 
 import (
+	"errors"
+	"fmt"
 	"io/fs"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -14,10 +17,26 @@ type langTab struct {
 	Current bool
 }
 
-// langSuffix is the language in name.<lang>.md, such as README.ja.md or
-// guide.zh-TW.md; the code is checked against langCodes, so that the .go
-// of api.go.md is no language.
-var langSuffix = regexp.MustCompile(`(?i)\.([a-z]{2})(?:-[a-z]{2})?$`)
+// Translations are Markdown files named after another and a language,
+// such as guide.ja.md for guide.md. How they are named is a layout: a
+// template of the path of a translation from the directory of its
+// original, without the extension, with {name} for the original's name
+// and {lang} for the language. --translations gives the layouts as
+// presets and templates separated by commas, tried in order, or "off".
+const (
+	translationsOff     = "off"
+	defaultTranslations = "suffix"
+)
+
+// translationPresets are the layouts the settings dialog offers by name.
+var translationPresets = []struct{ name, template string }{
+	{"suffix", "{name}.{lang}"},
+	{"dir", "{lang}/{name}"},
+}
+
+// langPattern is what {lang} matches, such as ja or zh-TW; the code is
+// checked against langCodes, so that the .go of api.go.md is no language.
+const langPattern = `[A-Za-z]{2}(?:-[A-Za-z]{2})?`
 
 // langCodes are the ISO 639-1 language codes.
 var langCodes = map[string]bool{
@@ -39,31 +58,257 @@ var langCodes = map[string]bool{
 	"yo": true, "za": true, "zh": true, "zu": true,
 }
 
-// splitLang splits a Markdown file's name into the name of the document and
-// its language, "" for the original. ok is false for other files.
-func splitLang(name string) (base, lang string, ok bool) {
-	ext := path.Ext(name)
-	if !isMarkdown(name) {
-		return "", "", false
+// translationSettings parses the choices of the translations setting: off,
+// the presets and, when it is none of them, the --translations value.
+func translationSettings(value string) (map[string]translationLayouts, []choice, error) {
+	choices := []choice{{translationsOff, "Off"}}
+	for _, p := range translationPresets {
+		choices = append(choices, choice{p.name, translationsLabel(p.name)})
 	}
-	stem := strings.TrimSuffix(name, ext)
-	if m := langSuffix.FindStringSubmatchIndex(stem); m != nil && langCodes[strings.ToLower(stem[m[2]:m[3]])] {
-		return strings.ToLower(stem[:m[0]]), strings.ToLower(stem[m[0]+1:]), true
+	if !slices.ContainsFunc(choices, func(c choice) bool { return c.Value == value }) {
+		choices = append(choices, choice{value, translationsLabel(value)})
 	}
-	return strings.ToLower(stem), "", true
+	layouts := make(map[string]translationLayouts, len(choices))
+	for _, c := range choices {
+		ls, err := parseTranslations(c.Value)
+		if err != nil {
+			return nil, nil, fmt.Errorf("translations %w", err)
+		}
+		layouts[c.Value] = ls
+	}
+	return layouts, choices, nil
 }
 
-// isReadme tells README.md and its translations.
-func isReadme(name string) bool {
-	base, _, ok := splitLang(name)
-	return ok && base == "readme"
+// translationsLabel shows layouts as the templates they are, with the
+// presets' spelled out and .md added, such as "{lang}/{name}.md", so that
+// the dialog tells patterns and not file names.
+func translationsLabel(value string) string {
+	var labels []string
+	for _, p := range strings.Split(value, ",") {
+		for _, preset := range translationPresets {
+			if p == preset.name {
+				p = preset.template
+			}
+		}
+		if !isMarkdown(p) {
+			p += ".md"
+		}
+		labels = append(labels, p)
+	}
+	return strings.Join(labels, ", ")
 }
 
-// langOf returns the language of a translated Markdown file, or "" for the
-// original.
-func langOf(name string) string {
-	_, lang, _ := splitLang(name)
-	return lang
+// translations are the layouts a page uses, as the viewer picked them.
+func (s *Server) translationsFor(settings map[string]string) translationLayouts {
+	return s.translations[settings["translations"]]
+}
+
+// translationLayout is one layout, parsed.
+type translationLayout struct {
+	// path matches the path of a translation without its extension: the
+	// directory of the original, then the template
+	path *regexp.Regexp
+	// segments are the template's parts between slashes, and dirs the
+	// patterns of the ones before the last that hold {lang}, nil for the
+	// others
+	segments []string
+	dirs     []*regexp.Regexp
+}
+
+// translationLayouts are the layouts in use, none when translations are
+// off.
+type translationLayouts []translationLayout
+
+// normalizeTranslations trims the layouts of a --translations value; an
+// empty one is the default.
+func normalizeTranslations(value string) string {
+	var parts []string
+	for _, p := range strings.Split(value, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			parts = append(parts, p)
+		}
+	}
+	if len(parts) == 0 {
+		return defaultTranslations
+	}
+	return strings.Join(parts, ",")
+}
+
+// CheckTranslations tells what is wrong with a --translations value.
+func CheckTranslations(value string) error {
+	_, err := parseTranslations(value)
+	return err
+}
+
+func parseTranslations(value string) (translationLayouts, error) {
+	parts := strings.Split(normalizeTranslations(value), ",")
+	if len(parts) == 1 && parts[0] == translationsOff {
+		return nil, nil
+	}
+	var out translationLayouts
+	for _, p := range parts {
+		if p == translationsOff {
+			return nil, errors.New(`"off" goes alone`)
+		}
+		tmpl := p
+		for _, preset := range translationPresets {
+			if p == preset.name {
+				tmpl = preset.template
+			}
+		}
+		l, err := parseTranslationLayout(tmpl)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", p, err)
+		}
+		out = append(out, l)
+	}
+	return out, nil
+}
+
+func parseTranslationLayout(tmpl string) (translationLayout, error) {
+	if isMarkdown(tmpl) {
+		tmpl = strings.TrimSuffix(tmpl, path.Ext(tmpl))
+	}
+	if strings.Count(tmpl, "{name}") != 1 || strings.Count(tmpl, "{lang}") != 1 {
+		return translationLayout{}, errors.New("needs {name} and {lang} once each")
+	}
+	if strings.Contains(tmpl, "{name}{lang}") || strings.Contains(tmpl, "{lang}{name}") {
+		return translationLayout{}, errors.New("needs something between {name} and {lang}")
+	}
+	if strings.ContainsAny(strings.NewReplacer("{name}", "", "{lang}", "").Replace(tmpl), "{}") {
+		return translationLayout{}, errors.New("knows only {name} and {lang}")
+	}
+	l := translationLayout{segments: strings.Split(tmpl, "/")}
+	for i, seg := range l.segments {
+		if seg == "" || seg == "." || seg == ".." {
+			return translationLayout{}, errors.New("must be a path down from the original's directory")
+		}
+		last := i == len(l.segments)-1
+		if strings.Contains(seg, "{name}") && !last {
+			return translationLayout{}, errors.New("needs {name} in the file name")
+		}
+		if !last {
+			var re *regexp.Regexp
+			if strings.Contains(seg, "{lang}") {
+				re = regexp.MustCompile("^" + templatePattern(seg) + "$")
+			}
+			l.dirs = append(l.dirs, re)
+		}
+	}
+	l.path = regexp.MustCompile(`^(?:(?P<dir>.*)/)?` + templatePattern(tmpl) + "$")
+	return l, nil
+}
+
+// templatePattern turns a template into a regular expression, with groups
+// for {name} and {lang}.
+func templatePattern(tmpl string) string {
+	var b strings.Builder
+	for {
+		i := strings.IndexByte(tmpl, '{')
+		if i < 0 {
+			b.WriteString(regexp.QuoteMeta(tmpl))
+			return b.String()
+		}
+		b.WriteString(regexp.QuoteMeta(tmpl[:i]))
+		if strings.HasPrefix(tmpl[i:], "{name}") {
+			b.WriteString(`(?P<name>[^/]+)`)
+		} else {
+			b.WriteString(`(?P<lang>` + langPattern + `)`)
+		}
+		tmpl = tmpl[i+len("{name}"):]
+	}
+}
+
+// translationGroup names a document, whatever its language: the directory
+// of the original and its name without the extension, in lower case.
+type translationGroup struct {
+	dir, name string
+}
+
+// split tells the document a Markdown file is of and its language, "" for
+// the original.
+func (ls translationLayouts) split(rel string) (translationGroup, string) {
+	stem := strings.TrimSuffix(rel, path.Ext(rel))
+	for _, l := range ls {
+		m := l.path.FindStringSubmatch(stem)
+		if m == nil {
+			continue
+		}
+		lang := strings.ToLower(m[l.path.SubexpIndex("lang")])
+		if !langCodes[lang[:2]] {
+			continue
+		}
+		dir := m[l.path.SubexpIndex("dir")]
+		if dir == "" {
+			dir = "."
+		}
+		return translationGroup{dir: dir, name: strings.ToLower(m[l.path.SubexpIndex("name")])}, lang
+	}
+	return translationGroup{dir: path.Dir(rel), name: strings.ToLower(path.Base(stem))}, ""
+}
+
+// member is a Markdown file of a document, in one language.
+type member struct {
+	Rel  string
+	Lang string
+}
+
+// members lists the files of a document, the shortest path first.
+func (ls translationLayouts) members(fsys fs.FS, skipped func(string) bool, g translationGroup) []member {
+	var out []member
+	seen := map[string]bool{}
+	collect := func(dir string) {
+		if seen[dir] {
+			return
+		}
+		seen[dir] = true
+		dirents, err := fs.ReadDir(fsys, dir)
+		if err != nil {
+			return
+		}
+		for _, d := range dirents {
+			if d.IsDir() || skipped(d.Name()) || !isMarkdown(d.Name()) {
+				continue
+			}
+			rel := path.Join(dir, d.Name())
+			if dg, lang := ls.split(rel); dg == g {
+				out = append(out, member{Rel: rel, Lang: lang})
+			}
+		}
+	}
+	collect(g.dir)
+	for _, l := range ls {
+		dirs := []string{g.dir}
+		for i, re := range l.dirs {
+			var next []string
+			for _, dir := range dirs {
+				if re == nil {
+					next = append(next, path.Join(dir, l.segments[i]))
+					continue
+				}
+				dirents, err := fs.ReadDir(fsys, dir)
+				if err != nil {
+					continue
+				}
+				for _, d := range dirents {
+					if !skipped(d.Name()) && re.MatchString(d.Name()) {
+						next = append(next, path.Join(dir, d.Name()))
+					}
+				}
+			}
+			dirs = next
+		}
+		for _, dir := range dirs {
+			collect(dir)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if len(out[i].Rel) != len(out[j].Rel) {
+			return len(out[i].Rel) < len(out[j].Rel)
+		}
+		return out[i].Rel < out[j].Rel
+	})
+	return out
 }
 
 func langLabel(lang string) string {
@@ -80,59 +325,47 @@ func orDefault(lang string) string {
 	return lang
 }
 
-// pickReadme chooses README.md, or its translation for the language asked
-// for in the URL or picked before.
-func pickReadme(names []string, query, saved string) string {
-	if len(names) == 0 {
-		return ""
-	}
-	want := query
+// pickReadme chooses the README in the language asked for in the URL or
+// picked before, else the original, of a README's members.
+func pickReadme(members []member, query, saved string) member {
+	want := strings.ToLower(query)
 	if want == "" {
-		want = saved
+		want = strings.ToLower(saved)
 	}
 	if want == "default" {
 		want = ""
 	}
-	sort.Slice(names, func(i, j int) bool { return len(names[i]) < len(names[j]) })
-	for _, n := range names {
-		if langOf(n) == strings.ToLower(want) {
-			return n
+	for _, m := range members {
+		if m.Lang == want {
+			return m
 		}
 	}
-	for _, n := range names {
-		if langOf(n) == "" {
-			return n
+	for _, m := range members {
+		if m.Lang == "" {
+			return m
 		}
 	}
-	return names[0]
+	return members[0]
 }
 
-// langTabs links a Markdown file to its translations next to it:
-// guide.md, guide.ja.md and so on.
-func (s *Server) langTabs(rel string) []langTab {
-	base, _, ok := splitLang(path.Base(rel))
-	if !ok {
+// langTabs links a Markdown file to its translations: guide.md,
+// guide.ja.md and so on.
+func (s *Server) langTabs(tr translationLayouts, rel string) []langTab {
+	if !isMarkdown(rel) {
 		return nil
 	}
-	dir := path.Dir(rel)
-	dirents, err := fs.ReadDir(s.ws.FS().FS(), dir)
-	if err != nil {
+	g, _ := tr.split(rel)
+	members := tr.members(s.ws.FS().FS(), s.ws.Skipped, g)
+	if len(members) < 2 {
 		return nil
 	}
 	var tabs []langTab
-	for _, d := range dirents {
-		dbase, dlang, ok := splitLang(d.Name())
-		if d.IsDir() || !ok || dbase != base {
-			continue
-		}
+	for _, m := range members {
 		tabs = append(tabs, langTab{
-			Label:   langLabel(dlang),
-			Href:    href(path.Join(dir, d.Name())),
-			Current: d.Name() == path.Base(rel),
+			Label:   langLabel(m.Lang),
+			Href:    href(m.Rel),
+			Current: m.Rel == rel,
 		})
-	}
-	if len(tabs) < 2 {
-		return nil
 	}
 	sort.SliceStable(tabs, func(i, j int) bool {
 		return tabs[i].Label == "Default" || (tabs[j].Label != "Default" && tabs[i].Label < tabs[j].Label)

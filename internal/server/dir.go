@@ -40,7 +40,12 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		s.serveError(w, r, snap, rel, err)
 		return
 	}
-	var readmes []string
+	tr := s.translationsFor(p.Settings)
+	// The README of this directory and its translations
+	var readme *translationGroup
+	// A README of a document elsewhere, such as ja/README.md in the
+	// directory ja, shown without its translations when there is no other
+	var otherReadme string
 	// A README that is not Markdown, shown as text when there is no other
 	var plainReadme string
 	for _, d := range dirents {
@@ -63,8 +68,12 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 			e.Href = dirHref(child)
 		}
 		v.Entries = append(v.Entries, e)
-		if !e.Dir && isReadme(d.Name()) {
-			readmes = append(readmes, d.Name())
+		if !e.Dir && readme == nil && isMarkdown(d.Name()) {
+			if g, _ := tr.split(child); g.dir == rel && g.name == "readme" {
+				readme = &g
+			} else if strings.EqualFold(strings.TrimSuffix(d.Name(), path.Ext(d.Name())), "readme") && otherReadme == "" {
+				otherReadme = child
+			}
 		}
 		if !e.Dir && plainReadme == "" && isPlainReadme(d.Name()) {
 			plainReadme = d.Name()
@@ -78,8 +87,15 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
 	})
 
-	if readme := pickReadme(readmes, r.URL.Query().Get("lang"), cookie(r, "gh-mini-lang")); readme != "" {
-		name := path.Join(rel, readme)
+	var readmes []member
+	if readme != nil {
+		readmes = tr.members(s.ws.FS().FS(), s.ws.Skipped, *readme)
+	} else if otherReadme != "" {
+		readmes = []member{{Rel: otherReadme}}
+	}
+	if len(readmes) > 0 {
+		picked := pickReadme(readmes, r.URL.Query().Get("lang"), cookie(r, "gh-mini-lang"))
+		name := picked.Rel
 		// Stat before reading, so that a file changing in between is
 		// cached under its old key and rendered again next time
 		info, err := s.ws.FS().Stat(name)
@@ -88,14 +104,13 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 			b, err = s.ws.FS().ReadFile(name)
 		}
 		if err == nil {
-			v.Readme = readme
+			v.Readme = strings.TrimPrefix(name, rel+"/")
 			v.Content, p.Features, _ = s.renderMarkdownFile(name, info, b)
-			for _, name := range readmes {
-				lang := langOf(name)
+			for _, m := range readmes {
 				v.Langs = append(v.Langs, langTab{
-					Label:   langLabel(lang),
-					Href:    "?lang=" + url.QueryEscape(orDefault(lang)),
-					Current: name == readme,
+					Label:   langLabel(m.Lang),
+					Href:    "?lang=" + url.QueryEscape(orDefault(m.Lang)),
+					Current: m == picked,
 				})
 			}
 			if len(v.Langs) < 2 {

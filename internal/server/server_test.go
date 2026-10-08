@@ -8,51 +8,6 @@ import (
 	"unicode/utf8"
 )
 
-func TestLangOf(t *testing.T) {
-	for name, want := range map[string]string{
-		"README.md":       "",
-		"README.ja.md":    "ja",
-		"guide.zh-TW.md":  "zh-tw",
-		"notes.markdown":  "",
-		"v1.2.md":         "",
-		"my.notes.ja.md":  "ja",
-		"guide.ja.mdx":    "ja",
-		"guide.mdx":       "",
-		"notamd.ja.txt":   "",
-		"guideXjaXmd":     "",
-		"api.go.md":       "",
-		"build.sh.md":     "",
-		"notes.github.md": "",
-		"guide.pt-BR.md":  "pt-br",
-	} {
-		if got := langOf(name); got != want {
-			t.Errorf("langOf(%q) = %q, want %q", name, got, want)
-		}
-	}
-}
-
-func TestPickReadme(t *testing.T) {
-	names := []string{"README.ja.md", "README.md"}
-	tests := []struct{ query, saved, want string }{
-		{"", "", "README.md"},
-		{"ja", "", "README.ja.md"},
-		{"", "ja", "README.ja.md"},
-		{"default", "ja", "README.md"},
-		{"fr", "", "README.md"},
-	}
-	for _, tt := range tests {
-		if got := pickReadme(append([]string(nil), names...), tt.query, tt.saved); got != tt.want {
-			t.Errorf("pickReadme(%q, %q) = %q, want %q", tt.query, tt.saved, got, tt.want)
-		}
-	}
-	if !isReadme("README.mdx") || isReadme("READMEXmd") || isReadme("README.go.md") || !isReadme("readme.zh-TW.md") {
-		t.Error("isReadme: README.mdx and readme.zh-TW.md are READMEs, READMEXmd and README.go.md are not")
-	}
-	if got := pickReadme([]string{"readme.ja.md"}, "", ""); got != "readme.ja.md" {
-		t.Errorf("only a translation: got %q", got)
-	}
-}
-
 func TestHref(t *testing.T) {
 	for rel, want := range map[string]string{
 		".":           "/",

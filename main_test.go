@@ -254,6 +254,32 @@ func TestParseArgsErrors(t *testing.T) {
 	if _, err := parseArgs([]string{"-p", "x"}, io.Discard); !errors.As(err, &ue) {
 		t.Errorf("-p x: err = %v, want a usageError", err)
 	}
+
+	stderr.Reset()
+	if _, err := parseArgs([]string{"--translations", "{name}"}, &stderr); !errors.As(err, &ue) {
+		t.Errorf("--translations {name}: err = %v, want a usageError", err)
+	}
+	if !strings.Contains(stderr.String(), "needs {name} and {lang} once each") {
+		t.Errorf("--translations {name}: stderr does not tell what is wrong:\n%s", stderr.String())
+	}
+}
+
+func TestParseArgsTranslations(t *testing.T) {
+	t.Setenv("GH_MINI_TRANSLATIONS", "dir")
+	if c, err := parseArgs(nil, io.Discard); err != nil || c.translations != "dir" {
+		t.Errorf("from the environment: got %q, %v", c.translations, err)
+	}
+	if c, err := parseArgs([]string{"--translations", "{name}_{lang}"}, io.Discard); err != nil || c.translations != "{name}_{lang}" {
+		t.Errorf("--translations over the environment: got %q, %v", c.translations, err)
+	}
+	t.Setenv("GH_MINI_TRANSLATIONS", "off,dir")
+	var ue usageError
+	if _, err := parseArgs(nil, io.Discard); err == nil || errors.As(err, &ue) || !strings.Contains(err.Error(), "$GH_MINI_TRANSLATIONS") {
+		t.Errorf("a wrong $GH_MINI_TRANSLATIONS: err = %v", err)
+	}
+	if _, err := parseArgs([]string{"--translations", "suffix"}, io.Discard); err != nil {
+		t.Errorf("--translations over a wrong $GH_MINI_TRANSLATIONS: %v", err)
+	}
 }
 
 func TestRunVersion(t *testing.T) {

@@ -131,7 +131,7 @@ func runsScripts(name string) bool {
 
 func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspace.Snapshot, rel string, info fs.FileInfo) {
 	p := s.newPage(r, snap, rel, "")
-	v := &fileView{Size: humanSize(info.Size()), Langs: s.langTabs(rel)}
+	v := &fileView{Size: humanSize(info.Size()), Langs: s.langTabs(s.translationsFor(p.Settings), rel)}
 	p.File = v
 	if !p.Ignored {
 		v.Commit = s.lastCommit(rel)

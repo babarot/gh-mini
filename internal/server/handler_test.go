@@ -204,6 +204,46 @@ func TestHandlerReadmeLanguage(t *testing.T) {
 	get(t, h, "/?lang=default", withCookie("gh-mini-lang", "ja")).expect(t, http.StatusOK, `<h1 id="repo">Repo</h1>`)
 }
 
+func TestHandlerTranslationsOff(t *testing.T) {
+	h := newTestServer(t)
+	off := withSettings(`{"translations":"off"}`)
+	r := get(t, h, "/", off, withCookie("gh-mini-lang", "ja"))
+	r.expect(t, http.StatusOK, `<h1 id="repo">Repo</h1>`)
+	if strings.Contains(r.body, `class="segmented langs"`) {
+		t.Error("translations off: the README has a language switch")
+	}
+	if r := get(t, h, "/docs/guide.md", off); strings.Contains(r.body, `class="segmented langs"`) {
+		t.Error("translations off: guide.md has a language switch")
+	}
+	// A setting this server does not offer counts as none
+	get(t, h, "/", withSettings(`{"translations":"{name}_{lang}"}`)).expect(t, http.StatusOK, `class="segmented langs"`)
+}
+
+func TestHandlerTranslationsLayout(t *testing.T) {
+	root, _ := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "ja", "README.md"), []byte("# 日本語\n"))
+	writeFile(t, filepath.Join(root, "docs", "guide_fr.md"), []byte("# Guide en français\n"))
+	srv, err := New(Options{Root: root, Name: "repo", Translations: "dir, {name}_{lang}.md"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+
+	get(t, h, "/").expect(t, http.StatusOK, `<option value="dir,{name}_{lang}.md" selected>{lang}/{name}.md, {name}_{lang}.md</option>`)
+	get(t, h, "/?lang=ja").expect(t, http.StatusOK, `>日本語</h1>`, `<a href="/ja/README.md">ja/README.md</a>`, `>JA</a>`)
+	get(t, h, "/docs/guide.md").expect(t, http.StatusOK, `<a href="/docs/guide_fr.md" data-lang="FR">FR</a>`)
+	if r := get(t, h, "/ja/"); strings.Contains(r.body, `class="segmented langs"`) || !strings.Contains(r.body, `>日本語</h1>`) {
+		t.Error("ja/: want its README without a language switch")
+	}
+	// The presets stay on offer
+	get(t, h, "/?lang=ja", withSettings(`{"translations":"suffix"}`)).expect(t, http.StatusOK, `>リポジトリ</h1>`)
+
+	if _, err := New(Options{Root: root, Name: "repo", Translations: "{name}"}); err == nil {
+		t.Error("New with a layout without {lang} is no error")
+	}
+}
+
 func TestHandlerDirRedirect(t *testing.T) {
 	r := get(t, newTestServer(t), "/docs")
 	if r.code != http.StatusMovedPermanently || r.header.Get("Location") != "/docs/" {
