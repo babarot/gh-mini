@@ -202,7 +202,10 @@
   <aside class="sidebar" id="mini.sidebar">
     <div class="sidebar-tools">
       <input type="search" id="mini.tree-filter" aria-label="Go to file" placeholder="Go to file  (t)" autocomplete="off" spellcheck="false">
-      <label class="md-only"><input type="checkbox" id="mini.md-only"> Markdown only</label>
+      <div class="sidebar-row">
+        <label class="md-only"><input type="checkbox" id="mini.md-only"> Markdown only</label>
+        <button type="button" class="link-btn" id="mini.collapse-all">Collapse all</button>
+      </div>
     </div>
     <nav id="mini.tree" class="tree" aria-label="Files"></nav>
   </aside>

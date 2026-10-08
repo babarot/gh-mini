@@ -8,7 +8,11 @@ const filterEl = document.getElementById("mini.tree-filter");
 const mdOnlyEl = document.getElementById("mini.md-only");
 const current = page.path;
 let tree = null;
-const open = new Set(load("open", []));
+// kept are the directories opened by hand, which every page opens again,
+// and open those and the directories down to the page shown, which only
+// this page opens
+const kept = new Set(load("open", []));
+const open = new Set(kept);
 
 // loaded are the lazy directories whose entries were read: directories
 // git ignores come without them, and are read when opened.
@@ -108,8 +112,10 @@ function before(a, b) {
 // fold opens or folds a directory in the tree, reading it first if it
 // came without its entries.
 function fold(path, opening) {
-  if (opening) open.add(path); else open.delete(path);
-  save("open", Array.from(open));
+  for (const set of [open, kept]) {
+    if (opening) set.add(path); else set.delete(path);
+  }
+  save("open", Array.from(kept));
   const n = find(path);
   (n && n.lazy && !n.children && opening ? readDir(path) : Promise.resolve()).then(render);
 }
@@ -269,6 +275,20 @@ export async function fetchTree() {
   tree = await r.json();
   loaded.clear();
   await readOpen();
+  // Directories removed or renamed are not kept open any more
+  const gone = Array.from(kept).filter((p) => !find(p));
+  if (gone.length) {
+    gone.forEach((p) => { kept.delete(p); open.delete(p); });
+    save("open", Array.from(kept));
+  }
+  render();
+}
+
+// collapseAll folds every directory, those down to the page shown too.
+function collapseAll() {
+  kept.clear();
+  open.clear();
+  save("open", []);
   render();
 }
 
@@ -299,8 +319,8 @@ export function initTree() {
       e.preventDefault();
       fold(path, !open.has(path));
     } else {
+      // Its page opens it, as the way to the page
       open.add(path);
-      save("open", Array.from(open));
     }
   });
   // The keys of a tree view: up and down move between the rows, right
@@ -350,6 +370,7 @@ export function initTree() {
       unpeek();
     }
   });
+  document.getElementById("mini.collapse-all").addEventListener("click", collapseAll);
   mdOnlyEl.addEventListener("change", () => {
     save("mdOnly", mdOnlyEl.checked);
     render();

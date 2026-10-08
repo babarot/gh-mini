@@ -167,6 +167,9 @@ body.sidebar-hidden .sidebar { display: none; }
   user-select: none;
 }
 .md-only input { margin: 0; }
+.sidebar-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.link-btn { padding: 0; color: var(--fgColor-muted); font: inherit; font-size: 12px; background: none; border: 0; cursor: pointer; }
+.link-btn:hover { color: var(--fgColor-accent); text-decoration: underline; }
 
 .tree {
   flex: 1;
