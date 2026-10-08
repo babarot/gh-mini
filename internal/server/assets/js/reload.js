@@ -108,29 +108,29 @@ function underDir(p) {
 }
 
 // subscribe calls onChange with every change the server tells, onBoot with
-// the boot ID a stream starts with, and catchUp once subscribed and when
-// the page comes back from the back/forward cache, as changes may have
-// been missed then. The tabs share one connection through a shared worker
-// where there is one.
+// the boot ID a stream starts with, and catchUp once the page is passed
+// the stream, on subscribing and on coming back from the back/forward
+// cache, as changes may have been missed before. The tabs share one
+// connection through a shared worker where there is one.
 function subscribe(onChange, onBoot, catchUp) {
-  window.addEventListener("pageshow", (e) => { if (e.persisted) catchUp(); });
   if (!window.SharedWorker) {
     const es = new EventSource("/_mini/events");
     es.onmessage = (e) => onChange(JSON.parse(e.data));
+    // Every stream starts with it, the first one and one opened again
     es.addEventListener("boot", (e) => onBoot(e.data));
-    catchUp();
+    window.addEventListener("pageshow", (e) => { if (e.persisted) catchUp(); });
     return;
   }
   const worker = new SharedWorker(new URL("./events-worker.js", import.meta.url), { name: "gh-mini-events" });
   worker.port.onmessage = (e) => {
     const c = JSON.parse(e.data);
-    if (c.boot !== undefined) onBoot(c.boot);
+    // The worker may have its stream open already, and tells no boot ID
+    // to a tab that comes later, but that it is passed the stream
+    if (c.attached) catchUp();
+    else if (c.boot !== undefined) onBoot(c.boot);
     else onChange(c);
   };
   worker.port.start();
-  // The worker may have its stream open already, and tells no boot ID to
-  // a tab that comes later
-  catchUp();
   window.addEventListener("pagehide", () => worker.port.postMessage("close"));
   window.addEventListener("pageshow", (e) => { if (e.persisted) worker.port.postMessage("open"); });
 }

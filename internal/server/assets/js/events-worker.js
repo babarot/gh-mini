@@ -18,13 +18,19 @@ events.addEventListener("boot", (e) => {
 });
 
 // A tab says "close" when it is left, and "open" when it comes back from
-// the back/forward cache
+// the back/forward cache. Once it is passed the stream again it is told
+// so, and asks for what it missed before: told any sooner, it could miss
+// a change that came in between
+const attach = (port) => {
+  ports.add(port);
+  port.postMessage(JSON.stringify({ attached: true }));
+};
 onconnect = (e) => {
   const port = e.ports[0];
-  ports.add(port);
   port.onmessage = (m) => {
     if (m.data === "close") ports.delete(port);
-    else if (m.data === "open") ports.add(port);
+    else if (m.data === "open") attach(port);
   };
   port.start();
+  attach(port);
 };
