@@ -379,7 +379,9 @@ body[data-kind="html"] .main {
   height: calc(100vh - var(--mini-topbar-height));
   padding-bottom: 16px;
 }
-body[data-kind="html"] .main > .box {
+/* The box of the preview, not the commit above it, takes the rest of the
+   window's height */
+body[data-kind="html"] .main > .box:has(> .html-preview) {
   flex: 1;
   min-height: 0;
   display: flex;
