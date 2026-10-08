@@ -21,6 +21,12 @@ A directory with changes under it has a dot, so that a folded one tells where to
 
 A directory's page tells how many lines each file changed, and for a directory, those of the files under it. A deleted file stays listed, struck through, until the deletion is committed.
 
+## A file's page
+
+A changed file's page says how it changed, and whether that is staged, above the file, with a link to it on the Changes page. A Diff view joins Preview and Code, with the lines it changed on its tab; a source file, which has no views otherwise, gets Code and Diff. The diff is that of everything changed since the last commit, staged or not.
+
+A file deleted still has a page, of its deletion, until the deletion is committed: follow it from the tree or a directory's page.
+
 ## The Changes page
 
 The count in the top bar leads to the Changes page, `/_mini/changes`, which shows the diff of every file changed, as a pull request on GitHub does: highlighted, with the lines' numbers before and after. A file's header folds it, tells how many lines it changed, and leads to its page.

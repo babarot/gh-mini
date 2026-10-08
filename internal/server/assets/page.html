@@ -344,23 +344,36 @@
       <span class="meta" title="{{.Date}}">{{.Ago}}</span>
     </div>
     {{- end}}
+    {{- with .Change}}
+    <div class="box uncommitted s-{{.Letter}}">
+      <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M1 1.75C1 .784 1.784 0 2.75 0h7.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 15H2.75A1.75 1.75 0 0 1 1 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073ZM8 3.25a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0V7h-1.5a.75.75 0 0 1 0-1.5h1.5V4A.75.75 0 0 1 8 3.25Zm-3 8a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z"></path></svg>
+      <span><strong>{{.Label}}</strong>, {{.Where}}{{with .From}}, from <code>{{.}}</code>{{end}}</span>
+      {{- if not .Binary}}
+      <span class="diff-stat"><span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span></span>
+      {{- end}}
+      <span class="spacer"></span>
+      <a href="{{.Href}}">Open in Changes</a>
+    </div>
+    {{- end}}
     <div class="box">
       <div class="box-header">
         {{- with .Views}}
         <div class="segmented">
           {{- range .}}
-          <a href="{{.Href}}"{{if .Current}} class="selected"{{end}}>{{.Label}}</a>
+          <a href="{{.Href}}"{{if .Current}} class="selected"{{end}}>{{.Label}}{{with .Stat}}{{if not .Binary}} <span class="counter"><span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span></span>{{end}}{{end}}</a>
           {{- end}}
         </div>
         {{- end}}
         {{- if .Lines}}<span class="meta">{{.Lines}} lines</span>{{end}}
-        <span class="meta">{{.Size}}</span>
+        {{with .Size}}<span class="meta">{{.}}</span>{{end}}
         <span class="spacer"></span>
         {{template "langs" .Langs}}
         {{- if gt (len $.Features.Headings) 1}}
         <button type="button" class="btn toc-toggle" data-toc-toggle aria-controls="mini.toc" aria-expanded="false" title="Outline"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M5.75 2.5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5ZM2 14a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-6a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg></button>
         {{- end}}
+        {{- if not .Gone}}
         <a class="btn" href="?raw">Raw</a>
+        {{- end}}
       </div>
       {{- with .Notice}}
       <div class="notice">{{.}}</div>
@@ -369,6 +382,8 @@
       <article class="markdown-body">{{.Content}}</article>
       {{- else if eq $.Kind "code"}}
       <div class="code">{{.Content}}</div>
+      {{- else if eq $.Kind "diff"}}
+      <div class="diff-scroll">{{.Content}}</div>
       {{- else if eq $.Kind "html"}}
       <iframe class="html-preview" src="{{.PreviewURL}}" title="{{$.Path}}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
       {{- else if eq $.Kind "image"}}

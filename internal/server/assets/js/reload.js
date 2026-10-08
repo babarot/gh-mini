@@ -71,6 +71,8 @@ export function initReload({ onTheme, onStructure, onFiles, onStatus }) {
       onStatus().then(({ changed }) => {
         if (page.kind === "changes" && changed.length) reload();
         else if (page.kind === "dir" && changed.some(inPageDir)) reload();
+        // A file's page tells how it changed, and shows its diff
+        else if (changed.includes(page.path)) reload();
       });
     }
     if (!c.theme && !c.structure && !c.resync && !c.paths?.length && !c.dirs?.length) return;
@@ -120,7 +122,7 @@ const inPageDir = (p) => page.path === "." || p.startsWith(page.path + "/");
 // the status read already has it.
 export function checkStatus(etag) {
   const rendered = document.body.dataset.status;
-  if (page.reload && (page.kind === "dir" || page.kind === "changes") && rendered && etag && etag !== rendered) reload();
+  if (page.reload && ["dir", "changes", "diff"].includes(page.kind) && rendered && etag && etag !== rendered) reload();
 }
 
 // underDir tells whether a path is in the directory of the page's file or

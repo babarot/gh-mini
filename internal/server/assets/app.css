@@ -779,3 +779,16 @@ body[data-kind="html"] .main > .box {
 .diff .num.add { background: color-mix(in srgb, var(--fgColor-success) 25%, transparent); }
 .diff .num.del { background: color-mix(in srgb, var(--fgColor-danger) 25%, transparent); }
 .diff .no-newline { margin-left: 4px; color: var(--fgColor-danger); user-select: none; }
+
+/* Above a changed file's page: how it changed since the last commit */
+.uncommitted {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-color: color-mix(in srgb, var(--mini-status-color) 40%, var(--borderColor-default));
+  background: color-mix(in srgb, var(--mini-status-color) 6%, var(--bgColor-default));
+}
+.uncommitted .octicon { color: var(--mini-status-color); }
+.uncommitted strong { color: var(--mini-status-color); }

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"html/template"
 	"io/fs"
+	"math"
 	"net/http"
 	"net/url"
 	"path"
@@ -147,71 +148,95 @@ func (s *Server) serveChangesPage(w http.ResponseWriter, r *http.Request) {
 	case "unstaged":
 		which = workspace.DiffUnstaged
 	}
-	patches := map[string]*diff.File{}
+	var patches map[string]*diff.File
 	if show != "untracked" {
 		var specs []string
 		if v.One {
-			specs = []string{paths[0]}
-			if from := st.Files[paths[0]].From; from != "" {
-				specs = append(specs, from)
-			}
+			specs = filePathspecs(st, paths[0])
 		}
-		parsed := diff.Parse(s.ws.Diff(st, which, specs...))
-		for i := range parsed {
-			patches[parsed[i].Path()] = &parsed[i]
-		}
+		patches = s.patchesOf(st, which, specs...)
 	}
 
 	budget := maxPageLines
 	for _, rel := range paths {
-		f := st.Files[rel]
-		cf := &changedFile{
-			Path:   rel,
-			From:   f.From,
-			Letter: f.Letter,
-			Label:  strings.ToUpper(statusLabels[f.Letter][:1]) + statusLabels[f.Letter][1:],
-			Anchor: diffAnchor(rel),
-		}
-		if show == "all" {
-			cf.Staged = inShow(f, "staged")
-			cf.Unstaged = inShow(f, "unstaged")
-		}
-		if f.Letter != "D" {
-			cf.Href = href(rel)
-		}
-		var df *diff.File
-		if f.X == "?" {
-			df = s.untrackedPatch(rel, cf)
-		} else if df = patches[rel]; df == nil {
-			cf.Notice = "No change in the content to show."
-		}
-		if df != nil {
-			cf.Added, cf.Deleted = df.Stat()
-			lines := 0
-			for _, h := range df.Hunks {
-				lines += len(h.Lines)
-			}
-			switch {
-			case df.Binary:
-				cf.Binary = true
-				cf.Notice = "Binary file not shown."
-			case len(df.Hunks) == 0 && df.OldMode != "":
-				cf.Notice = "File mode changed from " + df.OldMode + " to " + df.NewMode + "."
-			case len(df.Hunks) == 0:
-				cf.Notice = "Empty file."
-			case !v.One && (lines > maxDiffLines || lines > budget):
-				cf.Load = changesHref(show, rel)
-			default:
-				budget -= lines
-				cf.Diff = s.diffTable(st, which, df)
-			}
-		}
-		cf.Blocks = statBlocks(cf.Added, cf.Deleted)
+		cf := s.changedFile(st, show, which, rel, patches, &budget, !v.One)
 		v.Added += cf.Added
 		v.Deleted += cf.Deleted
 		v.Files = append(v.Files, cf)
 	}
 	s.render(w, p)
+}
+
+// changedFile makes a file's diff, from the patches of the files read
+// from git, or for an untracked one, from the file. budget is how many
+// lines of diffs the page may still show; with fold, a diff past it, or
+// too long, is folded.
+func (s *Server) changedFile(st *workspace.Status, show, which, rel string, patches map[string]*diff.File, budget *int, fold bool) *changedFile {
+	f := st.Files[rel]
+	cf := &changedFile{
+		Path:   rel,
+		From:   f.From,
+		Letter: f.Letter,
+		Label:  strings.ToUpper(statusLabels[f.Letter][:1]) + statusLabels[f.Letter][1:],
+		Anchor: diffAnchor(rel),
+	}
+	if show == "all" {
+		cf.Staged = inShow(f, "staged")
+		cf.Unstaged = inShow(f, "unstaged")
+	}
+	if f.Letter != "D" {
+		cf.Href = href(rel)
+	}
+	var df *diff.File
+	if f.X == "?" {
+		df = s.untrackedPatch(rel, cf)
+	} else if df = patches[rel]; df == nil {
+		cf.Notice = "No change in the content to show."
+	}
+	if df != nil {
+		cf.Added, cf.Deleted = df.Stat()
+		lines := 0
+		for _, h := range df.Hunks {
+			lines += len(h.Lines)
+		}
+		switch {
+		case df.Binary:
+			cf.Binary = true
+			cf.Notice = "Binary file not shown."
+		case len(df.Hunks) == 0 && df.OldMode != "":
+			cf.Notice = "File mode changed from " + df.OldMode + " to " + df.NewMode + "."
+		case len(df.Hunks) == 0:
+			cf.Notice = "Empty file."
+		case fold && (lines > maxDiffLines || lines > *budget):
+			cf.Load = changesHref(show, rel)
+		default:
+			*budget -= lines
+			cf.Diff = s.diffTable(st, which, df)
+		}
+	}
+	cf.Blocks = statBlocks(cf.Added, cf.Deleted)
+	return cf
+}
+
+// patchesOf reads the patches of files from git: those at paths, or with
+// none, all those changed.
+func (s *Server) patchesOf(st *workspace.Status, which string, paths ...string) map[string]*diff.File {
+	patches := map[string]*diff.File{}
+	parsed := diff.Parse(s.ws.Diff(st, which, paths...))
+	for i := range parsed {
+		patches[parsed[i].Path()] = &parsed[i]
+	}
+	return patches
+}
+
+// filePathspecs are the paths that make a file's diff: its own, and the
+// one it was renamed from.
+func filePathspecs(st *workspace.Status, rel string) []string {
+	specs := []string{rel}
+	if from := st.Files[rel].From; from != "" {
+		specs = append(specs, from)
+	}
+	return specs
 }
 
 func changesHref(show, file string) string {
@@ -386,4 +411,95 @@ func (s *Server) diffTable(st *workspace.Status, which string, df *diff.File) te
 	}
 	b.WriteString("</table>")
 	return template.HTML(b.String())
+}
+
+// fileChange is how a file changed since the last commit, as its page
+// tells it above the file.
+type fileChange struct {
+	Letter string
+	Label  string
+	// Where tells which of the index and the working tree have it
+	Where   string
+	From    string
+	Added   int
+	Deleted int
+	Binary  bool
+	// Href is the file on the Changes page
+	Href string
+}
+
+func newFileChange(rel string, f *workspace.FileStatus) *fileChange {
+	c := &fileChange{
+		Letter:  f.Letter,
+		Label:   strings.ToUpper(statusLabels[f.Letter][:1]) + statusLabels[f.Letter][1:],
+		From:    f.From,
+		Added:   f.Added,
+		Deleted: f.Deleted,
+		Binary:  f.Binary,
+		Href:    changesHref("all", "") + "#" + diffAnchor(rel),
+	}
+	staged, unstaged := inShow(f, "staged"), inShow(f, "unstaged")
+	switch {
+	case f.Unmerged:
+		c.Where = "in a merge conflict"
+	case f.X == "?":
+		c.Where = "not tracked by git yet"
+	case staged && unstaged:
+		c.Where = "partly staged"
+	case staged:
+		c.Where = "staged"
+	default:
+		c.Where = "not staged"
+	}
+	return c
+}
+
+// changeOf is how a file changed since the last commit, or nil.
+func (s *Server) changeOf(snap *workspace.Snapshot, rel string) *workspace.FileStatus {
+	if snap.Status == nil || snap.Ignored(rel) {
+		return nil
+	}
+	return snap.Status.Files[rel]
+}
+
+// diffView tells a request for a changed file's diff.
+func (s *Server) diffView(r *http.Request, snap *workspace.Snapshot, rel string) bool {
+	return r.URL.Query().Get("diff") == "1" && s.changeOf(snap, rel) != nil
+}
+
+// fileDiff makes a file's page show its diff against the last commit.
+func (s *Server) fileDiff(p *page, st *workspace.Status, rel string) {
+	p.Kind = "diff"
+	var patches map[string]*diff.File
+	if st.Files[rel].X != "?" {
+		patches = s.patchesOf(st, workspace.DiffAll, filePathspecs(st, rel)...)
+	}
+	budget := math.MaxInt
+	cf := s.changedFile(st, "all", workspace.DiffAll, rel, patches, &budget, false)
+	p.File.Content = cf.Diff
+	if cf.Notice != "" {
+		p.File.Content = template.HTML(`<div class="diff-notice">` + template.HTMLEscapeString(cf.Notice) + `</div>`)
+	}
+}
+
+// serveDeleted serves the page of a file deleted since the last commit:
+// its diff, the deletion.
+func (s *Server) serveDeleted(w http.ResponseWriter, r *http.Request, snap *workspace.Snapshot, rel string) {
+	p := s.newPage(r, snap, rel, "diff")
+	f := snap.Status.Files[rel]
+	v := &fileView{Gone: true, Change: newFileChange(rel, f)}
+	p.File = v
+	v.Commit = s.lastCommit(rel)
+	if v.Commit != nil && p.Settings["avatars"] == "false" {
+		v.Commit.Avatar = ""
+	}
+	v.Views = []viewTab{{Label: "Diff", Href: "?diff=1", Current: true, Stat: v.Change}}
+	s.fileDiff(p, snap.Status, rel)
+	s.render(w, p)
+}
+
+// deleted tells a file deleted since the last commit, which git still has.
+func (s *Server) deleted(snap *workspace.Snapshot, rel string) bool {
+	f := s.changeOf(snap, rel)
+	return f != nil && f.Letter == "D"
 }

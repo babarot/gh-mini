@@ -115,3 +115,23 @@ func TestChangesPage(t *testing.T) {
 	run(t, ctx, chromedp.Click(`#mini\.changes`, chromedp.ByQuery))
 	waitFor(t, ctx, `document.body.dataset.kind === "changes"`)
 }
+
+// A changed file's page tells how it changed, as git has it now, and a
+// file deleted, found in the tree, shows its deletion.
+func TestChangedFilePage(t *testing.T) {
+	a := newRepoApp(t, map[string]string{"a.md": "# A\n", "b.md": "# B\n"})
+	a.write("a.md", "# A\n\nOne.\n")
+	if err := os.Remove(filepath.Join(a.root, "b.md")); err != nil {
+		t.Fatal(err)
+	}
+	ctx := tab(t)
+	open(t, ctx, a.URL("/a.md?diff=1"))
+	subscribed(t, ctx)
+	banner := `document.querySelector(".uncommitted")?.textContent`
+	waitFor(t, ctx, banner+`.includes("not staged") && document.body.dataset.kind === "diff"`)
+	a.git("add", "a.md")
+	waitFor(t, ctx, banner+`.includes(", staged")`)
+
+	run(t, ctx, chromedp.Click(`.tree .row.gone[data-path="b.md"]`, chromedp.ByQuery))
+	waitFor(t, ctx, `document.body.dataset.path === "b.md" && document.querySelector(".diff .text.del")?.textContent.includes("# B")`)
+}
