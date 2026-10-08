@@ -44,8 +44,14 @@ type page struct {
 
 // layout is what every page shows around its content.
 type layout struct {
-	Title   string
+	Title string
+	// Name is the directory's name, which keeps the viewer's state apart
+	// from other directories'. Owner and Repo are what the page shows:
+	// the GitHub repository of the origin remote, or no owner and the
+	// directory's name.
 	Name    string
+	Owner   string
+	Repo    string
 	Branch  string
 	Path    string
 	Crumbs  []crumb
@@ -81,12 +87,20 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 		Static:   s.static.prefix(),
 		About:    s.about(),
 	}}
-	p.Title = s.opts.Name
+	p.Owner, p.Repo, _ = strings.Cut(s.ws.Repo(), "/")
+	if p.Repo == "" {
+		p.Owner, p.Repo = "", s.opts.Name
+	}
+	full := p.Repo
+	if p.Owner != "" {
+		full = p.Owner + "/" + p.Repo
+	}
+	p.Title = full
 	p.SettingAttrs = settingAttrs(p.Settings)
 	p.SidebarHidden = cookie(r, sidebarCookie) == "hidden"
 	p.SettingSections = s.settingSections(p.Settings)
 	if rel != "." {
-		p.Title = rel + " · " + s.opts.Name
+		p.Title = rel + " · " + full
 		parts := strings.Split(rel, "/")
 		for i, name := range parts {
 			p.Crumbs = append(p.Crumbs, crumb{Name: name, Href: dirHref(strings.Join(parts[:i+1], "/"))})

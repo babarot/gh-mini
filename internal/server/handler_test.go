@@ -320,6 +320,32 @@ func TestHandlerLastCommitPushed(t *testing.T) {
 	get(t, other.Handler(), "/main.go").reject(t, "avatars.githubusercontent.com", "/commit/")
 }
 
+// The page shows the repository of the origin remote, whatever the
+// directory is called, and the directory's name without one. The viewer's
+// state stays under the directory's name, so that two worktrees of a
+// repository keep theirs apart.
+func TestHandlerRepoName(t *testing.T) {
+	root, _ := newTestRepo(t)
+	srv, err := New(Options{Root: root, Name: "worktree-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { srv.Close() })
+	get(t, srv.Handler(), "/docs/").expect(t, http.StatusOK,
+		`<title>docs · example/repo</title>`, `data-name="worktree-a"`,
+		`<a class="owner" href="https://github.com/example">example</a>`, `<a href="/">repo</a>`)
+
+	git(t, root, "remote", "remove", "origin")
+	other, err := New(Options{Root: root, Name: "worktree-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { other.Close() })
+	r := get(t, other.Handler(), "/docs/")
+	r.expect(t, http.StatusOK, `<title>docs · worktree-a</title>`, `<a href="/">worktree-a</a>`)
+	r.reject(t, `class="owner"`)
+}
+
 func TestHandlerImageAndRaw(t *testing.T) {
 	h := newTestServer(t)
 	get(t, h, "/img.png").expect(t, http.StatusOK, `data-kind="image"`, `<img src="?raw"`)

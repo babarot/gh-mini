@@ -70,10 +70,27 @@ a:hover { text-decoration: underline; }
 .repo {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   color: var(--fgColor-default);
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
+}
+.repo .octicon { margin-right: 4px; }
+/* Owner and repository are links of their own, shaded on hover as
+   GitHub's are, rather than underlined */
+.repo a {
+  padding: 0 6px;
+  line-height: 32px;
+  color: inherit;
+  border-radius: var(--mini-radius);
+}
+.repo a:hover { text-decoration: none; background: var(--mini-selected); }
+.repo .owner,
+.repo .sep {
+  font-weight: 400;
+}
+.repo .sep {
+  margin: 0 4px;
+  color: var(--fgColor-muted);
 }
 
 .branch {
