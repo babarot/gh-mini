@@ -30,4 +30,4 @@ The dialog never offers a choice the world does not have, and a flag never overr
 ## Adding one
 
 - A flag: parseArgs in [main.go](../../main.go), passed to the server in `server.Options`, and a row in the README's Flags table.
-- A setting: an entry in settingDefs in [settings.go](../../internal/server/settings.go); the comment at the top of that file tells how its value reaches the page.
+- A setting: an entry in settingDefs in [settings.go](../../internal/server/settings.go); the comment at the top of that file tells how its value reaches the page. Add a row to the table in [Settings](../guides/settings.md) too.
