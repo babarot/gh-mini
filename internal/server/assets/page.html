@@ -117,31 +117,42 @@
       <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path></svg>
     </button>
   </div>
-  {{- range $s := .SettingViews}}
-  <div class="setting">
-    <div class="setting-text">
-      <div class="setting-label" id="mini.setting-{{$s.Key}}">{{$s.Label}}</div>
-      {{- with $s.Description}}
-      <div class="setting-description">{{.}}</div>
+  <div class="settings-body{{if eq (len .SettingSections) 1}} single{{end}}">
+    <div class="settings-nav" role="tablist" aria-orientation="vertical" aria-label="Sections">
+      {{- range $i, $sec := .SettingSections}}
+      <button type="button" role="tab" id="mini.settings-tab-{{$sec.ID}}" data-section="{{$sec.ID}}" aria-controls="mini.settings-{{$sec.ID}}" aria-selected="{{if eq $i 0}}true{{else}}false{{end}}" tabindex="{{if eq $i 0}}0{{else}}-1{{end}}">{{$sec.Name}}</button>
       {{- end}}
     </div>
-    {{- if eq $s.Control "select"}}
-    <select data-setting="{{$s.Key}}" aria-labelledby="mini.setting-{{$s.Key}}">
-      {{- range $s.Options}}
-      <option value="{{.Value}}"{{if eq .Value $s.Value}} selected{{end}}>{{.Label}}</option>
+    {{- range $i, $sec := .SettingSections}}
+    <section class="settings-pane" role="tabpanel" id="mini.settings-{{$sec.ID}}" aria-labelledby="mini.settings-tab-{{$sec.ID}}"{{if ne $i 0}} hidden{{end}}>
+      {{- range $s := .Settings}}
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-{{$s.Key}}">{{$s.Label}}</div>
+          {{- with $s.Description}}
+          <div class="setting-description">{{.}}</div>
+          {{- end}}
+        </div>
+        {{- if eq $s.Control "select"}}
+        <select data-setting="{{$s.Key}}" aria-labelledby="mini.setting-{{$s.Key}}">
+          {{- range $s.Options}}
+          <option value="{{.Value}}"{{if eq .Value $s.Value}} selected{{end}}>{{.Label}}</option>
+          {{- end}}
+        </select>
+        {{- else if eq $s.Control "segmented"}}
+        <div class="segmented" role="radiogroup" aria-labelledby="mini.setting-{{$s.Key}}">
+          {{- range $s.Options}}
+          <button type="button" role="radio" data-setting="{{$s.Key}}" data-value="{{.Value}}" aria-checked="{{if eq .Value $s.Value}}true{{else}}false{{end}}" tabindex="{{if eq .Value $s.Value}}0{{else}}-1{{end}}"{{if eq .Value $s.Value}} class="selected"{{end}}>{{.Label}}</button>
+          {{- end}}
+        </div>
+        {{- else if eq $s.Control "toggle"}}
+        <input type="checkbox" role="switch" data-setting="{{$s.Key}}" aria-labelledby="mini.setting-{{$s.Key}}"{{if eq $s.Value "true"}} checked{{end}}>
+        {{- end}}
+      </div>
       {{- end}}
-    </select>
-    {{- else if eq $s.Control "segmented"}}
-    <div class="segmented" role="radiogroup" aria-labelledby="mini.setting-{{$s.Key}}">
-      {{- range $s.Options}}
-      <button type="button" role="radio" data-setting="{{$s.Key}}" data-value="{{.Value}}" aria-checked="{{if eq .Value $s.Value}}true{{else}}false{{end}}" tabindex="{{if eq .Value $s.Value}}0{{else}}-1{{end}}"{{if eq .Value $s.Value}} class="selected"{{end}}>{{.Label}}</button>
-      {{- end}}
-    </div>
-    {{- else if eq $s.Control "toggle"}}
-    <input type="checkbox" role="switch" data-setting="{{$s.Key}}" aria-labelledby="mini.setting-{{$s.Key}}"{{if eq $s.Value "true"}} checked{{end}}>
+    </section>
     {{- end}}
   </div>
-  {{- end}}
 </dialog>
 <script type="application/json" id="mini.settings-data">{{.Settings}}</script>
 

@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -95,4 +96,36 @@ func TestSettingsMissingDefaultTheme(t *testing.T) {
 	}
 	defer srv.Close()
 	get(t, srv.Handler(), "/").expect(t, http.StatusOK, `id="mini.theme" href="/_mini/theme/github.css"`)
+}
+
+// Settings are grouped by section, in the order of their first setting;
+// one that names none goes under defaultSection.
+func TestSettingSections(t *testing.T) {
+	saved := settingDefs
+	defer func() { settingDefs = saved }()
+	none := func(*Server) string { return "" }
+	settingDefs = []setting{
+		{Key: "a", Section: "Look and Feel", Control: "toggle", Default: none},
+		{Key: "b", Control: "toggle", Default: none},
+		{Key: "c", Section: "Look and Feel", Control: "toggle", Default: none},
+	}
+	var got []string
+	for _, sec := range (&Server{}).settingSections(map[string]string{}) {
+		keys := ""
+		for _, s := range sec.Settings {
+			keys += s.Key
+		}
+		got = append(got, sec.Name+"|"+sec.ID+"|"+keys)
+	}
+	want := []string{"Look and Feel|look-and-feel|ac", "General|general|b"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestSettingsDialogSections(t *testing.T) {
+	get(t, newTestServer(t), "/").expect(t, http.StatusOK,
+		`<button type="button" role="tab" id="mini.settings-tab-appearance" data-section="appearance" aria-controls="mini.settings-appearance" aria-selected="true" tabindex="0">Appearance</button>`,
+		`<section class="settings-pane" role="tabpanel" id="mini.settings-files" aria-labelledby="mini.settings-tab-files" hidden>`,
+	)
 }

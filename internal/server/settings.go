@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -19,7 +20,8 @@ import (
 // changes only the keys it sets and keeps the rest, even ones this server
 // does not know (see settings.js).
 //
-// To add a setting, add it to settingDefs. With Attr, its value is set as
+// To add a setting, add it to settingDefs, in the Section the dialog lists
+// it under. With Attr, its value is set as
 // <html data-<key>>, for CSS to match; for anything else the page must do
 // at once, add an applier for the key in settings.js.
 const settingsCookie = "gh-mini-settings"
@@ -29,6 +31,9 @@ type setting struct {
 	Key         string
 	Label       string
 	Description string
+	// Section is the page of the dialog it is on; defaultSection when
+	// empty. Sections are listed in the order their first setting is.
+	Section string
 	// Control is how the dialog shows it: "select" for choices that are
 	// many or grow at run time, "segmented" for a few fixed choices,
 	// "toggle" for on and off, whose values are "true" and "false".
@@ -49,6 +54,7 @@ type choice struct {
 var settingDefs = []setting{
 	{
 		Key:         "theme",
+		Section:     "Appearance",
 		Label:       "Theme",
 		Description: "Built-in themes and CSS files in the themes directory",
 		Control:     "select",
@@ -57,6 +63,7 @@ var settingDefs = []setting{
 	},
 	{
 		Key:         "mode",
+		Section:     "Appearance",
 		Label:       "Mode",
 		Description: "Auto follows the system",
 		Control:     "segmented",
@@ -67,6 +74,7 @@ var settingDefs = []setting{
 	},
 	{
 		Key:         "htmlPreview",
+		Section:     "Files",
 		Label:       "HTML preview",
 		Description: "Open HTML files rendered, with their scripts, rather than as code",
 		Control:     "toggle",
@@ -187,14 +195,47 @@ type settingView struct {
 	Options []choice
 }
 
-func (s *Server) settingViews(values map[string]string) []settingView {
-	out := make([]settingView, 0, len(settingDefs))
+// settingSection is a page of the settings dialog.
+type settingSection struct {
+	Name string
+	// ID names the section in element ids and in what the page keeps of
+	// the one last open
+	ID       string
+	Settings []settingView
+}
+
+// defaultSection is the section of a setting that names none.
+const defaultSection = "General"
+
+func (s *Server) settingSections(values map[string]string) []settingSection {
+	var out []settingSection
+	index := map[string]int{}
 	for _, d := range settingDefs {
 		v := settingView{setting: d, Value: values[d.Key]}
 		if d.Choices != nil {
 			v.Options = d.Choices(s)
 		}
-		out = append(out, v)
+		name := cmp.Or(d.Section, defaultSection)
+		i, ok := index[name]
+		if !ok {
+			i = len(out)
+			index[name] = i
+			out = append(out, settingSection{Name: name, ID: sectionID(name)})
+		}
+		out[i].Settings = append(out[i].Settings, v)
 	}
 	return out
+}
+
+// sectionID makes a section's name fit for an element id.
+func sectionID(name string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case 'a' <= r && r <= 'z', '0' <= r && r <= '9':
+			return r
+		case 'A' <= r && r <= 'Z':
+			return r + 'a' - 'A'
+		}
+		return '-'
+	}, name)
 }

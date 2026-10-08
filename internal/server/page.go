@@ -50,10 +50,10 @@ type layout struct {
 	Path    string
 	Crumbs  []crumb
 	Ignored bool
-	// Settings holds the value of every setting, by key, and SettingViews
-	// what the settings dialog shows.
-	Settings     map[string]string
-	SettingViews []settingView
+	// Settings holds the value of every setting, by key, and
+	// SettingSections what the settings dialog shows, page by page.
+	Settings        map[string]string
+	SettingSections []settingSection
 	// SettingAttrs are the settings set on <html> for CSS.
 	SettingAttrs template.HTMLAttr
 	Reload       bool
@@ -81,7 +81,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 	p.Title = s.opts.Name
 	p.SettingAttrs = settingAttrs(p.Settings)
 	p.SidebarHidden = cookie(r, sidebarCookie) == "hidden"
-	p.SettingViews = s.settingViews(p.Settings)
+	p.SettingSections = s.settingSections(p.Settings)
 	if rel != "." {
 		p.Title = rel + " · " + s.opts.Name
 		parts := strings.Split(rel, "/")

@@ -105,35 +105,45 @@
       <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"></path></svg>
     </button>
   </div>
-  <div class="setting">
-    <div class="setting-text">
-      <div class="setting-label" id="mini.setting-theme">Theme</div>
-      <div class="setting-description">Built-in themes and CSS files in the themes directory</div>
+  <div class="settings-body">
+    <div class="settings-nav" role="tablist" aria-orientation="vertical" aria-label="Sections">
+      <button type="button" role="tab" id="mini.settings-tab-appearance" data-section="appearance" aria-controls="mini.settings-appearance" aria-selected="true" tabindex="0">Appearance</button>
+      <button type="button" role="tab" id="mini.settings-tab-files" data-section="files" aria-controls="mini.settings-files" aria-selected="false" tabindex="-1">Files</button>
     </div>
-    <select data-setting="theme" aria-labelledby="mini.setting-theme">
-      <option value="github" selected>github</option>
-      <option value="nord">nord</option>
-      <option value="tokyo-night">tokyo-night</option>
-      <option value="sepia">sepia</option>
-    </select>
-  </div>
-  <div class="setting">
-    <div class="setting-text">
-      <div class="setting-label" id="mini.setting-mode">Mode</div>
-      <div class="setting-description">Auto follows the system</div>
-    </div>
-    <div class="segmented" role="radiogroup" aria-labelledby="mini.setting-mode">
-      <button type="button" role="radio" data-setting="mode" data-value="" aria-checked="true" tabindex="0" class="selected">Auto</button>
-      <button type="button" role="radio" data-setting="mode" data-value="light" aria-checked="false" tabindex="-1">Light</button>
-      <button type="button" role="radio" data-setting="mode" data-value="dark" aria-checked="false" tabindex="-1">Dark</button>
-    </div>
-  </div>
-  <div class="setting">
-    <div class="setting-text">
-      <div class="setting-label" id="mini.setting-htmlPreview">HTML preview</div>
-      <div class="setting-description">Open HTML files rendered, with their scripts, rather than as code</div>
-    </div>
-    <input type="checkbox" role="switch" data-setting="htmlPreview" aria-labelledby="mini.setting-htmlPreview">
+    <section class="settings-pane" role="tabpanel" id="mini.settings-appearance" aria-labelledby="mini.settings-tab-appearance">
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-theme">Theme</div>
+          <div class="setting-description">Built-in themes and CSS files in the themes directory</div>
+        </div>
+        <select data-setting="theme" aria-labelledby="mini.setting-theme">
+          <option value="github" selected>github</option>
+          <option value="nord">nord</option>
+          <option value="tokyo-night">tokyo-night</option>
+          <option value="sepia">sepia</option>
+        </select>
+      </div>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-mode">Mode</div>
+          <div class="setting-description">Auto follows the system</div>
+        </div>
+        <div class="segmented" role="radiogroup" aria-labelledby="mini.setting-mode">
+          <button type="button" role="radio" data-setting="mode" data-value="" aria-checked="true" tabindex="0" class="selected">Auto</button>
+          <button type="button" role="radio" data-setting="mode" data-value="light" aria-checked="false" tabindex="-1">Light</button>
+          <button type="button" role="radio" data-setting="mode" data-value="dark" aria-checked="false" tabindex="-1">Dark</button>
+        </div>
+      </div>
+    </section>
+    <section class="settings-pane" role="tabpanel" id="mini.settings-files" aria-labelledby="mini.settings-tab-files" hidden>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-htmlPreview">HTML preview</div>
+          <div class="setting-description">Open HTML files rendered, with their scripts, rather than as code</div>
+        </div>
+        <input type="checkbox" role="switch" data-setting="htmlPreview" aria-labelledby="mini.setting-htmlPreview">
+      </div>
+    </section>
   </div>
 </dialog>
 <script type="application/json" id="mini.settings-data">{"htmlPreview":"false","mode":"","theme":"github"}</script>

@@ -3,7 +3,7 @@
 // cookie, so the next page is rendered with it, and applied to this page
 // at once.
 
-import { page, setCookie, closeOnBackdrop } from "./util.js";
+import { page, setCookie, closeOnBackdrop, load, save as keep } from "./util.js";
 import { reload } from "./reload.js";
 
 const COOKIE = "gh-mini-settings";
@@ -95,6 +95,38 @@ function set(key, value) {
   else root.setAttribute("data-" + key, v);
 }
 
+// initSections switches the page of the dialog, one per section, from the
+// list of sections, which is one stop of Tab chosen with the arrow keys as
+// the dialog's tabs. The page last shown is shown again.
+function initSections(dialog) {
+  const tabs = Array.from(dialog.querySelectorAll("button[role=tab]"));
+  const show = (tab) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", String(on));
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+    }
+    keep("settingsSection", tab.dataset.section);
+  };
+  const last = tabs.find((t) => t.dataset.section === load("settingsSection", ""));
+  if (last) show(last);
+  dialog.addEventListener("click", (e) => {
+    const tab = e.target.closest("button[role=tab]");
+    if (tab) show(tab);
+  });
+  dialog.addEventListener("keydown", (e) => {
+    const tab = e.target.closest("button[role=tab]");
+    if (!tab) return;
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const next = tabs[(tabs.indexOf(tab) + step + tabs.length) % tabs.length];
+    show(next);
+    next.focus();
+  });
+}
+
 // refreshTheme loads the theme's CSS again after it was saved.
 export function refreshTheme() {
   themeLink.href = themeLink.href.split("?")[0] + "?t=" + Date.now();
@@ -119,6 +151,7 @@ export function initSettings() {
     }
     set(button.dataset.setting, button.dataset.value);
   };
+  initSections(dialog);
   dialog.addEventListener("keydown", (e) => {
     const button = e.target.closest("button[role=radio]");
     if (!button) return;
