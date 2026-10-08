@@ -69,12 +69,33 @@ function flatten(node, out, hide) {
 
 // rank orders a file found by the words typed: the name equal to them,
 // starting with them, holding them all, then the path holding them; then
-// shallower paths, then earlier matches. A lower rank comes first.
+// shallower paths, then earlier matches. Files whose path holds the words
+// only with letters between them, as "rdme" for README.md, come after,
+// those with the letters in the name first, then the closer together. A
+// lower rank comes first.
 function rank(n, q, words) {
   const name = n.name.toLowerCase();
   const p = n.path.toLowerCase();
+  if (!words.every((w) => p.includes(w))) {
+    const inName = words.every((w) => spread(name, w) >= 0);
+    const span = words.reduce((sum, w) => sum + spread(p, w), 0);
+    return [4, inName ? 0 : 1, span, n.path.split("/").length, p];
+  }
   const kind = name === q ? 0 : name.startsWith(words[0]) ? 1 : words.every((w) => name.includes(w)) ? 2 : 3;
   return [kind, n.path.split("/").length, p.indexOf(words[0]), p.length, p];
+}
+
+// spread is how many letters of s a word's letters take, in its order
+// and with others between them, or -1 when s does not hold them so.
+function spread(s, w) {
+  let start = -1;
+  let at = -1;
+  for (const c of w) {
+    at = s.indexOf(c, at + 1);
+    if (at < 0) return -1;
+    if (start < 0) start = at;
+  }
+  return at - start + 1;
 }
 
 function before(a, b) {
@@ -117,7 +138,7 @@ function draw() {
   if (q) {
     const words = q.split(/\s+/);
     hits = flatten(data, [], hidingIgnored())
-      .filter((n) => words.every((w) => n.path.toLowerCase().includes(w)))
+      .filter((n) => words.every((w) => spread(n.path.toLowerCase(), w) >= 0))
       .map((n) => [rank(n, q, words), n])
       .sort((a, b) => before(a[0], b[0]))
       .slice(0, 300)
