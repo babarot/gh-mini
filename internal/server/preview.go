@@ -82,6 +82,7 @@ func (s *Server) PreviewHandler() http.Handler {
 		}
 		defer f.Close()
 		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("ETag", fileETag(info))
 		http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 	}))
 }

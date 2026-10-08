@@ -940,3 +940,45 @@ func TestHandlerEncodings(t *testing.T) {
 		t.Error("a notice for UTF-8")
 	}
 }
+
+// A file written twice within a second is not taken for its first version.
+func TestHandlerRawRevalidate(t *testing.T) {
+	srv, root := newPreviewServer(t)
+	h := srv.Handler()
+	token := withCookie("gh-mini-preview-7000", srv.previewToken)
+	name := filepath.Join(root, "site", "index.html")
+	mod := time.Now().Truncate(time.Second)
+	for _, tt := range []struct {
+		what string
+		get  func(...func(*http.Request)) response
+	}{
+		{"raw", func(edit ...func(*http.Request)) response { return get(t, h, "/site/index.html?raw", edit...) }},
+		{"preview", func(edit ...func(*http.Request)) response {
+			return previewGet(t, srv, http.MethodGet, "/site/index.html", append(edit, token)...)
+		}},
+	} {
+		writeFile(t, name, []byte("one"))
+		if err := os.Chtimes(name, mod, mod); err != nil {
+			t.Fatal(err)
+		}
+		first := tt.get()
+		etag, lastMod := first.header.Get("ETag"), first.header.Get("Last-Modified")
+		if etag == "" {
+			t.Fatalf("%s: no ETag", tt.what)
+		}
+		revalidate := func(r *http.Request) {
+			r.Header.Set("If-None-Match", etag)
+			r.Header.Set("If-Modified-Since", lastMod)
+		}
+		if r := tt.get(revalidate); r.code != http.StatusNotModified {
+			t.Errorf("%s unchanged: status %d, want 304", tt.what, r.code)
+		}
+		writeFile(t, name, []byte("two!"))
+		if err := os.Chtimes(name, mod.Add(time.Millisecond), mod.Add(time.Millisecond)); err != nil {
+			t.Fatal(err)
+		}
+		if r := tt.get(revalidate); r.code != http.StatusOK || r.body != "two!" {
+			t.Errorf("%s written again in the same second: status %d, body %q", tt.what, r.code, r.body)
+		}
+	}
+}

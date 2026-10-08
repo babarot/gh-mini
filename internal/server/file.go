@@ -123,6 +123,7 @@ func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request, rel string, in
 	w.Header().Set("Content-Type", ctype)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("ETag", fileETag(info))
 	if !passive(ctype) {
 		// Opened as a page, from here or from a link on any site, a file's
 		// scripts would run as gh-mini and could read every file through
@@ -131,6 +132,14 @@ func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request, rel string, in
 		w.Header().Set("Content-Security-Policy", "sandbox")
 	}
 	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
+}
+
+// fileETag tells one version of a file from another by its modification
+// time to the nanosecond and its size. Last-Modified alone, to the second,
+// would keep a file written twice in a second, as a build or a formatter
+// does, at its first version.
+func fileETag(info fs.FileInfo) string {
+	return fmt.Sprintf(`"%x-%x"`, info.ModTime().UnixNano(), info.Size())
 }
 
 // rawType is the Content-Type a file is served raw with: the one of its
