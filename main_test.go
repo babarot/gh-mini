@@ -309,18 +309,22 @@ func TestRunMissingTarget(t *testing.T) {
 }
 
 func TestBrowserAddr(t *testing.T) {
-	for addr, want := range map[string]string{
-		"127.0.0.1:6419": "127.0.0.1:6419",
-		"0.0.0.0:6419":   "localhost:6419",
-		"[::]:6419":      "localhost:6419",
-		"[::1]:6419":     "[::1]:6419",
+	for _, tt := range []struct{ host, addr, want string }{
+		{"localhost", "127.0.0.1:6419", "localhost:6419"},
+		{"localhost", "[::1]:6419", "localhost:6419"},
+		{"mini.test", "127.0.0.1:6419", "mini.test:6419"},
+		{"127.0.0.1", "127.0.0.1:6419", "127.0.0.1:6419"},
+		{"::1", "[::1]:6419", "[::1]:6419"},
+		{"0.0.0.0", "0.0.0.0:6419", "localhost:6419"},
+		{"::", "[::]:6419", "localhost:6419"},
+		{"", "[::]:6419", "localhost:6419"},
 	} {
-		a, err := net.ResolveTCPAddr("tcp", addr)
+		a, err := net.ResolveTCPAddr("tcp", tt.addr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := browserAddr(a); got != want {
-			t.Errorf("browserAddr(%s) = %s, want %s", addr, got, want)
+		if got := browserAddr(tt.host, a); got != tt.want {
+			t.Errorf("browserAddr(%q, %s) = %s, want %s", tt.host, tt.addr, got, tt.want)
 		}
 	}
 }

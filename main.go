@@ -191,7 +191,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		}()
 	}
 
-	url := fmt.Sprintf("http://%s%s", browserAddr(ln.Addr()), open)
+	url := fmt.Sprintf("http://%s%s", browserAddr(c.host, ln.Addr()), open)
 	fmt.Fprintf(stdout, "gh-mini: serving %s at %s\n", root, url)
 	if ifaddrs, err := net.InterfaceAddrs(); err == nil {
 		for _, addr := range lanAddrs(ln.Addr(), ifaddrs) {
@@ -315,15 +315,24 @@ func splitList(s string) []string {
 	return out
 }
 
-// browserAddr is the address a browser opens for a listener. One on every
-// address, as with --host 0.0.0.0, is reached as localhost: browsers
+// browserAddr is the address a browser opens for a listener on host. A
+// name, as localhost, is kept: the listener has only the address it
+// resolved to, and the page's settings cookie belongs to the name. One on
+// every address, as with --host 0.0.0.0, is reached as localhost: browsers
 // refuse to open 0.0.0.0 or [::].
-func browserAddr(a net.Addr) string {
+func browserAddr(host string, a net.Addr) string {
 	tcp, ok := a.(*net.TCPAddr)
-	if !ok || tcp.IP == nil || !tcp.IP.IsUnspecified() {
+	if !ok {
 		return a.String()
 	}
-	return net.JoinHostPort("localhost", strconv.Itoa(tcp.Port))
+	port := strconv.Itoa(tcp.Port)
+	switch {
+	case tcp.IP == nil || tcp.IP.IsUnspecified():
+		return net.JoinHostPort("localhost", port)
+	case net.ParseIP(host) == nil:
+		return net.JoinHostPort(host, port)
+	}
+	return a.String()
 }
 
 // lanAddrs gives the addresses other machines can reach the server at, if
