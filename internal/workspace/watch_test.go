@@ -28,7 +28,12 @@ func newRepo(t *testing.T, gitignore string, files ...string) string {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not found")
 	}
-	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(t.TempDir(), "gitconfig"))
+	// Who commits, for the tests that commit; git guesses it from the
+	// machine's name on some machines and fails on others. A -c given to
+	// a commit still wins
+	gitconfig := filepath.Join(t.TempDir(), "gitconfig")
+	write(t, gitconfig, "[user]\n\tname = t\n\temail = t@example.com\n")
+	t.Setenv("GIT_CONFIG_GLOBAL", gitconfig)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	dir, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -448,6 +453,7 @@ func TestWatchPerDirectory(t *testing.T) {
 	for name, test := range map[string]func(*testing.T){
 		"file changes":         TestWatchFileChanges,
 		"git head":             TestWatchGitHead,
+		"status":               TestWatchStatus,
 		"git internals":        TestWatchIgnoresGitInternals,
 		"no longer ignored":    TestWatchFollowsDirsNoLongerIgnored,
 		"new dir":              TestWatchNewDir,

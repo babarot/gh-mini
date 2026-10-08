@@ -70,15 +70,23 @@ a:hover { text-decoration: underline; }
 .repo {
   display: inline-flex;
   align-items: center;
+  /* Kept whole before the branch is, up to a share of the bar */
+  flex-shrink: 0;
+  max-width: 45vw;
+  min-width: 0;
   color: var(--fgColor-default);
   font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
 }
 .repo .octicon { margin-right: 4px; }
 /* Owner and repository are links of their own, shaded on hover as
    GitHub's are, rather than underlined */
 .repo a {
+  min-width: 0;
   padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 32px;
   color: inherit;
   border-radius: var(--mini-radius);
@@ -93,10 +101,32 @@ a:hover { text-decoration: underline; }
   color: var(--fgColor-muted);
 }
 
+.changes {
+  flex: none;
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--borderColor-default);
+  border-radius: 2em;
+}
+.changes { color: var(--fgColor-default); }
+.changes:hover { text-decoration: none; background: var(--mini-selected); }
+.changes[aria-current="page"] { background: var(--mini-selected); }
+.changes .octicon { color: var(--fgColor-attention); }
+.changes[hidden] { display: none; }
+/* The branch gives way first when the bar is short of room, cut short
+   rather than wrapped; its title tells it whole */
 .branch {
+  flex-shrink: 100;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
   padding: 2px 8px;
   color: var(--fgColor-muted);
   font-size: 12px;
@@ -153,22 +183,38 @@ body.sidebar-hidden .sidebar { display: none; }
 
 .sidebar-tools {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 12px 8px;
-}
-.sidebar-tools input[type="search"] { width: 100%; }
-.md-only {
-  display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--fgColor-muted);
-  font-size: 12px;
+  padding: 12px 12px 8px;
+}
+.sidebar-tools input[type="search"] { flex: 1; min-width: 0; }
+.sidebar-tools .icon-btn { flex: none; position: relative; }
+.sidebar-tools .icon-btn[aria-expanded="true"] { color: var(--fgColor-default); background: var(--mini-selected); }
+/* The files shown are filtered: a dot on the button that does it */
+.filter-on {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--fgColor-accent);
+}
+/* Placed under its button as it opens; a menu is fixed to the top bar */
+.tree-options { top: auto; right: auto; width: 200px; }
+.tree-options label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--mini-radius);
+  cursor: pointer;
   user-select: none;
 }
-.md-only input { margin: 0; }
-.sidebar-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.link-btn { padding: 0; color: var(--fgColor-muted); font: inherit; font-size: 12px; background: none; border: 0; cursor: pointer; }
+.tree-options label:hover { background: var(--mini-selected); }
+.tree-options input { margin: 0; }
+.menu-heading { padding: 4px 8px; color: var(--fgColor-muted); font-size: 12px; font-weight: 600; }
+.link-btn { white-space: nowrap; padding: 0; color: var(--fgColor-muted); font: inherit; font-size: 12px; background: none; border: 0; cursor: pointer; }
 .link-btn:hover { color: var(--fgColor-accent); text-decoration: underline; }
 
 .tree {
@@ -200,6 +246,26 @@ body.sidebar-hidden .sidebar { display: none; }
 .tree .ignored > .row .label { opacity: .6; }
 [data-hideignoreddirs="true"] .tree li.hideable { display: none; }
 .tree .indent { width: 12px; flex: none; }
+/* How a file changed since the last commit: a letter after its name, and
+   the name in the same color; a dot on a directory with changes under it */
+.tree .row .status-letter {
+  margin-left: auto;
+  padding-left: 6px;
+  font-family: var(--mini-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.tree .row.changed .label, .tree .row .status-letter { color: var(--mini-status-color); }
+.tree .row.gone .label { text-decoration: line-through; }
+.tree .row .status-dot,
+.files .stat .dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--fgColor-attention);
+}
 .tree .empty { padding: 8px; color: var(--fgColor-muted); }
 
 .main {
@@ -328,6 +394,22 @@ body[data-kind="html"] .main > .box {
   border-bottom: 1px solid var(--borderColor-default);
 }
 
+.branch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A narrow bar keeps the repository's name, and the count of changes
+   without its lines */
+@media (max-width: 600px) {
+  .topbar { gap: 8px; padding: 0 12px; }
+  .repo .owner, .repo .sep { display: none; }
+}
+@media (max-width: 480px) {
+  .changes .added, .changes .deleted { display: none; }
+}
+/* Too narrow for a branch's name to be read: its icon, which tells it on
+   hover */
+@media (max-width: 420px) {
+  .branch-name { display: none; }
+}
+
 /* Settings dialog */
 .settings {
   width: min(480px, calc(100vw - 32px));
@@ -360,6 +442,11 @@ body[data-kind="html"] .main > .box {
 .setting.unavailable .setting-label { color: var(--fgColor-muted); }
 .setting-reason { color: var(--fgColor-attention); font-size: 12px; }
 .setting :disabled { cursor: not-allowed; }
+/* A setting that tells more of the one above it, and does nothing while
+   that is off */
+.setting.child { padding-left: 32px; }
+.setting.disabled .setting-label { color: var(--fgColor-muted); }
+.setting.disabled .setting-description { opacity: .7; }
 
 /* The settings dialog has a page per section, listed on the left */
 .settings:has(.settings-body) { width: min(680px, calc(100vw - 32px)); }
@@ -514,6 +601,27 @@ body[data-kind="html"] .main > .box {
 .files .ignored .name a { color: var(--fgColor-muted); }
 [data-hideignoreddirs="true"] .files tr.hideable { display: none; }
 .files .ago { color: var(--fgColor-muted); text-align: right; white-space: nowrap; }
+.files .stat { text-align: right; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.files .stat .dot { display: inline-block; margin: 0 2px 1px 0; vertical-align: middle; }
+.files .changed .name a { color: var(--mini-status-color); }
+.files .gone .name a { text-decoration: line-through; }
+.status-badge {
+  padding: 0 7px;
+  color: var(--mini-status-color);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  border: 1px solid currentColor;
+  border-radius: 2em;
+}
+
+/* The colors of the letters, M, A and so on, as git status shows them */
+.s-M { --mini-status-color: var(--fgColor-attention); }
+.s-A, .s-U { --mini-status-color: var(--fgColor-success); }
+.s-D, .s-C { --mini-status-color: var(--fgColor-danger); }
+.s-R { --mini-status-color: var(--fgColor-accent); }
+.added { color: var(--fgColor-success); }
+.deleted { color: var(--fgColor-danger); }
 
 .markdown-body { padding: 32px; background: transparent; }
 .readme .markdown-body { padding: 32px 32px 24px; }
@@ -662,6 +770,7 @@ body[data-kind="html"] .main > .box {
   .markdown-body { padding: 16px; }
   /* As on GitHub, a narrow list drops the dates for the names */
   .files .ago { display: none; }
+  .files .status-badge { display: none; }
 }
 
 /* Images marked for one color mode, as GitHub's README logos are */
@@ -669,3 +778,79 @@ body[data-kind="html"] .main > .box {
 :root[data-mode="dark"] .markdown-body img[src$="#gh-light-mode-only"] {
   display: none;
 }
+
+/* The Changes page: the diffs of the files changed since the last commit,
+   each folded by its header, as GitHub's pull requests show them */
+.changes-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.changes-head h2 { margin: 0; font-size: 20px; }
+.changes-toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+.changes-summary { margin: 0 0 16px; color: var(--fgColor-muted); }
+.counter {
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 2em;
+  background: var(--bgColor-neutral-muted);
+  font-variant-numeric: tabular-nums;
+}
+.diff-file > summary { gap: 8px; cursor: pointer; list-style: none; }
+.diff-file > summary::-webkit-details-marker { display: none; }
+.diff-file > summary .chevron { color: var(--fgColor-muted); transition: transform .1s; }
+.diff-file[open] > summary .chevron { transform: rotate(90deg); }
+.diff-file:not([open]) > summary { border-bottom: 0; }
+.diff-path { min-width: 0; overflow-wrap: anywhere; font-family: var(--mini-font-mono); font-size: 12px; font-weight: 600; }
+.diff-path .from { font-weight: 400; color: var(--fgColor-muted); }
+.stage { padding: 0 7px; color: var(--fgColor-muted); font-size: 12px; line-height: 18px; border: 1px dashed var(--borderColor-default); border-radius: 2em; }
+.diff-stat { font-family: var(--mini-font-mono); font-size: 12px; white-space: nowrap; }
+.blocks { display: inline-flex; gap: 1px; }
+.blocks i { width: 8px; height: 8px; border-radius: 1px; background: var(--bgColor-neutral-muted); }
+.blocks i.g { background: var(--fgColor-success); }
+.blocks i.r { background: var(--fgColor-danger); }
+.diff-notice { padding: 16px; color: var(--fgColor-muted); text-align: center; }
+.diff-scroll { overflow-x: auto; }
+.diff {
+  --mini-diff-add: color-mix(in srgb, var(--fgColor-success) 15%, transparent);
+  --mini-diff-del: color-mix(in srgb, var(--fgColor-danger) 15%, transparent);
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mini-font-mono);
+  font-size: 12px;
+  line-height: 20px;
+  tab-size: 4;
+}
+.diff td { padding: 0 10px; vertical-align: top; }
+.diff .num { width: 1%; min-width: 40px; color: var(--fgColor-muted); text-align: right; white-space: nowrap; user-select: none; }
+.diff .text { white-space: pre; }
+[data-wrap="true"] .diff .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.diff .sign { display: inline-block; width: 1.2em; color: var(--fgColor-muted); user-select: none; }
+.diff .hunk td { color: var(--fgColor-muted); background: color-mix(in srgb, var(--fgColor-accent) 10%, transparent); }
+.diff .add { background: var(--mini-diff-add); }
+.diff .del { background: var(--mini-diff-del); }
+.diff .num.add { background: color-mix(in srgb, var(--fgColor-success) 25%, transparent); }
+.diff .num.del { background: color-mix(in srgb, var(--fgColor-danger) 25%, transparent); }
+/* The words that differ between a line and the one in its place */
+.diff mark { color: inherit; border-radius: 2px; }
+.diff .text.add mark { background: color-mix(in srgb, var(--fgColor-success) 40%, transparent); }
+.diff .text.del mark { background: color-mix(in srgb, var(--fgColor-danger) 40%, transparent); }
+.diff .no-newline { margin-left: 4px; color: var(--fgColor-danger); user-select: none; }
+
+/* Above a changed file's page: how it changed since the last commit */
+.uncommitted {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-color: color-mix(in srgb, var(--mini-status-color) 40%, var(--borderColor-default));
+  background: color-mix(in srgb, var(--mini-status-color) 6%, var(--bgColor-default));
+}
+.uncommitted .octicon { color: var(--mini-status-color); }
+.uncommitted strong { color: var(--mini-status-color); }
+
+/* The marks of changes in the tree, as the viewer likes them */
+[data-treemarks="color"] .tree .status-letter,
+[data-treemarks="none"] .tree .status-letter,
+[data-treemarks="none"] .tree .status-dot,
+[data-treemarks="none"] .tree li:has(> .row.gone) { display: none; }
+[data-treemarks="none"] .tree .row.changed .label { color: inherit; }
+[data-changedwords="false"] .diff mark { background: none; }

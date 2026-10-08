@@ -32,6 +32,13 @@ type entry struct {
 	Ago     string
 	// Date is when it was modified, which Ago tells roughly
 	Date string
+	// Status is how it changed since the last commit, and Gone is set on
+	// a file deleted since, which git still has
+	Status *entryStatus
+	Gone   bool
+	// Class is the row's: ignored, hideable when the setting to hide
+	// ignored directories may, and changed with its letter, s-M and so on
+	Class string
 }
 
 func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspace.Snapshot, rel string) {
@@ -82,6 +89,47 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		if !e.Dir && plainReadme == "" && isPlainReadme(d.Name()) {
 			plainReadme = d.Name()
 		}
+	}
+	changed := childStatus(p.status, rel)
+	listed := map[string]bool{}
+	for i := range v.Entries {
+		e := &v.Entries[i]
+		listed[e.Name] = true
+		if !e.Ignored {
+			e.Status = changed[e.Name]
+		}
+	}
+	// Files deleted are listed until the deletion is committed, as is a
+	// directory with nothing left in it
+	for name, st := range changed {
+		if listed[name] {
+			continue
+		}
+		child := path.Join(rel, name)
+		e := entry{Name: name, Status: st, Gone: true, Dir: st.Letter == "", Ago: "deleted"}
+		e.Href = href(child)
+		if e.Dir {
+			e.Href = dirHref(child)
+		}
+		v.Entries = append(v.Entries, e)
+	}
+	for i := range v.Entries {
+		e := &v.Entries[i]
+		var cls []string
+		if e.Ignored {
+			cls = append(cls, "ignored")
+			// Inside an ignored directory, everything is: nothing to hide
+			if e.Dir && !p.Ignored {
+				cls = append(cls, "hideable")
+			}
+		}
+		if e.Status != nil && e.Status.Letter != "" {
+			cls = append(cls, "changed", "s-"+e.Status.Letter)
+		}
+		if e.Gone {
+			cls = append(cls, "gone")
+		}
+		e.Class = strings.Join(cls, " ")
 	}
 	sort.SliceStable(v.Entries, func(i, j int) bool {
 		a, b := v.Entries[i], v.Entries[j]

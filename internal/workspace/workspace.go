@@ -1,5 +1,6 @@
 // Package workspace holds the state of the directory being served: its
-// file tree, what git ignores in it, its branch and its GitHub repository.
+// file tree, what git ignores in it, what changed since the last commit,
+// its branch and its GitHub repository.
 // The state is read as immutable snapshots, rebuilt only for what changed.
 package workspace
 
@@ -26,6 +27,9 @@ type Options struct {
 	// MaxAge is how long a snapshot is used when no Watcher invalidates
 	// it. Zero rebuilds it every time.
 	MaxAge time.Duration
+	// NoStatus leaves out what changed since the last commit, which is
+	// then never read from git.
+	NoStatus bool
 }
 
 // Change tells which parts of a snapshot are out of date.
@@ -35,12 +39,16 @@ type Change struct {
 	Structure bool
 	// GitHead is set when HEAD moved: the branch.
 	GitHead bool
+	// Status is set when files or git's index may have changed: what
+	// changed since the last commit.
+	Status bool
 }
 
 const (
 	dirtyStructure uint32 = 1 << iota
 	dirtyGitHead
-	dirtyAll = dirtyStructure | dirtyGitHead
+	dirtyStatus
+	dirtyAll = dirtyStructure | dirtyGitHead | dirtyStatus
 )
 
 // Workspace is one directory being served.
@@ -48,6 +56,10 @@ type Workspace struct {
 	opts Options
 	root *os.Root
 	repo string
+	// git is set in a git repository, where prefix is where the root is
+	// in it, such as "docs/"
+	git    bool
+	prefix string
 
 	mu    sync.Mutex // serializes rebuilds
 	snap  atomic.Pointer[Snapshot]
@@ -76,9 +88,14 @@ type Snapshot struct {
 	Branch   string
 	// Repo is the GitHub repository of the origin remote, "owner/name", or
 	// "" when there is none.
-	Repo    string
-	ignored map[string]bool
-	gen     uint64
+	Repo string
+	// Status is what changed since the last commit, StatusJSON it encoded
+	// once, and StatusETag a hash of that.
+	Status     *Status
+	StatusJSON []byte
+	StatusETag string
+	ignored    map[string]bool
+	gen        uint64
 	// dirs are the tree's directories by path, "." for the root
 	dirs  map[string]*Node
 	built time.Time
@@ -91,6 +108,9 @@ func Open(opts Options) (*Workspace, error) {
 		return nil, err
 	}
 	w := &Workspace{opts: opts, root: root, repo: gitHubRepo(opts.Root)}
+	if !opts.NoStatus {
+		w.prefix, w.git = gitPrefix(opts.Root)
+	}
 	w.dirty.Store(dirtyAll)
 	return w, nil
 }
@@ -136,6 +156,9 @@ func (w *Workspace) Invalidate(c Change) {
 	if c.GitHead {
 		bits |= dirtyGitHead
 	}
+	if c.Status {
+		bits |= dirtyStatus
+	}
 	w.dirty.Or(bits)
 	w.gen.Add(1)
 }
@@ -144,7 +167,7 @@ func (w *Workspace) Invalidate(c Change) {
 func (w *Workspace) Snapshot() *Snapshot {
 	if !w.watched.Load() {
 		if s := w.snap.Load(); s == nil || time.Since(s.built) >= w.opts.MaxAge {
-			w.Invalidate(Change{Structure: true, GitHead: true})
+			w.Invalidate(Change{Structure: true, GitHead: true, Status: true})
 		}
 	}
 	if s := w.snap.Load(); s != nil && s.gen == w.gen.Load() {
@@ -181,6 +204,13 @@ func (w *Workspace) Snapshot() *Snapshot {
 	if prev == nil || bits&dirtyGitHead != 0 {
 		next.Branch = gitBranch(w.opts.Root)
 	}
+	// Files added or removed change it too, and the tree it reads
+	if prev == nil || bits&(dirtyStatus|dirtyStructure|dirtyGitHead) != 0 {
+		next.Status = w.status(next)
+		next.StatusJSON, _ = json.Marshal(next.Status)
+		sum := sha256.Sum256(next.StatusJSON)
+		next.StatusETag = `"` + hex.EncodeToString(sum[:8]) + `"`
+	}
 	w.snap.Store(next)
 	return next
 }
@@ -209,6 +239,13 @@ func (w *Workspace) ignoredTree() (map[string]bool, *Node, map[string]*Node) {
 			return ignored, tree, dirs
 		}
 	}
+}
+
+func (w *Workspace) status(s *Snapshot) *Status {
+	if !w.git {
+		return &Status{Files: map[string]*FileStatus{}}
+	}
+	return gitStatus(w.opts.Root, w.prefix, w.opts.Skip, s.untrackedFiles)
 }
 
 // Ignored tells whether git ignores a path relative to the root, or one

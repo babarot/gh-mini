@@ -187,7 +187,7 @@ func TestHandlerRootDir(t *testing.T) {
 		`<h1 id="repo">Repo</h1>`,
 		`<p>See #1.</p>`,
 		`>README.md</a>`,
-		"main\n",
+		`<span class="branch-name">main</span>`,
 	)
 	r.reject(t, "node_modules")
 	if row := r.row(t, "local-only"); !strings.Contains(row, `class="ignored hideable"`) {
@@ -492,7 +492,7 @@ func TestHandlerThemes(t *testing.T) {
 		`href="/_mini/theme/sepia.css"`, `<option value="sepia" selected>`)
 	get(t, h, "/", withCookie("gh-mini-theme", "unknown")).expect(t, http.StatusOK,
 		`href="/_mini/theme/github.css"`)
-	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark" data-wide="false" data-wrap="false" data-hideIgnoredDirs="false">`)
+	get(t, h, "/", withCookie("gh-mini-mode", "dark")).expect(t, http.StatusOK, `<html lang="en" data-mode="dark" data-wide="false" data-wrap="false" data-hideIgnoredDirs="false" data-treeMarks="letter" data-changedWords="true">`)
 }
 
 // A theme of the viewer's own replaces the built-in one of the same name.
@@ -570,6 +570,7 @@ func waitFor(t *testing.T, ch <-chan change, want func(change) bool) {
 			}
 			got.Theme = got.Theme || c.Theme
 			got.Structure = got.Structure || c.Structure
+			got.Status = got.Status || c.Status
 			got.Paths = append(got.Paths, c.Paths...)
 		case <-timeout:
 			t.Fatalf("got %+v", got)
@@ -583,6 +584,17 @@ func TestHandlerEvents(t *testing.T) {
 	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Changed\n"))
 	writeFile(t, filepath.Join(themes, "sepia.css"), []byte(":root {}\n"))
 	waitFor(t, ch, func(c change) bool { return c.Theme && slices.Contains(c.Paths, "docs/guide.md") })
+}
+
+// Staging a file changes only git's index, and is told as a change of
+// status.
+func TestHandlerEventsStatus(t *testing.T) {
+	root, _, url := newReloadServer(t)
+	writeFile(t, filepath.Join(root, "README.md"), []byte("# Changed\n"))
+	ch := events(t, url)
+	waitFor(t, ch, func(c change) bool { return c.Status })
+	git(t, root, "add", "README.md")
+	waitFor(t, ch, func(c change) bool { return c.Status && len(c.Paths) == 0 })
 }
 
 // The stream names the server's boot ID first, the one its pages carry,
@@ -681,6 +693,164 @@ func TestHandlerScriptsForFeatures(t *testing.T) {
 			t.Errorf("%s: MathJax loaded = %v, want %v", target, got, want[1])
 		}
 	}
+}
+
+func TestHandlerStatus(t *testing.T) {
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "README.md"), []byte("# Repo\n\nChanged.\n"))
+	writeFile(t, filepath.Join(root, "docs", "new.md"), []byte("# New\n"))
+	writeFile(t, filepath.Join(root, "node_modules", "y.js"), []byte("y\n"))
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git", "node_modules"}, ThemesDir: themes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+
+	r := get(t, h, "/_mini/api/status")
+	var st workspace.Status
+	if err := json.Unmarshal([]byte(r.body), &st); err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Files) != 2 || st.Files["README.md"] == nil || st.Files["docs/new.md"] == nil {
+		t.Fatalf("files = %+v", st.Files)
+	}
+	if f := st.Files["README.md"]; f.Y != "M" || f.Added != 1 || f.Deleted != 1 {
+		t.Errorf("README.md = %+v", f)
+	}
+	if st.Added != 2 || st.Deleted != 1 {
+		t.Errorf("totals +%d -%d", st.Added, st.Deleted)
+	}
+	etag := r.header.Get("ETag")
+	if r := get(t, h, "/_mini/api/status", withHeader("If-None-Match", etag)); r.code != http.StatusNotModified {
+		t.Errorf("same status: %d", r.code)
+	}
+}
+
+// A directory's page tells how its files changed, and lists a deleted one
+// and a directory left with nothing.
+func TestHandlerDirStatus(t *testing.T) {
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Guide\n\nMore.\n"))
+	writeFile(t, filepath.Join(root, "docs", "new.md"), []byte("# New\n"))
+	if err := os.Remove(filepath.Join(root, "docs", "math.md")); err != nil {
+		t.Fatal(err)
+	}
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git", "node_modules"}, ThemesDir: themes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+
+	r := get(t, h, "/docs/")
+	if row := r.row(t, "guide.md"); !strings.Contains(row, `class="changed s-M"`) || !strings.Contains(row, "+1") || !strings.Contains(row, "modified") {
+		t.Errorf("guide.md: %s", row)
+	}
+	if row := r.row(t, "new.md"); !strings.Contains(row, "s-U") || !strings.Contains(row, "untracked") {
+		t.Errorf("new.md: %s", row)
+	}
+	if row := r.row(t, "math.md"); !strings.Contains(row, "gone") || !strings.Contains(row, "deleted") {
+		t.Errorf("math.md: %s", row)
+	}
+	if row := r.row(t, "README.md"); strings.Contains(row, "changed") {
+		t.Errorf("README.md: %s", row)
+	}
+	// The root sums up docs
+	if row := get(t, h, "/").row(t, "docs"); !strings.Contains(row, `class="dot"`) || !strings.Contains(row, "+2") {
+		t.Errorf("docs: %s", row)
+	}
+	get(t, h, "/").expect(t, http.StatusOK, `id="mini.changes"`, "3 changes", "mini.changed-only")
+}
+
+func TestHandlerChangesPage(t *testing.T) {
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "main.go"), []byte("package main\n\nfunc main() { println() }\n"))
+	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Guide\n\n## Setup\n"))
+	git(t, root, "add", "docs/guide.md")
+	writeFile(t, filepath.Join(root, "docs", "new.md"), []byte("# New\n<b>"))
+	writeFile(t, filepath.Join(root, "bin.dat"), []byte("a\x00c"))
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git", "node_modules"}, ThemesDir: themes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+
+	r := get(t, h, "/_mini/changes")
+	r.expect(t, http.StatusOK, "4 files changed", "main.go", "docs/guide.md", "docs/new.md", "Binary file not shown.",
+		// Highlighted, the line kept and the one added
+		`<span class="kd">func</span>`, `class="text add"`, `class="text del"`,
+		// Escaped, and without a newline at its end
+		"&lt;b&gt;", `class="no-newline"`,
+		`<span class="stage">staged</span>`,
+		// The word changed in a line, within its highlighting
+		`println</span></mark>`)
+	if r := get(t, h, "/_mini/changes?show=staged"); !strings.Contains(r.body, "1 file changed") || strings.Contains(r.body, "main.go") {
+		t.Errorf("staged: %s", r.body[strings.Index(r.body, "changes-summary"):][:200])
+	}
+	get(t, h, "/_mini/changes?show=untracked").expect(t, http.StatusOK, "docs/new.md", "1 file changed")
+	get(t, h, "/_mini/changes?file=main.go").expect(t, http.StatusOK, "1 file changed", "All changed files")
+	// Only a file listed is read
+	if r := get(t, h, "/_mini/changes?file=README.md"); r.code != http.StatusNotFound {
+		t.Errorf("unchanged file: %d", r.code)
+	}
+	if r := get(t, h, "/_mini/changes?file=*.go"); r.code != http.StatusNotFound {
+		t.Errorf("pattern: %d", r.code)
+	}
+}
+
+// A changed file's page tells how it changed, and shows its diff; a file
+// deleted has a page of its diff alone.
+func TestHandlerFileDiff(t *testing.T) {
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "main.go"), []byte("package main\n\nfunc main() { println() }\n"))
+	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Guide\n\n## Setup\n"))
+	git(t, root, "add", "docs/guide.md")
+	writeFile(t, filepath.Join(root, "docs", "new.md"), []byte("# New\n"))
+	if err := os.Remove(filepath.Join(root, "docs", "math.md")); err != nil {
+		t.Fatal(err)
+	}
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git", "node_modules"}, ThemesDir: themes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+
+	// The code, with a tab to the diff
+	r := get(t, h, "/main.go")
+	r.expect(t, http.StatusOK, `class="box uncommitted s-M"`, "not staged", `href="?diff=1">Diff <span class="counter">`, `data-kind="code"`)
+	get(t, h, "/main.go?diff=1").expect(t, http.StatusOK, `data-kind="diff"`, `class="text add"`, `<a href="?diff=1" class="selected">Diff`)
+	// Markdown keeps its two views before it
+	get(t, h, "/docs/guide.md").expect(t, http.StatusOK, ">Preview</a>", ">Code</a>", ">Diff <span", "staged")
+	get(t, h, "/docs/new.md?diff=1").expect(t, http.StatusOK, "not tracked by git yet", `class="text add"`)
+	// A file not changed has none, and ?diff=1 shows it as it is
+	r = get(t, h, "/README.md?diff=1")
+	r.expect(t, http.StatusOK, `data-kind="markdown"`)
+	r.reject(t, "uncommitted", ">Diff")
+
+	r = get(t, h, "/docs/math.md")
+	r.expect(t, http.StatusOK, `data-kind="diff"`, "Deleted", `class="text del"`, "Euler")
+	r.reject(t, `href="?raw"`)
+	if r := get(t, h, "/docs/math.md?raw"); r.code != http.StatusNotFound {
+		t.Errorf("raw of a deleted file: %d", r.code)
+	}
+}
+
+func TestHandlerChangesPageNotRepository(t *testing.T) {
+	isolateGit(t)
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "a.md"), []byte("# A\n"))
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	if r := get(t, srv.Handler(), "/_mini/changes"); r.code != http.StatusNotFound {
+		t.Errorf("status %d", r.code)
+	}
+	get(t, srv.Handler(), "/").reject(t, `id="mini.changes"`, "mini.changed-only")
 }
 
 func TestHandlerTreeETag(t *testing.T) {

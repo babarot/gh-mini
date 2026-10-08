@@ -52,6 +52,9 @@ type setting struct {
 	// when the command line turned off what it is for; nil or "" when it
 	// works. The dialog shows it off, and the reason.
 	Unavailable func(s *Server) string
+	// Parent is the key of a toggle this setting tells more of: it does
+	// nothing, and the dialog shows it disabled, while that is off.
+	Parent string
 }
 
 type choice struct {
@@ -134,6 +137,73 @@ var settingDefs = []setting{
 		Control:     "toggle",
 		Default:     func(*Server) string { return "false" },
 		Attr:        true,
+	},
+	{
+		Key:         "changes",
+		Section:     "Changes",
+		Label:       "Changes",
+		Description: "Show what changed since the last commit: the count in the top bar, the marks in the tree and the listings, the Diff view of a file and the Changes page",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "true" },
+		Unavailable: func(s *Server) string {
+			if s.opts.NoChanges {
+				return "Changes are off: gh-mini was started with --no-changes"
+			}
+			return ""
+		},
+	},
+	{
+		Key:         "treeMarks",
+		Section:     "Changes",
+		Parent:      "changes",
+		Label:       "Marks in the tree",
+		Description: "How the tree tells a changed file: M, A, D after its name, its name in color, or nothing",
+		Control:     "segmented",
+		Choices: func(*Server) []choice {
+			return []choice{{"letter", "Letter and color"}, {"color", "Color"}, {"none", "None"}}
+		},
+		Default: func(*Server) string { return "letter" },
+		Attr:    true,
+	},
+	{
+		Key:         "untracked",
+		Section:     "Changes",
+		Parent:      "changes",
+		Label:       "Untracked files",
+		Description: "Count files git does not track yet as changed. Off leaves them out of the marks, the count and the Changes page",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "true" },
+	},
+	{
+		Key:         "changedWords",
+		Section:     "Changes",
+		Parent:      "changes",
+		Label:       "Changed words",
+		Description: "Mark the words that differ in a line replaced by another",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "true" },
+		Attr:        true,
+	},
+	{
+		Key:         "ignoreWhitespace",
+		Section:     "Changes",
+		Parent:      "changes",
+		Label:       "Ignore whitespace",
+		Description: "Leave out changes of spaces and indentation alone from diffs, as git diff -w does",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "false" },
+	},
+	{
+		Key:         "openChanged",
+		Section:     "Changes",
+		Parent:      "changes",
+		Label:       "Open a changed file at",
+		Description: "What the page of a changed file shows first",
+		Control:     "segmented",
+		Choices: func(*Server) []choice {
+			return []choice{{"file", "The file"}, {"diff", "Its diff"}}
+		},
+		Default: func(*Server) string { return "file" },
 	},
 	{
 		Key:         "avatars",
@@ -258,6 +328,9 @@ type settingView struct {
 	Options []choice
 	// Reason is why the setting does nothing here, "" when it works
 	Reason string
+	// Disabled is set while the setting does nothing: it has a Reason,
+	// or its Parent is off
+	Disabled bool
 }
 
 // settingSection is a page of the settings dialog.
@@ -275,6 +348,8 @@ const defaultSection = "General"
 func (s *Server) settingSections(values map[string]string) []settingSection {
 	var out []settingSection
 	index := map[string]int{}
+	// off are the toggles that do nothing, for the settings under them
+	off := map[string]bool{}
 	for _, d := range settingDefs {
 		v := settingView{setting: d, Value: values[d.Key]}
 		if d.Choices != nil {
@@ -285,6 +360,10 @@ func (s *Server) settingSections(values map[string]string) []settingSection {
 				// What it is for is off, whatever the viewer picked
 				v.Value = "false"
 			}
+		}
+		v.Disabled = v.Reason != "" || (d.Parent != "" && off[d.Parent])
+		if d.Control == "toggle" && (v.Disabled || v.Value == "false") {
+			off[d.Key] = true
 		}
 		name := cmp.Or(d.Section, defaultSection)
 		i, ok := index[name]

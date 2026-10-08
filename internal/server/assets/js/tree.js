@@ -1,11 +1,15 @@
 // The file tree in the sidebar, its filter and its toggle.
 
 import { page, load, save, href, dirname, isMarkdown, esc, ICON_DIR, ICON_FILE, ICON_CHEVRON, setCookie } from "./util.js";
+import { changedFiles, changedDirs, onStatus } from "./status.js";
 
 const body = document.body;
 const treeEl = document.getElementById("mini.tree");
 const filterEl = document.getElementById("mini.tree-filter");
 const mdOnlyEl = document.getElementById("mini.md-only");
+// Outside a git repository there is no such filter
+const changedOnlyEl = document.getElementById("mini.changed-only");
+const changedOnly = () => Boolean(changedOnlyEl && changedOnlyEl.checked);
 const current = page.path;
 let tree = null;
 // kept are the directories opened by hand, which every page opens again,
@@ -36,28 +40,67 @@ function hideable(node, parentIgnored) {
   return current !== node.path && !current.startsWith(node.path + "/");
 }
 
+// pruneChanged drops files that did not change since the last commit, and
+// directories with none under them.
+function pruneChanged(node, files, dirs) {
+  if (!node.dir) return files[node.path] ? node : null;
+  if (node.path && !dirs.has(node.path)) return null;
+  const kids = (node.children || []).map((n) => pruneChanged(n, files, dirs)).filter(Boolean);
+  return Object.assign({}, node, { children: kids });
+}
+
+const LABELS = { M: "Modified", A: "Added", D: "Deleted", R: "Renamed", U: "Untracked", C: "Conflict" };
+
+// letterHTML tells how a file changed since the last commit, by a letter
+// after its name.
+function letterHTML(f) {
+  if (!f) return "";
+  const title = LABELS[f.letter] + (f.from ? " from " + f.from : "");
+  return '<span class="status-letter" title="' + esc(title) + '">' + esc(f.letter) + "</span>";
+}
+
+// ghosts are the files deleted since the last commit, which the tree read
+// from the disk has not, by the directory they are shown in: theirs, or
+// the nearest one left when it is gone too, under their path from it.
+function ghosts(files) {
+  const by = {};
+  for (const [p, f] of Object.entries(files)) {
+    if (f.letter !== "D") continue;
+    let d = dirname(p);
+    while (d !== "." && !find(d)) d = dirname(d);
+    const name = d === "." ? p : p.slice(d.length + 1);
+    (by[d] = by[d] || []).push({ name, path: p, gone: true });
+  }
+  return by;
+}
+
+const byName = (a, b) => (a.dir !== b.dir ? (a.dir ? -1 : 1) : a.name.toLowerCase() < b.name.toLowerCase() ? -1 : a.name.toLowerCase() > b.name.toLowerCase() ? 1 : 0);
+
 const hidingIgnored = () => document.documentElement.dataset.hideignoreddirs === "true";
 
-function rowHTML(node) {
-  const cls = "row" + (node.path === current ? " current" : "");
+function rowHTML(node, files, dirs) {
+  const f = files[node.path];
+  const cls = "row" + (node.path === current ? " current" : "") + (f ? " changed s-" + f.letter : "") + (node.gone ? " gone" : "");
   const icon = node.dir ? ICON_CHEVRON + ICON_DIR : '<span class="indent"></span>' + ICON_FILE;
   return '<a class="' + cls + '" href="' + href(node.path, node.dir) + '" data-path="' + esc(node.path) + '"' +
     (node.dir ? ' data-dir="1" aria-expanded="' + open.has(node.path) + '"' : "") +
     (node.path === current ? ' aria-current="page"' : "") +
-    ' title="' + esc(node.name) + '">' + icon + '<span class="label">' + esc(node.name) + "</span></a>";
+    ' title="' + esc(node.name) + '">' + icon + '<span class="label">' + esc(node.name) + "</span>" +
+    (node.dir ? (dirs.has(node.path) ? '<span class="status-dot" title="Has changes"></span>' : "") : letterHTML(f)) + "</a>";
 }
 
-function listHTML(nodes, parentIgnored) {
+function listHTML(nodes, parentIgnored, dir, st) {
   let out = "<ul>";
+  if (st.ghosts[dir]) nodes = nodes.concat(st.ghosts[dir]).sort(byName);
   nodes.forEach((n) => {
     const cls = [];
     if (n.dir && open.has(n.path)) cls.push("open");
     if (n.ignored) cls.push("ignored");
     // Hidden by CSS, so that the setting applies at once
     if (hideable(n, parentIgnored)) cls.push("hideable");
-    out += '<li class="' + cls.join(" ") + '"' + (n.ignored ? ' title="Ignored by git"' : "") + ">" + rowHTML(n);
+    out += '<li class="' + cls.join(" ") + '"' + (n.ignored ? ' title="Ignored by git"' : "") + ">" + rowHTML(n, st.files, st.dirs);
     // Only what is open is drawn: a large tree costs nothing folded
-    if (n.dir && open.has(n.path) && n.children && n.children.length) out += listHTML(n.children, n.ignored);
+    if (n.dir && open.has(n.path) && ((n.children && n.children.length) || st.ghosts[n.path])) out += listHTML(n.children || [], n.ignored, n.path, st);
     out += "</li>";
   });
   return out + "</ul>";
@@ -139,7 +182,9 @@ function render() {
 
 function draw() {
   if (!tree) return;
-  const data = mdOnlyEl.checked ? prune(tree) || { children: [] } : tree;
+  const files = changedFiles();
+  const dirs = changedDirs();
+  const data = shown();
   const q = filterEl.value.trim().toLowerCase();
   if (q) {
     const words = q.split(/\s+/);
@@ -156,12 +201,12 @@ function draw() {
       const cls = "row" + (n.path === current ? " current" : "") + (i === selected ? " selected" : "");
       return '<li class="' + (n.ignored ? "ignored" : "") + '"><a class="' + cls + '" href="' + href(n.path) +
         '" data-path="' + esc(n.path) + '" title="' + esc(n.path) + '"' + (n.path === current ? ' aria-current="page"' : "") + '>' + ICON_FILE + '<span class="label">' + esc(n.name) +
-        (d === "." ? "" : ' <span class="dir-path">' + esc(d) + "</span>") + "</span></a></li>";
+        (d === "." ? "" : ' <span class="dir-path">' + esc(d) + "</span>") + "</span>" + letterHTML(files[n.path]) + "</a></li>";
     }).join("") + "</ul>" : '<div class="empty">No matching files</div>';
     return;
   }
   hits = [];
-  treeEl.innerHTML = listHTML(data.children || []);
+  treeEl.innerHTML = listHTML(data.children || [], false, ".", { files, dirs, ghosts: ghosts(files) });
 }
 
 // select moves the choice among the files found, keeping it in sight.
@@ -284,6 +329,70 @@ export async function fetchTree() {
   render();
 }
 
+// openChanged opens the directories with changes under them, for the
+// moment, while only changed files are shown: the filter is for finding
+// them.
+function openChanged() {
+  if (changedOnly()) changedDirs().forEach((d) => open.add(d));
+}
+
+// shown is the tree as the filters leave it.
+function shown() {
+  let data = mdOnlyEl.checked ? prune(tree) || { children: [] } : tree;
+  if (changedOnly()) data = pruneChanged(data, changedFiles(), changedDirs());
+  return data;
+}
+
+// maxExpanded bounds the rows Expand all opens the tree to. The tree draws
+// every row of the directories open, again on every change of a file's
+// status and on every page: twenty thousand rows take a third of a second
+// each time, three thousand a twentieth.
+const maxExpanded = 3000;
+
+// expandAll opens the directories of the tree as shown, a level at a time,
+// as deep as it stays within maxExpanded rows. Directories git ignores,
+// which are read only when opened, stay folded.
+function expandAll() {
+  if (!tree) return;
+  const data = shown();
+  const foldable = (n) => n.dir && !n.lazy && !n.ignored;
+  let rows = (data.children || []).length;
+  let level = (data.children || []).filter(foldable);
+  while (level.length) {
+    const more = level.reduce((sum, n) => sum + (n.children || []).length, 0);
+    if (rows + more > maxExpanded) break;
+    rows += more;
+    level.forEach((n) => { open.add(n.path); kept.add(n.path); });
+    level = level.flatMap((n) => (n.children || []).filter(foldable));
+  }
+  save("open", Array.from(kept));
+  render();
+}
+
+// initOptions places the menu of the tree's options under its button as it
+// opens, and marks the button while a filter leaves files out.
+function initOptions() {
+  const button = document.getElementById("mini.tree-options-open");
+  const menu = document.getElementById("mini.tree-options");
+  const dot = button.querySelector(".filter-on");
+  const mark = () => { dot.hidden = !(mdOnlyEl.checked || changedOnly()); };
+  menu.addEventListener("beforetoggle", (e) => {
+    button.setAttribute("aria-expanded", String(e.newState === "open"));
+    if (e.newState !== "open") return;
+    const r = button.getBoundingClientRect();
+    menu.style.top = r.bottom + 4 + "px";
+    menu.style.left = Math.max(8, r.right - 200) + "px";
+  });
+  menu.addEventListener("change", mark);
+  mark();
+  for (const [id, f] of [["mini.expand-all", expandAll], ["mini.collapse-all", collapseAll]]) {
+    document.getElementById(id).addEventListener("click", () => {
+      menu.hidePopover();
+      f();
+    });
+  }
+}
+
 // collapseAll folds every directory, those down to the page shown too.
 function collapseAll() {
   kept.clear();
@@ -374,11 +483,23 @@ export function initTree() {
       unpeek();
     }
   });
-  document.getElementById("mini.collapse-all").addEventListener("click", collapseAll);
   mdOnlyEl.addEventListener("change", () => {
     save("mdOnly", mdOnlyEl.checked);
     render();
   });
+  if (changedOnlyEl) {
+    changedOnlyEl.checked = load("changedOnly", false);
+    changedOnlyEl.addEventListener("change", () => {
+      save("changedOnly", changedOnlyEl.checked);
+      openChanged();
+      render();
+    });
+  }
+  onStatus(() => {
+    openChanged();
+    render();
+  });
+  initOptions();
 
   // The server renders the tree closed from a cookie. It was kept in
   // localStorage before: move it over once

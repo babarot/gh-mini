@@ -143,6 +143,8 @@ type app struct {
 	addr string
 	srv  *server.Server
 	hs   *http.Server
+	// skip is what the server leaves out of the tree, as --skip does
+	skip []string
 }
 
 // URL is the address of a page, such as "/a.md".
@@ -174,7 +176,7 @@ func newApp(t *testing.T, files map[string]string) *app {
 
 func (a *app) start(ln net.Listener) {
 	a.t.Helper()
-	srv, err := server.New(server.Options{Root: a.root, Name: "repo", Reload: true, ThemesDir: filepath.Join(a.root, ".themes")})
+	srv, err := server.New(server.Options{Root: a.root, Name: "repo", Skip: a.skip, Reload: true, ThemesDir: filepath.Join(a.root, ".themes")})
 	if err != nil {
 		a.t.Fatal(err)
 	}

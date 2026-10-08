@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,6 +32,9 @@ type Event struct {
 	Structure bool
 	// GitHead is set when HEAD moved, as when switching branches.
 	GitHead bool
+	// Status is set when what changed since the last commit is not what
+	// it was: a file edited, staged, committed or restored.
+	Status bool
 	// Theme is set when a file in the themes directory changed.
 	Theme bool
 	// Resync is set when changes may have been missed, so that pages and
@@ -58,7 +62,8 @@ var recursiveWatch = runtime.GOOS == "darwin"
 // entries in them; kqueue opens a file descriptor for every entry.
 const maxViewedCost = 2000
 
-// Watcher follows a workspace's files, its git HEAD and a themes directory.
+// Watcher follows a workspace's files, its git HEAD and index, and a themes
+// directory.
 //
 // On macOS one recursive watch covers the whole root: FSEvents follows a
 // tree without a file descriptor per entry. Elsewhere a watch costs one
@@ -113,6 +118,7 @@ type burst struct {
 	paths       []string
 	seen        map[string]bool
 	gitHead     bool
+	gitIndex    bool
 	theme       bool
 	gitignore   bool
 	resync      bool
@@ -163,8 +169,9 @@ func Watch(ws *Workspace, themesDir string, handlers ...func(Event)) (*Watcher, 
 	}
 	if gitDir := gitDirOf(root); gitDir != "" {
 		// A git directory inside a recursively watched root is covered;
-		// a worktree's is elsewhere. HEAD is replaced by a rename, so the
-		// directory holding it is followed
+		// a worktree's is elsewhere. HEAD and the index are replaced by a
+		// rename, so the directory holding them is followed, and logs,
+		// where every commit is added to logs/HEAD
 		inside := w.recursive && strings.HasPrefix(gitDir, root+string(filepath.Separator))
 		if inside {
 			w.gitDir = gitDir
@@ -172,6 +179,9 @@ func Watch(ws *Workspace, themesDir string, handlers ...func(Event)) (*Watcher, 
 			log.Printf("watch %s: %v", gitDir, err)
 		} else {
 			w.gitDir = gitDir
+			if err := fw.Add(filepath.Join(gitDir, "logs"), fswatcher.All); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				log.Printf("watch %s: %v", filepath.Join(gitDir, "logs"), err)
+			}
 		}
 	}
 	w.ignores = ignoreDirs(root)
@@ -298,12 +308,16 @@ func (w *Watcher) add(e fswatcher.Event) {
 		}
 		b.gitignore = true
 	case w.gitDir != "" && (e.Name == w.gitDir || strings.HasPrefix(e.Name, w.gitDir+string(filepath.Separator))):
-		// Only HEAD matters; git writes its index and locks here all
-		// the time
-		if dir != w.gitDir || filepath.Base(e.Name) != "HEAD" {
+		// Only HEAD, the index and the log of HEAD matter; git writes
+		// locks and objects here all the time
+		switch {
+		case e.Name == filepath.Join(w.gitDir, "HEAD"):
+			b.gitHead = true
+		case e.Name == filepath.Join(w.gitDir, "index"), e.Name == filepath.Join(w.gitDir, "logs", "HEAD"):
+			b.gitIndex = true
+		default:
 			return
 		}
-		b.gitHead = true
 	case w.themesDir != "" && e.Name == w.themesDir:
 		// The watch ends with the directory; WatchThemes starts it again
 		if _, err := os.Stat(w.themesDir); err != nil {
@@ -366,14 +380,24 @@ func (w *Watcher) flushLoop() {
 func (w *Watcher) flush(b burst) {
 	snap := w.ws.Snapshot()
 	structure := b.gitignore || b.resync || w.structureChanged(snap, b.paths)
-	w.ws.Invalidate(Change{Structure: structure, GitHead: b.gitHead || b.resync})
+	// A change under a directory git ignores changes no file git sees
+	status := structure || b.gitHead || b.gitIndex || b.resync || slices.ContainsFunc(b.paths, func(p string) bool { return !snap.Ignored(p) })
+	w.ws.Invalidate(Change{Structure: structure, GitHead: b.gitHead || b.resync, Status: status})
 	if structure && !w.recursive {
 		// Watch new directories, and those no longer ignored, by what git
 		// ignores now
 		w.addTree(w.ws.opts.Root, w.ws.Snapshot())
 	}
 	e := Event{Structure: structure, GitHead: b.gitHead, Theme: b.theme, Resync: b.resync}
+	// git writes its index for other reasons too, such as a status run
+	// by an editor: only a change of status is told
+	if status {
+		e.Status = w.ws.Snapshot().StatusETag != snap.StatusETag
+	}
 	e.Paths, e.Dirs = limitPaths(snap, b.paths)
+	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.GitHead && !e.Status && !e.Theme && !e.Resync {
+		return
+	}
 	for _, h := range w.handlers {
 		h(e)
 	}

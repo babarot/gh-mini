@@ -29,17 +29,23 @@ type crumb struct {
 // of its kind.
 type page struct {
 	layout
-	// Kind is dir, markdown, code, image, binary, notfound or error.
+	// Kind is dir, markdown, code, image, binary, changes, notfound or
+	// error.
 	Kind string
 	// Error tells why a page of kind error could not be shown.
 	Error string
 	// Dir is set for a directory, File for the other kinds but notfound.
 	Dir  *dirView
 	File *fileView
+	// ChangeList is set on the Changes page
+	ChangeList *changeList
 	// Features loads the scripts the page's Markdown needs.
 	Features markdown.Features
 	// csp is the page's Content-Security-Policy
 	csp string
+	// status is what changed since the last commit as the viewer's
+	// settings show it, nil when nothing is shown
+	status *workspace.Status
 }
 
 // layout is what every page shows around its content.
@@ -49,10 +55,13 @@ type layout struct {
 	// from other directories'. Owner and Repo are what the page shows:
 	// the GitHub repository of the origin remote, or no owner and the
 	// directory's name.
-	Name    string
-	Owner   string
-	Repo    string
-	Branch  string
+	Name   string
+	Owner  string
+	Repo   string
+	Branch string
+	// Changes counts what changed since the last commit, in a git
+	// repository only
+	Changes *changesView
 	Path    string
 	Crumbs  []crumb
 	Ignored bool
@@ -100,6 +109,9 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 		full = p.Owner + "/" + p.Repo
 	}
 	p.Title = full
+	var etag string
+	p.status, _, etag = s.statusFor(snap, p.Settings)
+	p.Changes = newChangesView(p.status, etag)
 	p.SettingAttrs = settingAttrs(p.Settings)
 	p.SidebarHidden = cookie(r, sidebarCookie) == "hidden"
 	p.SettingSections = s.settingSections(p.Settings)

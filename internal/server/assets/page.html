@@ -19,7 +19,7 @@
 {{- end}}
 <script type="module" src="{{.Static}}/assets/js/main.js"></script>
 </head>
-<body data-path="{{.Path}}" data-kind="{{.Kind}}" data-name="{{.Name}}"{{if .Reload}} data-reload="1" data-seq="{{.Seq}}" data-boot="{{.Boot}}"{{end}}{{if .SidebarHidden}} class="sidebar-hidden"{{end}}>
+<body data-path="{{.Path}}" data-kind="{{.Kind}}" data-name="{{.Name}}"{{if .Reload}} data-reload="1" data-seq="{{.Seq}}" data-boot="{{.Boot}}"{{with .Changes}} data-status="{{.ETag}}"{{end}}{{end}}{{if .SidebarHidden}} class="sidebar-hidden"{{end}}>
 
 <header class="topbar">
   <button class="icon-btn" id="mini.sidebar-toggle" title="Toggle file tree" aria-label="Toggle file tree" aria-controls="mini.sidebar" aria-expanded="{{if .SidebarHidden}}false{{else}}true{{end}}">
@@ -34,10 +34,18 @@
     <a href="/">{{.Repo}}</a>
   </div>
   {{- if .Branch}}
-  <span class="branch" title="Current branch">
+  <span class="branch" title="Current branch: {{.Branch}}">
     <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"></path></svg>
-    {{.Branch}}
+    <span class="branch-name">{{.Branch}}</span>
   </span>
+  {{- end}}
+  {{- with .Changes}}
+  <a class="changes" id="mini.changes" href="/_mini/changes" title="Uncommitted changes"{{if not .Files}} hidden{{end}}{{if eq $.Kind "changes"}} aria-current="page"{{end}}>
+    <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M1 1.75C1 .784 1.784 0 2.75 0h7.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 15H2.75A1.75 1.75 0 0 1 1 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073ZM8 3.25a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0V7h-1.5a.75.75 0 0 1 0-1.5h1.5V4A.75.75 0 0 1 8 3.25Zm-3 8a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z"></path></svg>
+    <span data-files>{{.Files}} {{if eq .Files 1}}change{{else}}changes{{end}}</span>
+    <span class="added" data-added>+{{.Added}}</span>
+    <span class="deleted" data-deleted>−{{.Deleted}}</span>
+  </a>
   {{- end}}
   <span class="spacer"></span>
   <button class="icon-btn" id="mini.menu-open" title="Menu" aria-label="Menu" popovertarget="mini.menu">
@@ -138,7 +146,7 @@
     {{- range $i, $sec := .SettingSections}}
     <section class="settings-pane" role="tabpanel" id="mini.settings-{{$sec.ID}}" aria-labelledby="mini.settings-tab-{{$sec.ID}}"{{if ne $i 0}} hidden{{end}}>
       {{- range $s := .Settings}}
-      <div class="setting{{if $s.Reason}} unavailable{{end}}">
+      <div class="setting{{if $s.Reason}} unavailable{{end}}{{if $s.Parent}} child{{end}}{{if and $s.Disabled (not $s.Reason)}} disabled{{end}}"{{with $s.Parent}} data-parent="{{.}}"{{end}}>
         <div class="setting-text">
           <div class="setting-label" id="mini.setting-{{$s.Key}}">{{$s.Label}}</div>
           {{- with $s.Description}}
@@ -149,7 +157,7 @@
           {{- end}}
         </div>
         {{- if eq $s.Control "select"}}
-        <select data-setting="{{$s.Key}}" aria-labelledby="mini.setting-{{$s.Key}}"{{if $s.Reason}} disabled{{end}}>
+        <select data-setting="{{$s.Key}}" aria-labelledby="mini.setting-{{$s.Key}}"{{if $s.Disabled}} disabled{{end}}>
           {{- range $s.Options}}
           <option value="{{.Value}}"{{if eq .Value $s.Value}} selected{{end}}>{{.Label}}</option>
           {{- end}}
@@ -157,11 +165,11 @@
         {{- else if eq $s.Control "segmented"}}
         <div class="segmented" role="radiogroup" aria-labelledby="mini.setting-{{$s.Key}}">
           {{- range $s.Options}}
-          <button type="button" role="radio" data-setting="{{$s.Key}}" data-value="{{.Value}}" aria-checked="{{if eq .Value $s.Value}}true{{else}}false{{end}}" tabindex="{{if eq .Value $s.Value}}0{{else}}-1{{end}}"{{if eq .Value $s.Value}} class="selected"{{end}}{{if $s.Reason}} disabled{{end}}>{{.Label}}</button>
+          <button type="button" role="radio" data-setting="{{$s.Key}}" data-value="{{.Value}}" aria-checked="{{if eq .Value $s.Value}}true{{else}}false{{end}}" tabindex="{{if eq .Value $s.Value}}0{{else}}-1{{end}}"{{if eq .Value $s.Value}} class="selected"{{end}}{{if $s.Disabled}} disabled{{end}}>{{.Label}}</button>
           {{- end}}
         </div>
         {{- else if eq $s.Control "toggle"}}
-        <input type="checkbox" role="switch" data-setting="{{$s.Key}}" aria-labelledby="mini.setting-{{$s.Key}}"{{if eq $s.Value "true"}} checked{{end}}{{if $s.Reason}} disabled{{end}}>
+        <input type="checkbox" role="switch" data-setting="{{$s.Key}}" aria-labelledby="mini.setting-{{$s.Key}}"{{if eq $s.Value "true"}} checked{{end}}{{if $s.Disabled}} disabled{{end}}>
         {{- end}}
       </div>
       {{- end}}
@@ -175,10 +183,26 @@
   <aside class="sidebar" id="mini.sidebar">
     <div class="sidebar-tools">
       <input type="search" id="mini.tree-filter" aria-label="Go to file" placeholder="Go to file  (t)" autocomplete="off" spellcheck="false">
-      <div class="sidebar-row">
-        <label class="md-only"><input type="checkbox" id="mini.md-only"> Markdown only</label>
-        <button type="button" class="link-btn" id="mini.collapse-all">Collapse all</button>
-      </div>
+      <button type="button" class="icon-btn" id="mini.tree-options-open" title="Filter and fold the tree" aria-label="Filter and fold the tree" aria-expanded="false" popovertarget="mini.tree-options">
+        <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M.75 3h14.5a.75.75 0 0 1 0 1.5H.75a.75.75 0 0 1 0-1.5ZM3 7.75A.75.75 0 0 1 3.75 7h8.5a.75.75 0 0 1 0 1.5h-8.5A.75.75 0 0 1 3 7.75Zm3 4a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z"></path></svg>
+        <span class="filter-on" hidden></span>
+      </button>
+    </div>
+    <div class="menu tree-options" id="mini.tree-options" popover>
+      <div class="menu-heading">Show only</div>
+      <label><input type="checkbox" id="mini.md-only"> Markdown files</label>
+      {{- if .Changes}}
+      <label><input type="checkbox" id="mini.changed-only"> Changed files</label>
+      {{- end}}
+      <hr>
+      <button type="button" id="mini.expand-all">
+        <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="m8.177.677 2.896 2.896a.25.25 0 0 1-.177.427H8.75v1.25a.75.75 0 0 1-1.5 0V4H5.104a.25.25 0 0 1-.177-.427L7.823.677a.25.25 0 0 1 .354 0ZM7.25 10.75a.75.75 0 0 1 1.5 0V12h2.146a.25.25 0 0 1 .177.427l-2.896 2.896a.25.25 0 0 1-.354 0l-2.896-2.896A.25.25 0 0 1 5.104 12H7.25v-1.25Zm-5-2a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM6 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 6 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM12 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 12 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5Z"></path></svg>
+        <span>Expand all</span>
+      </button>
+      <button type="button" id="mini.collapse-all">
+        <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M10.896 2H8.75V.75a.75.75 0 0 0-1.5 0V2H5.104a.25.25 0 0 0-.177.427l2.896 2.896a.25.25 0 0 0 .354 0l2.896-2.896A.25.25 0 0 0 10.896 2ZM8.75 15.25a.75.75 0 0 1-1.5 0V14H5.104a.25.25 0 0 1-.177-.427l2.896-2.896a.25.25 0 0 1 .354 0l2.896 2.896a.25.25 0 0 1-.177.427H8.75v1.25Zm-6.5-6.5a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM6 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 6 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5ZM12 8a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1 0-1.5h.5A.75.75 0 0 1 12 8Zm2.25.75a.75.75 0 0 0 0-1.5h-.5a.75.75 0 0 0 0 1.5h.5Z"></path></svg>
+        <span>Collapse all</span>
+      </button>
     </div>
     <nav id="mini.tree" class="tree" aria-label="Files"></nav>
   </aside>
@@ -203,10 +227,10 @@
     <div class="box">
       <table class="files">
         {{- if ne $.Path "."}}
-        <tr><td colspan="2"><a class="up" href="..">..</a></td></tr>
+        <tr><td colspan="3"><a class="up" href="..">..</a></td></tr>
         {{- end}}
         {{- range .Entries}}
-        <tr{{if .Ignored}} class="ignored{{if and .Dir (not $.Ignored)}} hideable{{end}}"{{end}}>
+        <tr{{with .Class}} class="{{.}}"{{end}}>
           <td class="name"><div>
             {{- if .Dir}}
             <svg class="octicon dir" viewBox="0 0 16 16" width="16" height="16"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"></path></svg>
@@ -216,7 +240,17 @@
             <a href="{{.Href}}">{{.Name}}</a>
             {{- if .Link}}<span class="hint">symlink</span>{{end}}
             {{- if .Ignored}}<span class="badge">local</span>{{end}}
+            {{- with .Status}}{{with .Label}}<span class="status-badge">{{.}}</span>{{end}}{{end}}
           </div>
+          </td>
+          <td class="stat">
+            {{- with .Status}}
+            {{- if .Letter}}
+            {{- if .Binary}}<span class="meta">binary</span>{{else}}<span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span>{{end}}
+            {{- else}}
+            <span class="dot" title="{{.Files}} changed"></span> <span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span>
+            {{- end}}
+            {{- end -}}
           </td>
           <td class="ago"{{with .Date}} title="{{.}}"{{end}}>{{.Ago}}</td>
         </tr>
@@ -236,6 +270,56 @@
       </div>
       <article class="markdown-body">{{.Content}}</article>
     </div>
+    {{- end}}
+    {{- end}}
+
+    {{- with .ChangeList}}
+    <div class="changes-head">
+      <h2>Changes</h2>
+      <span class="meta">{{if eq .Show "unstaged"}}the working tree against the index{{else if eq .Show "staged"}}the index against the last commit{{else}}the working tree against the last commit{{end}}</span>
+    </div>
+    <div class="changes-toolbar">
+      <div class="segmented" aria-label="Which changes">
+        {{- range .Tabs}}
+        <a href="{{.Href}}"{{if .Current}} class="selected" aria-current="page"{{end}}>{{.Label}} <span class="counter">{{.Count}}</span></a>
+        {{- end}}
+      </div>
+      {{- if .One}}
+      <a class="link-btn" href="{{.All}}">All changed files</a>
+      {{- end}}
+    </div>
+    {{- if .Files}}
+    <p class="changes-summary">{{len .Files}} {{if eq (len .Files) 1}}file{{else}}files{{end}} changed, with <span class="added">{{.Added}} {{if eq .Added 1}}addition{{else}}additions{{end}}</span> and <span class="deleted">{{.Deleted}} {{if eq .Deleted 1}}deletion{{else}}deletions{{end}}</span></p>
+    {{- range .Files}}
+    <details class="box diff-file s-{{.Letter}}" id="{{.Anchor}}"{{if not .Load}} open{{end}}>
+      <summary class="box-header">
+        <svg class="octicon chevron" viewBox="0 0 16 16" width="16" height="16"><path d="M6.22 3.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L9.94 8 6.22 4.28a.75.75 0 0 1 0-1.06Z"></path></svg>
+        <span class="diff-path">{{with .From}}<span class="from">{{.}} → </span>{{end}}{{.Path}}</span>
+        <span class="status-badge">{{.Label}}</span>
+        {{- if .Staged}}<span class="stage">staged</span>{{end}}
+        {{- if .Unstaged}}<span class="stage">unstaged</span>{{end}}
+        <span class="spacer"></span>
+        {{- if .Binary}}
+        <span class="meta">binary</span>
+        {{- else}}
+        <span class="diff-stat"><span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span></span>
+        <span class="blocks" aria-hidden="true">{{range .Blocks}}<i class="{{.}}"></i>{{end}}</span>
+        {{- end}}
+        {{- with .Href}}
+        <a class="btn" href="{{.}}">View file</a>
+        {{- end}}
+      </summary>
+      {{- if .Load}}
+      <div class="diff-notice">This diff is long. <a href="{{.Load}}">Show it</a></div>
+      {{- else if .Notice}}
+      <div class="diff-notice">{{.Notice}}</div>
+      {{- else}}
+      <div class="diff-scroll">{{.Diff}}</div>
+      {{- end}}
+    </details>
+    {{- end}}
+    {{- else}}
+    <div class="box empty"><p>{{if eq .Show "all"}}Nothing changed since the last commit.{{else}}No {{.Show}} changes.{{end}}</p></div>
     {{- end}}
     {{- end}}
 
@@ -273,23 +357,36 @@
       <span class="meta" title="{{.Date}}">{{.Ago}}</span>
     </div>
     {{- end}}
+    {{- with .Change}}
+    <div class="box uncommitted s-{{.Letter}}">
+      <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M1 1.75C1 .784 1.784 0 2.75 0h7.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 15H2.75A1.75 1.75 0 0 1 1 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073ZM8 3.25a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0V7h-1.5a.75.75 0 0 1 0-1.5h1.5V4A.75.75 0 0 1 8 3.25Zm-3 8a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z"></path></svg>
+      <span><strong>{{.Label}}</strong>, {{.Where}}{{with .From}}, from <code>{{.}}</code>{{end}}</span>
+      {{- if not .Binary}}
+      <span class="diff-stat"><span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span></span>
+      {{- end}}
+      <span class="spacer"></span>
+      <a href="{{.Href}}">Open in Changes</a>
+    </div>
+    {{- end}}
     <div class="box">
       <div class="box-header">
         {{- with .Views}}
         <div class="segmented">
           {{- range .}}
-          <a href="{{.Href}}"{{if .Current}} class="selected"{{end}}>{{.Label}}</a>
+          <a href="{{.Href}}"{{if .Current}} class="selected"{{end}}>{{.Label}}{{with .Stat}}{{if not .Binary}} <span class="counter"><span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span></span>{{end}}{{end}}</a>
           {{- end}}
         </div>
         {{- end}}
         {{- if .Lines}}<span class="meta">{{.Lines}} lines</span>{{end}}
-        <span class="meta">{{.Size}}</span>
+        {{with .Size}}<span class="meta">{{.}}</span>{{end}}
         <span class="spacer"></span>
         {{template "langs" .Langs}}
         {{- if gt (len $.Features.Headings) 1}}
         <button type="button" class="btn toc-toggle" data-toc-toggle aria-controls="mini.toc" aria-expanded="false" title="Outline"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M5.75 2.5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5ZM2 14a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-6a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg></button>
         {{- end}}
+        {{- if not .Gone}}
         <a class="btn" href="?raw">Raw</a>
+        {{- end}}
       </div>
       {{- with .Notice}}
       <div class="notice">{{.}}</div>
@@ -298,6 +395,8 @@
       <article class="markdown-body">{{.Content}}</article>
       {{- else if eq $.Kind "code"}}
       <div class="code">{{.Content}}</div>
+      {{- else if eq $.Kind "diff"}}
+      <div class="diff-scroll">{{.Content}}</div>
       {{- else if eq $.Kind "html"}}
       <iframe class="html-preview" src="{{.PreviewURL}}" title="{{$.Path}}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
       {{- else if eq $.Kind "image"}}

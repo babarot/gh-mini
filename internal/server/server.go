@@ -35,6 +35,9 @@ type Options struct {
 	ThemesDir string
 	// Reload makes pages reload when the files they show change.
 	Reload bool
+	// NoChanges keeps gh-mini from reading what changed since the last
+	// commit, and from showing it.
+	NoChanges bool
 	// PreviewPort is the port PreviewHandler is served on, on the same
 	// host; zero turns HTML previews off.
 	PreviewPort int
@@ -79,7 +82,7 @@ func New(opts Options) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("translations %w", err)
 	}
-	wsOpts := workspace.Options{Root: opts.Root, Name: opts.Name, Skip: opts.Skip}
+	wsOpts := workspace.Options{Root: opts.Root, Name: opts.Name, Skip: opts.Skip, NoStatus: opts.NoChanges}
 	if !opts.Reload {
 		// Nothing tells when files change, so look again now and then
 		wsOpts.MaxAge = 2 * time.Second
@@ -144,6 +147,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/_mini/static/", s.static)
 	mux.HandleFunc("/_mini/theme/", s.serveTheme)
 	mux.HandleFunc("/_mini/api/tree", s.serveTree)
+	mux.HandleFunc("/_mini/api/status", s.serveStatus)
+	mux.HandleFunc("/_mini/changes", s.serveChangesPage)
 	mux.HandleFunc("/_mini/events", s.serveEvents)
 	mux.HandleFunc("/_mini/api/changes", s.serveChanges)
 	mux.HandleFunc("/", s.servePath)
@@ -175,4 +180,25 @@ func (s *Server) serveTree(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(snap.TreeJSON)
+}
+
+// serveStatus serves what changed since the last commit as JSON, with an
+// ETag as the tree has.
+func (s *Server) serveStatus(w http.ResponseWriter, r *http.Request) {
+	snap := s.ws.Snapshot()
+	_, b, etag := s.statusFor(snap, s.settings(r))
+	if b == nil {
+		// Nothing to show: outside a repository, or with Changes off
+		b, etag = []byte(`{"git":false,"files":{},"added":0,"deleted":0}`), `"none"`
+	}
+	// The settings, in a cookie, tell what is left out
+	w.Header().Set("Vary", "Cookie")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("ETag", etag)
+	if r.Header.Get("If-None-Match") == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(b)
 }
