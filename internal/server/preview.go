@@ -37,7 +37,7 @@ func (s *Server) previewCookie() string {
 // PreviewHandler serves the files under the root as they are, to browsers
 // holding the preview cookie, for the server on Options.PreviewPort.
 func (s *Server) PreviewHandler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return s.checkHost(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.Header().Set("Allow", "GET, HEAD")
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -78,7 +78,7 @@ func (s *Server) PreviewHandler() http.Handler {
 		defer f.Close()
 		w.Header().Set("Cache-Control", "no-cache")
 		http.ServeContent(w, r, info.Name(), info.ModTime(), f)
-	})
+	}))
 }
 
 // htmlPreview tells whether an HTML file's page shows its preview: when the

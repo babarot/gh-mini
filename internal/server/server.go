@@ -45,6 +45,9 @@ type Options struct {
 	// full hash of the commit built from, or empty.
 	Version  string
 	Revision string
+	// Hosts are the names, other than localhost, the server answers to;
+	// it answers to any IP address
+	Hosts []string
 }
 
 // Server serves one directory.
@@ -143,7 +146,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/_mini/api/tree", s.serveTree)
 	mux.HandleFunc("/_mini/events", s.serveEvents)
 	mux.HandleFunc("/", s.servePath)
-	return mux
+	return s.checkHost(mux)
 }
 
 // serveTree serves the tree as JSON. The browser asks again on every page,

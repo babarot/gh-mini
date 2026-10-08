@@ -129,6 +129,7 @@ type response struct {
 func get(t *testing.T, h http.Handler, target string, edit ...func(*http.Request)) response {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, target, nil)
+	req.Host = "localhost"
 	for _, f := range edit {
 		f(req)
 	}

@@ -349,6 +349,33 @@ func TestLanAddrs(t *testing.T) {
 	}
 }
 
+func TestHostNames(t *testing.T) {
+	name, err := os.Hostname()
+	if err != nil {
+		t.Skip(err)
+	}
+	machine := name
+	if !strings.Contains(name, ".") {
+		machine += " " + name + ".local"
+	}
+	for _, tt := range []struct{ host, addr, want string }{
+		{"localhost", "127.0.0.1:6419", "localhost"},
+		{"127.0.0.1", "127.0.0.1:6419", ""},
+		{"::1", "[::1]:6419", ""},
+		{"box.local", "192.168.1.5:6419", "box.local"},
+		{"0.0.0.0", "0.0.0.0:6419", machine},
+		{"", "[::]:6419", machine},
+	} {
+		a, err := net.ResolveTCPAddr("tcp", tt.addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Join(hostNames(tt.host, a), " "); got != tt.want {
+			t.Errorf("hostNames(%q, %s) = %q, want %q", tt.host, tt.addr, got, tt.want)
+		}
+	}
+}
+
 // From the home directory, a file is served with its own directory, not
 // the whole home.
 func TestResolveFromHome(t *testing.T) {

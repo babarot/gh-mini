@@ -11,7 +11,7 @@ func TestPageCSP(t *testing.T) {
 	srv, _ := newPreviewServer(t)
 	for _, target := range []string{"/", "/README.md", "/nope"} {
 		csp := get(t, srv.Handler(), target).header.Get("Content-Security-Policy")
-		for _, want := range []string{"script-src 'self';", "base-uri 'none'", "object-src 'none'", "form-action 'none'", "frame-src http://example.com:7000;"} {
+		for _, want := range []string{"script-src 'self';", "base-uri 'none'", "object-src 'none'", "form-action 'none'", "frame-src http://localhost:7000;"} {
 			if !strings.Contains(csp+";", want) {
 				t.Errorf("%s: CSP %q lacks %q", target, csp, want)
 			}

@@ -32,6 +32,7 @@ func newPreviewServer(t *testing.T) (*Server, string) {
 func previewGet(t *testing.T, srv *Server, method, target string, edit ...func(*http.Request)) response {
 	t.Helper()
 	req := httptest.NewRequest(method, target, nil)
+	req.Host = "localhost"
 	for _, f := range edit {
 		f(req)
 	}
@@ -105,7 +106,7 @@ func TestHTMLPage(t *testing.T) {
 	srv, root := newPreviewServer(t)
 	writeFile(t, filepath.Join(root, "old.htm"), []byte("<p>old</p>"))
 	h := srv.Handler()
-	const iframe = `<iframe class="html-preview" src="http://example.com:7000/site/index.html"`
+	const iframe = `<iframe class="html-preview" src="http://localhost:7000/site/index.html"`
 	on := withSettings(`{"htmlPreview":true}`)
 	cookieSet := func(r response) bool {
 		for _, c := range r.header.Values("Set-Cookie") {

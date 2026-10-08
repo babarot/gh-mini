@@ -167,6 +167,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		Reload:       !c.noReload,
 		Version:      version.String(),
 		Revision:     version.Revision(),
+		Hosts:        hostNames(c.host, ln.Addr()),
 	}
 	if pln != nil {
 		opts.PreviewPort = pln.Addr().(*net.TCPAddr).Port
@@ -305,6 +306,25 @@ func lanAddrs(a net.Addr, ifaddrs []net.Addr) []string {
 			continue
 		}
 		out = append(out, net.JoinHostPort(n.IP.String(), strconv.Itoa(tcp.Port)))
+	}
+	return out
+}
+
+// hostNames are the names the server answers to besides localhost and IP
+// addresses: the one given to --host, and when it listens on every
+// address, the machine's own, as other machines reach it by.
+func hostNames(host string, a net.Addr) []string {
+	var out []string
+	if host != "" && net.ParseIP(strings.Trim(host, "[]")) == nil {
+		out = append(out, host)
+	}
+	if tcp, ok := a.(*net.TCPAddr); ok && (tcp.IP == nil || tcp.IP.IsUnspecified()) {
+		if name, err := os.Hostname(); err == nil && name != "" {
+			out = append(out, name)
+			if !strings.Contains(name, ".") {
+				out = append(out, name+".local")
+			}
+		}
 	}
 	return out
 }
