@@ -17,7 +17,7 @@ In the tree, a letter after a file's name tells how it changed, and the name tak
 | `U` | untracked: git does not track it yet |
 | `C` | in a merge conflict |
 
-A directory with changes under it has a dot, so that a folded one tells where to look. Changed files, under the filter button beside the finder, leaves the tree with only the changed files, and opens the directories that hold them.
+A directory with changes under it has a dot, so that a folded one tells where to look. Changed files, in the menu beside the finder, leaves the tree with only the changed files, and opens the directories that hold them.
 
 A directory's page tells how many lines each file changed, and for a directory, those of the files under it. A deleted file stays listed, struck through, until the deletion is committed.
 

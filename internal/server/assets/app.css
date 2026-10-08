@@ -201,8 +201,8 @@ body.sidebar-hidden .sidebar { display: none; }
   background: var(--fgColor-accent);
 }
 /* Placed under its button as it opens; a menu is fixed to the top bar */
-.tree-filters { top: auto; right: auto; width: 200px; }
-.tree-filters label {
+.tree-options { top: auto; right: auto; width: 200px; }
+.tree-options label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -211,8 +211,8 @@ body.sidebar-hidden .sidebar { display: none; }
   cursor: pointer;
   user-select: none;
 }
-.tree-filters label:hover { background: var(--mini-selected); }
-.tree-filters input { margin: 0; }
+.tree-options label:hover { background: var(--mini-selected); }
+.tree-options input { margin: 0; }
 .menu-heading { padding: 4px 8px; color: var(--fgColor-muted); font-size: 12px; font-weight: 600; }
 .link-btn { white-space: nowrap; padding: 0; color: var(--fgColor-muted); font: inherit; font-size: 12px; background: none; border: 0; cursor: pointer; }
 .link-btn:hover { color: var(--fgColor-accent); text-decoration: underline; }

@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/chromedp/chromedp"
@@ -51,6 +52,7 @@ func TestTreeKeepsOpen(t *testing.T) {
 		t.Errorf("back on a.md: open %q, want docs,src", got)
 	}
 
+	run(t, ctx, chromedp.Click(`[id="mini.tree-options-open"]`, chromedp.ByQuery))
 	run(t, ctx, chromedp.Click(`[id="mini.collapse-all"]`, chromedp.ByQuery))
 	waitFor(t, ctx, openDirs+` === ""`)
 	open(t, ctx, a.URL("/README.md"))
@@ -115,4 +117,38 @@ func TestFinder(t *testing.T) {
 	waitFor(t, ctx, `document.querySelector(".tree .row.selected")?.dataset.path === "README.md"`)
 	run(t, ctx, chromedp.KeyEvent(kb.Enter))
 	waitFor(t, ctx, `location.pathname === "/README.md"`)
+}
+
+// Expand all opens every directory, and they stay open; a tree too large
+// to draw whole opens only as deep as it fits.
+func TestTreeExpandAll(t *testing.T) {
+	a := newApp(t, treeFiles)
+	ctx := tab(t)
+	open(t, ctx, a.URL("/README.md"))
+	expand := func() {
+		run(t, ctx, chromedp.Click(`[id="mini.tree-options-open"]`, chromedp.ByQuery))
+		run(t, ctx, chromedp.Click(`[id="mini.expand-all"]`, chromedp.ByQuery))
+	}
+	expand()
+	waitFor(t, ctx, openDirs+` === "docs,docs/deep,src,src/lib"`)
+	if eval[bool](t, ctx, `document.getElementById("mini.tree-options").matches(":popover-open")`) {
+		t.Error("the menu stayed open")
+	}
+	open(t, ctx, a.URL("/a.md"))
+	if got := eval[string](t, ctx, openDirs); got != "docs,docs/deep,src,src/lib" {
+		t.Errorf("on the next page: open %q", got)
+	}
+
+	// Five directories, each with one of 1000 files: the first level fits,
+	// the files under it do not, and the tree opens down to them only
+	files := map[string]string{}
+	for d := range 5 {
+		for f := range 1000 {
+			files[fmt.Sprintf("d%d/sub/f%04d.md", d, f)] = "x\n"
+		}
+	}
+	big := newApp(t, files)
+	open(t, ctx, big.URL("/"))
+	expand()
+	waitFor(t, ctx, openDirs+` === "d0,d1,d2,d3,d4"`)
 }

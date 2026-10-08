@@ -184,8 +184,7 @@ function draw() {
   if (!tree) return;
   const files = changedFiles();
   const dirs = changedDirs();
-  let data = mdOnlyEl.checked ? prune(tree) || { children: [] } : tree;
-  if (changedOnly()) data = pruneChanged(data, files, dirs);
+  const data = shown();
   const q = filterEl.value.trim().toLowerCase();
   if (q) {
     const words = q.split(/\s+/);
@@ -337,11 +336,44 @@ function openChanged() {
   if (changedOnly()) changedDirs().forEach((d) => open.add(d));
 }
 
-// initFilters places the menu of the filters under its button as it opens,
-// and marks the button while a filter leaves files out.
-function initFilters() {
-  const button = document.getElementById("mini.tree-filters-open");
-  const menu = document.getElementById("mini.tree-filters");
+// shown is the tree as the filters leave it.
+function shown() {
+  let data = mdOnlyEl.checked ? prune(tree) || { children: [] } : tree;
+  if (changedOnly()) data = pruneChanged(data, changedFiles(), changedDirs());
+  return data;
+}
+
+// maxExpanded bounds the rows Expand all opens the tree to. The tree draws
+// every row of the directories open, again on every change of a file's
+// status and on every page: twenty thousand rows take a third of a second
+// each time, three thousand a twentieth.
+const maxExpanded = 3000;
+
+// expandAll opens the directories of the tree as shown, a level at a time,
+// as deep as it stays within maxExpanded rows. Directories git ignores,
+// which are read only when opened, stay folded.
+function expandAll() {
+  if (!tree) return;
+  const data = shown();
+  const foldable = (n) => n.dir && !n.lazy && !n.ignored;
+  let rows = (data.children || []).length;
+  let level = (data.children || []).filter(foldable);
+  while (level.length) {
+    const more = level.reduce((sum, n) => sum + (n.children || []).length, 0);
+    if (rows + more > maxExpanded) break;
+    rows += more;
+    level.forEach((n) => { open.add(n.path); kept.add(n.path); });
+    level = level.flatMap((n) => (n.children || []).filter(foldable));
+  }
+  save("open", Array.from(kept));
+  render();
+}
+
+// initOptions places the menu of the tree's options under its button as it
+// opens, and marks the button while a filter leaves files out.
+function initOptions() {
+  const button = document.getElementById("mini.tree-options-open");
+  const menu = document.getElementById("mini.tree-options");
   const dot = button.querySelector(".filter-on");
   const mark = () => { dot.hidden = !(mdOnlyEl.checked || changedOnly()); };
   menu.addEventListener("beforetoggle", (e) => {
@@ -353,6 +385,12 @@ function initFilters() {
   });
   menu.addEventListener("change", mark);
   mark();
+  for (const [id, f] of [["mini.expand-all", expandAll], ["mini.collapse-all", collapseAll]]) {
+    document.getElementById(id).addEventListener("click", () => {
+      menu.hidePopover();
+      f();
+    });
+  }
 }
 
 // collapseAll folds every directory, those down to the page shown too.
@@ -445,7 +483,6 @@ export function initTree() {
       unpeek();
     }
   });
-  document.getElementById("mini.collapse-all").addEventListener("click", collapseAll);
   mdOnlyEl.addEventListener("change", () => {
     save("mdOnly", mdOnlyEl.checked);
     render();
@@ -462,7 +499,7 @@ export function initTree() {
     openChanged();
     render();
   });
-  initFilters();
+  initOptions();
 
   // The server renders the tree closed from a cookie. It was kept in
   // localStorage before: move it over once
