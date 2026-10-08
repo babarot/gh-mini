@@ -108,6 +108,15 @@ var settingDefs = []setting{
 		Default:     func(s *Server) string { return s.opts.Translations },
 	},
 	{
+		Key:         "hideIgnoredDirs",
+		Section:     "Files",
+		Label:       "Hide ignored directories",
+		Description: "Leave directories git ignores, such as .venv or dist, out of the tree, the listings and the file finder. Files git ignores elsewhere still show",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "false" },
+		Attr:        true,
+	},
+	{
 		Key:         "avatars",
 		Section:     "Privacy",
 		Label:       "Avatars",

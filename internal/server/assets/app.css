@@ -170,6 +170,7 @@ body.sidebar-hidden .sidebar { display: none; }
 .tree .row .label { overflow: hidden; text-overflow: ellipsis; }
 .tree .row .dir-path { color: var(--fgColor-muted); }
 .tree .ignored > .row .label { opacity: .6; }
+[data-hideignoreddirs="true"] .tree li.hideable { display: none; }
 .tree .indent { width: 12px; flex: none; }
 .tree .empty { padding: 8px; color: var(--fgColor-muted); }
 
@@ -466,6 +467,7 @@ body[data-kind="html"] .main > .box {
 .files .name .octicon.dir { color: var(--mini-folder-color); }
 .files .name a { color: var(--fgColor-default); min-width: 0; overflow-wrap: anywhere; }
 .files .ignored .name a { color: var(--fgColor-muted); }
+[data-hideignoreddirs="true"] .files tr.hideable { display: none; }
 .files .ago { color: var(--fgColor-muted); text-align: right; white-space: nowrap; }
 
 .markdown-body { padding: 32px; background: transparent; }

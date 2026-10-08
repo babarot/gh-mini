@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -82,7 +83,7 @@ func TestSettingsDialog(t *testing.T) {
 		`<option value="sepia" selected>sepia</option>`,
 		`data-setting="mode" data-value="dark" aria-checked="true" tabindex="0" class="selected">Dark</button>`,
 		`data-setting="mode" data-value="" aria-checked="false" tabindex="-1">Auto</button>`,
-		`<script type="application/json" id="mini.settings-data">{"avatars":"true","htmlPreview":"false","mode":"dark","theme":"sepia","translations":"suffix","wide":"false","wrap":"false"}</script>`,
+		`<script type="application/json" id="mini.settings-data">{"avatars":"true","hideIgnoredDirs":"false","htmlPreview":"false","mode":"dark","theme":"sepia","translations":"suffix","wide":"false","wrap":"false"}</script>`,
 	)
 	r.reject(t, `id="theme-select"`, `id="mode-select"`)
 }
@@ -135,4 +136,26 @@ func TestSettingsLayoutAttrs(t *testing.T) {
 	h := newTestServer(t)
 	get(t, h, "/").expect(t, http.StatusOK, ` data-wide="false"`, ` data-wrap="false"`)
 	get(t, h, "/", withSettings(`{"wide":true,"wrap":true}`)).expect(t, http.StatusOK, ` data-wide="true"`, ` data-wrap="true"`)
+}
+
+// Only the outermost directory git ignores is marked to hide, and only
+// outside one: a listing of an ignored directory shows what is in it.
+// Files git ignores are never marked.
+func TestHideIgnoredDirs(t *testing.T) {
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "local-only", "sub", "x.md"), []byte("# X\n"))
+	srv, err := New(Options{Root: root, Name: "repo", ThemesDir: themes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { srv.Close() })
+	h := srv.Handler()
+	r := get(t, h, "/", withSettings(`{"hideIgnoredDirs":true}`))
+	r.expect(t, http.StatusOK, ` data-hideIgnoredDirs="true"`)
+	if row := r.row(t, "README.ja.md"); !strings.Contains(row, `class="ignored"`) {
+		t.Errorf("an ignored file is marked to hide: %s", row)
+	}
+	if row := get(t, h, "/local-only/").row(t, "sub"); strings.Contains(row, "hideable") {
+		t.Errorf("a directory in an ignored one is marked to hide: %s", row)
+	}
 }

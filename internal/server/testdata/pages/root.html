@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-wide="false" data-wrap="false">
+<html lang="en" data-wide="false" data-wrap="false" data-hideIgnoredDirs="false">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -168,6 +168,13 @@
           <option value="dir">{lang}/{name}.md</option>
         </select>
       </div>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-hideIgnoredDirs">Hide ignored directories</div>
+          <div class="setting-description">Leave directories git ignores, such as .venv or dist, out of the tree, the listings and the file finder. Files git ignores elsewhere still show</div>
+        </div>
+        <input type="checkbox" role="switch" data-setting="hideIgnoredDirs" aria-labelledby="mini.setting-hideIgnoredDirs">
+      </div>
     </section>
     <section class="settings-pane" role="tabpanel" id="mini.settings-privacy" aria-labelledby="mini.settings-tab-privacy" hidden>
       <div class="setting">
@@ -180,7 +187,7 @@
     </section>
   </div>
 </dialog>
-<script type="application/json" id="mini.settings-data">{"avatars":"true","htmlPreview":"false","mode":"","theme":"github","translations":"suffix","wide":"false","wrap":"false"}</script>
+<script type="application/json" id="mini.settings-data">{"avatars":"true","hideIgnoredDirs":"false","htmlPreview":"false","mode":"","theme":"github","translations":"suffix","wide":"false","wrap":"false"}</script>
 
 <div class="layout">
   <aside class="sidebar" id="mini.sidebar">
@@ -205,7 +212,7 @@
           </td>
           <td class="ago">just now</td>
         </tr>
-        <tr class="ignored">
+        <tr class="ignored hideable">
           <td class="name"><div>
             <svg class="octicon dir" viewBox="0 0 16 16" width="16" height="16"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"></path></svg>
             <a href="/local-only/">local-only</a><span class="badge">local</span>

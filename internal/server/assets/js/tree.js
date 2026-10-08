@@ -24,6 +24,16 @@ function prune(node) {
   return Object.assign({}, node, { children: kids });
 }
 
+// hideable tells a directory git ignores that the setting to hide them
+// leaves out: the outermost one, as what is in it is ignored too, unless
+// the page shown is in it, so that the tree still leads to the page.
+function hideable(node, parentIgnored) {
+  if (!node.dir || !node.ignored || parentIgnored) return false;
+  return current !== node.path && !current.startsWith(node.path + "/");
+}
+
+const hidingIgnored = () => document.documentElement.dataset.hideignoreddirs === "true";
+
 function rowHTML(node) {
   const cls = "row" + (node.path === current ? " current" : "");
   const icon = node.dir ? ICON_CHEVRON + ICON_DIR : '<span class="indent"></span>' + ICON_FILE;
@@ -31,24 +41,26 @@ function rowHTML(node) {
     (node.dir ? ' data-dir="1"' : "") + ' title="' + esc(node.name) + '">' + icon + '<span class="label">' + esc(node.name) + "</span></a>";
 }
 
-function listHTML(nodes) {
+function listHTML(nodes, parentIgnored) {
   let out = "<ul>";
   nodes.forEach((n) => {
     const cls = [];
     if (n.dir && open.has(n.path)) cls.push("open");
     if (n.ignored) cls.push("ignored");
+    // Hidden by CSS, so that the setting applies at once
+    if (hideable(n, parentIgnored)) cls.push("hideable");
     out += '<li class="' + cls.join(" ") + '"' + (n.ignored ? ' title="Ignored by git"' : "") + ">" + rowHTML(n);
     // Only what is open is drawn: a large tree costs nothing folded
-    if (n.dir && open.has(n.path) && n.children && n.children.length) out += listHTML(n.children);
+    if (n.dir && open.has(n.path) && n.children && n.children.length) out += listHTML(n.children, n.ignored);
     out += "</li>";
   });
   return out + "</ul>";
 }
 
-function flatten(node, out) {
+function flatten(node, out, hide) {
   (node.children || []).forEach((n) => {
     if (!n.dir) out.push(n);
-    else flatten(n, out);
+    else if (!(hide && hideable(n, node.ignored))) flatten(n, out, hide);
   });
   return out;
 }
@@ -80,7 +92,7 @@ function render() {
   const q = filterEl.value.trim().toLowerCase();
   if (q) {
     const words = q.split(/\s+/);
-    hits = flatten(data, [])
+    hits = flatten(data, [], hidingIgnored())
       .filter((n) => words.every((w) => n.path.toLowerCase().includes(w)))
       .map((n) => [rank(n, q, words), n])
       .sort((a, b) => before(a[0], b[0]))
