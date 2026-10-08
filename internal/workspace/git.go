@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -93,7 +94,46 @@ type Commit struct {
 // under the root, or nil outside a repository and for what is not
 // committed.
 func (w *Workspace) LastCommit(rel string) *Commit {
-	return gitLastCommit(w.opts.Root, rel)
+	return w.commits.get(w.opts.Root, rel)
+}
+
+// maxCommits bounds the last commits kept, by path.
+const maxCommits = 4096
+
+// commitCache keeps the last commits of paths while the refs stay as they
+// are. Finding one takes git long in a long history, a quarter of a
+// second for an old file among 60,000 commits, and whether it is pushed
+// longer again; listing the refs, which a commit, a fetch or a checkout
+// changes, takes a few milliseconds.
+type commitCache struct {
+	mu      sync.Mutex
+	refs    string
+	commits map[string]*Commit
+}
+
+func (c *commitCache) get(dir, rel string) *Commit {
+	refs := gitOutput(dir, "show-ref", "--head")
+	c.mu.Lock()
+	if refs == c.refs {
+		if commit, ok := c.commits[rel]; ok {
+			c.mu.Unlock()
+			return commit
+		}
+	}
+	c.mu.Unlock()
+	// No refs, outside a repository or before the first commit, means no
+	// commit to keep
+	if refs == "" {
+		return nil
+	}
+	commit := gitLastCommit(dir, rel)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if refs != c.refs || len(c.commits) >= maxCommits {
+		c.refs, c.commits = refs, map[string]*Commit{}
+	}
+	c.commits[rel] = commit
+	return commit
 }
 
 func gitLastCommit(dir, rel string) *Commit {

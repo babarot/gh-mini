@@ -60,6 +60,7 @@ type Workspace struct {
 	// watched is set once a Watcher invalidates the snapshot on changes.
 	// Until then, every Snapshot is rebuilt from scratch.
 	watched atomic.Bool
+	commits commitCache
 }
 
 // Snapshot is the state of a workspace at one time. It is never modified,

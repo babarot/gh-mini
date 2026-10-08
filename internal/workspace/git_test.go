@@ -133,3 +133,31 @@ func TestGitBranchDetached(t *testing.T) {
 		t.Errorf("detached: %q, want %q", b, sha)
 	}
 }
+
+// A last commit kept is given again until the refs move, by a commit or a
+// fetch.
+func TestLastCommitKept(t *testing.T) {
+	dir := newRepo(t, "", "a.md")
+	w, err := Open(Options{Root: dir, Name: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	for range 2 {
+		if c := w.LastCommit("a.md"); c == nil || c.Subject != "init" || c.Pushed {
+			t.Fatalf("a.md: got %+v", c)
+		}
+	}
+	write(t, filepath.Join(dir, "a.md"), "y\n")
+	git(t, dir, "-c", "user.name=Ann", "-c", "user.email=a@example.com", "commit", "-q", "-am", "Change a")
+	if c := w.LastCommit("a.md"); c == nil || c.Subject != "Change a" {
+		t.Errorf("a.md after a commit: got %+v", c)
+	}
+	git(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD")
+	if c := w.LastCommit("a.md"); c == nil || !c.Pushed {
+		t.Errorf("a.md after a fetch: got %+v", c)
+	}
+	if c := w.LastCommit("new.md"); c != nil {
+		t.Errorf("new.md: got %+v", c)
+	}
+}
