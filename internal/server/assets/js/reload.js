@@ -1,11 +1,13 @@
 // Live reload: the server tells what changed, and the page reloads when it
-// shows one of the changed files, keeping its scroll position and which of
-// its <details> are open.
+// shows one of the changed files, keeping its scroll position, which of
+// its <details> are open, and a dialog open on it, such as the settings
+// when one of them changes what the server renders.
 
 import { page, dirname, isImage } from "./util.js";
 
 const scrollKey = "gh-mini-scroll:" + location.pathname + location.search;
 const detailsKey = "gh-mini-details:" + location.pathname + location.search;
+const dialogKey = "gh-mini-dialog:" + location.pathname + location.search;
 
 const allDetails = () => Array.from(document.querySelectorAll(".markdown-body details"));
 
@@ -13,6 +15,12 @@ export function reload() {
   try {
     sessionStorage.setItem(scrollKey, String(window.scrollY));
     sessionStorage.setItem(detailsKey, JSON.stringify(allDetails().map((d) => d.open)));
+    const dialog = document.querySelector("dialog[open]");
+    if (dialog) {
+      // The setting just changed keeps the focus too
+      const focused = dialog.contains(document.activeElement) ? document.activeElement.dataset.setting : undefined;
+      sessionStorage.setItem(dialogKey, JSON.stringify({ id: dialog.id, setting: focused }));
+    }
   } catch (e) {}
   location.reload();
 }
@@ -24,6 +32,16 @@ function restore() {
       sessionStorage.removeItem(detailsKey);
       const states = JSON.parse(open);
       allDetails().forEach((d, i) => { if (i < states.length) d.open = states[i]; });
+    }
+    const shown = sessionStorage.getItem(dialogKey);
+    if (shown !== null) {
+      sessionStorage.removeItem(dialogKey);
+      const { id, setting } = JSON.parse(shown);
+      const dialog = document.getElementById(id);
+      if (dialog && !dialog.open) {
+        dialog.showModal();
+        if (setting) dialog.querySelector(`[data-setting="${CSS.escape(setting)}"]`)?.focus();
+      }
     }
     const y = sessionStorage.getItem(scrollKey);
     if (y !== null) {
