@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os/exec"
 	"path"
 	"slices"
 	"time"
@@ -73,6 +74,10 @@ type Server struct {
 	// boot tells this process from the one before it: a page from an
 	// earlier run reloads when the event stream gives another one
 	boot string
+	// gh is the path of gh, which tells the branch's pull request, or ""
+	// when it is not found
+	gh  string
+	prs prCache
 }
 
 // New opens the root and, when reloading is on, starts watching it.
@@ -116,6 +121,7 @@ func New(opts Options) (*Server, error) {
 	if opts.PreviewPort != 0 {
 		s.previewToken = newPreviewToken()
 	}
+	s.gh, _ = exec.LookPath("gh")
 	// A default theme that does not exist would leave pages unstyled
 	// with nothing to say why
 	if opts.Theme != "" && !slices.Contains(s.themes(), opts.Theme) {
@@ -149,6 +155,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/_mini/api/tree", s.serveTree)
 	mux.HandleFunc("/_mini/api/status", s.serveStatus)
 	mux.HandleFunc("/_mini/api/branch", s.serveBranch)
+	mux.HandleFunc("/_mini/api/pr", s.servePR)
 	mux.HandleFunc("/_mini/changes", s.serveChangesPage)
 	mux.HandleFunc("/_mini/events", s.serveEvents)
 	mux.HandleFunc("/_mini/api/changes", s.serveChanges)

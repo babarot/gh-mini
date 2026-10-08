@@ -1,6 +1,9 @@
 package e2e
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -119,4 +122,33 @@ func TestChangesPageSinceBase(t *testing.T) {
 	// It follows the files still
 	a.write("b.md", "# B\n\nStill not.\n")
 	waitFor(t, ctx, `document.querySelector(".diff-file").textContent.includes("Still not.")`)
+}
+
+// A branch pushed shows its pull request after the branch, as gh tells it,
+// leading to it on GitHub.
+func TestBranchPullRequest(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a shell script for gh")
+	}
+	bin := t.TempDir()
+	gh := filepath.Join(bin, "gh")
+	answer := `{"number":7,"title":"Add b","state":"MERGED","isDraft":false,"url":"https://github.com/example/repo/pull/7"}`
+	if err := os.WriteFile(gh, []byte("#!/bin/sh\necho '"+answer+"'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	a := newBranchApp(t, map[string]string{"a.md": "# A\n"}, func(a *app) {
+		a.git("remote", "add", "origin", "https://github.com/example/repo.git")
+		a.write("b.md", "# B\n")
+		a.git("add", "-A")
+		a.git("commit", "-q", "-m", "b")
+		a.git("update-ref", "refs/remotes/origin/feature", "HEAD")
+		a.git("branch", "-q", "--set-upstream-to=origin/feature")
+	})
+	ctx := tab(t)
+	open(t, ctx, a.URL("/a.md"))
+	chip := `document.getElementById("mini.pr")`
+	waitFor(t, ctx, chip+`?.textContent === "#7" && `+chip+`.classList.contains("merged") && `+chip+`.href === "https://github.com/example/repo/pull/7"`)
+	run(t, ctx, chromedp.KeyEvent("b"))
+	waitFor(t, ctx, panelQ+`.textContent.includes("Add b #7") && `+panelQ+`.textContent.includes("Pushed")`)
 }

@@ -32,8 +32,14 @@ type BranchInfo struct {
 	// commits it has not.
 	Upstream string `json:"upstream,omitempty"`
 	Unpushed int    `json:"unpushed"`
-	// mergeBase is MergeBase in full
+	// mergeBase is MergeBase in full, and head HEAD's commit
 	mergeBase string
+	head      string
+}
+
+// Head is HEAD's commit.
+func (b *BranchInfo) Head() string {
+	return b.head
 }
 
 // gitBase finds the base: the branch origin/HEAD names, the default
@@ -67,6 +73,7 @@ func gitBranchInfo(dir string) *BranchInfo {
 	b := &BranchInfo{Base: name, mergeBase: mb, MergeBase: mb[:min(len(mb), 7)]}
 	branch := gitOutput(dir, "symbolic-ref", "-q", "--short", "HEAD")
 	b.Branch = gitBranch(dir)
+	b.head = gitOutput(dir, "rev-parse", "HEAD")
 	b.Detached = branch == ""
 	b.OnBase = branch == name
 	if ahead, behind, ok := strings.Cut(gitOutput(dir, "rev-list", "--left-right", "--count", "HEAD..."+ref), "\t"); ok {

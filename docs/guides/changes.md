@@ -51,6 +51,8 @@ The branch in the top bar tells how many commits it is ahead of the base and beh
 
 The branch opens a panel, as `b` does, that tells where the branch left the base and whether its commits are pushed. gh-mini does not fetch: how far behind the base the branch is, is as of the last fetch. A commit, a fetch or a push shows without reloading.
 
+A branch pushed to a repository on GitHub shows its pull request after the branch, open, draft, merged or closed, leading to it on GitHub: a merged one tells that the branch, and its worktree, are done with. gh-mini asks [gh](https://cli.github.com/) for it, after the page is shown, and keeps what it told for a minute. Without gh, signed out, or offline, none shows.
+
 On the base itself, outside a repository with an origin, and with `--no-changes`, the branch shows as before, a name alone, and the changes are those since the last commit.
 
 ## Settings

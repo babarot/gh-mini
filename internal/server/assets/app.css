@@ -182,6 +182,29 @@ button.branch:has(+ .branch-panel:popover-open) { color: var(--fgColor-default);
 .branch-row.attention small { color: var(--fgColor-muted); }
 a.branch-row { color: var(--fgColor-default); }
 a.branch-row:hover { text-decoration: none; background: var(--mini-selected); }
+.branch-panel hr { margin: 4px 0; border: 0; border-top: 1px solid var(--borderColor-muted); }
+/* The branch's pull request, colored by its state as GitHub colors it */
+.pr-chip {
+  --mini-pr-color: #1f883d;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--mini-pr-color);
+  border-radius: 2em;
+}
+.pr-chip .octicon { width: 14px; height: 14px; }
+.pr-chip:hover { text-decoration: none; filter: brightness(1.1); }
+.branch-row.pr { --mini-pr-color: #1f883d; }
+.pr-chip.draft, .branch-row.draft { --mini-pr-color: #59636e; }
+.pr-chip.merged, .branch-row.merged { --mini-pr-color: #8250df; }
+.pr-chip.closed, .branch-row.closed { --mini-pr-color: #cf222e; }
+.branch-row.pr .octicon { color: var(--mini-pr-color); }
 
 
 select, input[type="search"] {
