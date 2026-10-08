@@ -157,4 +157,9 @@ func TestHTMLPageWithoutPreviews(t *testing.T) {
 	r := get(t, srv.Handler(), "/page.html?preview=1", sameOrigin)
 	r.expect(t, http.StatusOK, `data-kind="code"`)
 	r.reject(t, "html-preview", `href="?preview=1"`)
+
+	// The setting is shown off, with why, whatever the viewer picked
+	get(t, srv.Handler(), "/", withSettings(`{"htmlPreview":true}`)).expect(t, http.StatusOK,
+		`<div class="setting-reason">HTML previews are off: gh-mini could not listen on a port for them</div>`,
+		`<input type="checkbox" role="switch" data-setting="htmlPreview" aria-labelledby="mini.setting-htmlPreview" disabled>`)
 }

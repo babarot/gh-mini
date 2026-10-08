@@ -44,6 +44,10 @@ type setting struct {
 	Default func(s *Server) string
 	// Attr sets the value as <html data-<key>> on every page.
 	Attr bool
+	// Unavailable tells why the setting does nothing on this server, as
+	// when the command line turned off what it is for; nil or "" when it
+	// works. The dialog shows it off, and the reason.
+	Unavailable func(s *Server) string
 }
 
 type choice struct {
@@ -97,15 +101,26 @@ var settingDefs = []setting{
 		Description: "Open HTML files rendered, with their scripts, rather than as code",
 		Control:     "toggle",
 		Default:     func(*Server) string { return "false" },
+		Unavailable: func(s *Server) string {
+			if s.opts.PreviewPort == 0 {
+				return "HTML previews are off: gh-mini could not listen on a port for them"
+			}
+			return ""
+		},
 	},
 	{
-		Key:         "translations",
+		Key:         "languageSwitch",
 		Section:     "Files",
-		Label:       "Translations",
-		Description: "How translations of a Markdown file are named, for a language switch on it: {name} is the original's name and {lang} a language such as ja. --translations gives others",
-		Control:     "select",
-		Choices:     func(s *Server) []choice { return s.translationChoices },
-		Default:     func(s *Server) string { return s.opts.Translations },
+		Label:       "Language switch",
+		Description: "Switch between a Markdown file and its translations, and show a README in the language picked last. --translations tells how translations are named",
+		Control:     "toggle",
+		Default:     func(*Server) string { return "true" },
+		Unavailable: func(s *Server) string {
+			if s.translations == nil {
+				return "Translations are off: gh-mini was started with --translations off"
+			}
+			return ""
+		},
 	},
 	{
 		Key:         "hideIgnoredDirs",
@@ -237,6 +252,8 @@ type settingView struct {
 	setting
 	Value   string
 	Options []choice
+	// Reason is why the setting does nothing here, "" when it works
+	Reason string
 }
 
 // settingSection is a page of the settings dialog.
@@ -258,6 +275,12 @@ func (s *Server) settingSections(values map[string]string) []settingSection {
 		v := settingView{setting: d, Value: values[d.Key]}
 		if d.Choices != nil {
 			v.Options = d.Choices(s)
+		}
+		if d.Unavailable != nil {
+			if v.Reason = d.Unavailable(s); v.Reason != "" && d.Control == "toggle" {
+				// What it is for is off, whatever the viewer picked
+				v.Value = "false"
+			}
 		}
 		name := cmp.Or(d.Section, defaultSection)
 		i, ok := index[name]

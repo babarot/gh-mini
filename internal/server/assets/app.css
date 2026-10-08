@@ -328,6 +328,10 @@ body[data-kind="html"] .main > .box {
 .setting-text { flex: 1; min-width: 0; }
 .setting-label { font-weight: 600; }
 .setting-description { color: var(--fgColor-muted); font-size: 12px; }
+/* A setting for what the command line turned off, with why */
+.setting.unavailable .setting-label { color: var(--fgColor-muted); }
+.setting-reason { color: var(--fgColor-attention); font-size: 12px; }
+.setting :disabled { cursor: not-allowed; }
 
 /* The settings dialog has a page per section, listed on the left */
 .settings:has(.settings-body) { width: min(680px, calc(100vw - 32px)); }

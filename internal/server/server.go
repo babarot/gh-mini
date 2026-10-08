@@ -6,6 +6,7 @@ package server
 import (
 	"embed"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -37,9 +38,8 @@ type Options struct {
 	// PreviewPort is the port PreviewHandler is served on, on the same
 	// host; zero turns HTML previews off.
 	PreviewPort int
-	// Translations are the layouts translations are named by until the
-	// viewer picks others, as --translations takes them; empty for the
-	// default.
+	// Translations are the layouts translations are named by, as
+	// --translations takes them; empty for the default.
 	Translations string
 	// Version and Revision are shown in the About dialog; Revision is the
 	// full hash of the commit built from, or empty.
@@ -59,10 +59,9 @@ type Server struct {
 	renders *renderCache
 	// previewToken is the value of the preview cookie
 	previewToken string
-	// translations are the layouts of each choice of the translations
-	// setting, by its value, and translationChoices those choices
-	translations       map[string]translationLayouts
-	translationChoices []choice
+	// translations are the layouts of Options.Translations, none when
+	// they are off
+	translations translationLayouts
 	// serving is the root as the About dialog shows it
 	serving string
 	// boot tells this process from the one before it: a page from an
@@ -73,9 +72,9 @@ type Server struct {
 // New opens the root and, when reloading is on, starts watching it.
 func New(opts Options) (*Server, error) {
 	opts.Translations = normalizeTranslations(opts.Translations)
-	translations, choices, err := translationSettings(opts.Translations)
+	translations, err := parseTranslations(opts.Translations)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("translations %w", err)
 	}
 	wsOpts := workspace.Options{Root: opts.Root, Name: opts.Name, Skip: opts.Skip}
 	if !opts.Reload {
@@ -105,9 +104,8 @@ func New(opts Options) (*Server, error) {
 		renders: newRenderCache(maxRenderCache),
 		serving: shortenHome(opts.Root, homeDir()),
 
-		translations:       translations,
-		translationChoices: choices,
-		boot:               newPreviewToken(),
+		translations: translations,
+		boot:         newPreviewToken(),
 	}
 	if opts.PreviewPort != 0 {
 		s.previewToken = newPreviewToken()

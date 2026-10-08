@@ -83,7 +83,7 @@ func parseArgs(args []string, stderr io.Writer) (config, error) {
 	fs.BoolVar(&c.noOpen, "no-open", false, "do not open the browser")
 	fs.BoolVar(&c.noReload, "no-reload", false, "do not reload pages when files change")
 	fs.StringVar(&c.theme, "theme", os.Getenv("GH_MINI_THEME"), "theme to use until one is picked in the page ($GH_MINI_THEME)")
-	fs.Func("translations", `how translations are named until others are picked in the page: "off", or by commas "suffix" (guide.ja.md, the default), "dir" (ja/guide.md) and templates such as "{name}_{lang}" ($GH_MINI_TRANSLATIONS)`, func(v string) error {
+	fs.Func("translations", `how translations are named: "off", or by commas "suffix" (guide.ja.md, the default), "dir" (ja/guide.md) and templates such as "{name}_{lang}" ($GH_MINI_TRANSLATIONS)`, func(v string) error {
 		c.translations = v
 		return server.CheckTranslations(v)
 	})

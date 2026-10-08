@@ -204,19 +204,30 @@ func TestHandlerReadmeLanguage(t *testing.T) {
 	get(t, h, "/?lang=default", withCookie("gh-mini-lang", "ja")).expect(t, http.StatusOK, `<h1 id="repo">Repo</h1>`)
 }
 
-func TestHandlerTranslationsOff(t *testing.T) {
+// The viewer can turn the language switch off; the README is then the
+// original's, whatever language was picked last.
+func TestHandlerLanguageSwitchOff(t *testing.T) {
 	h := newTestServer(t)
-	off := withSettings(`{"translations":"off"}`)
+	off := withSettings(`{"languageSwitch":false}`)
 	r := get(t, h, "/", off, withCookie("gh-mini-lang", "ja"))
 	r.expect(t, http.StatusOK, `<h1 id="repo">Repo</h1>`)
-	if strings.Contains(r.body, `class="segmented langs"`) {
-		t.Error("translations off: the README has a language switch")
-	}
-	if r := get(t, h, "/docs/guide.md", off); strings.Contains(r.body, `class="segmented langs"`) {
-		t.Error("translations off: guide.md has a language switch")
-	}
-	// A setting this server does not offer counts as none
-	get(t, h, "/", withSettings(`{"translations":"{name}_{lang}"}`)).expect(t, http.StatusOK, `class="segmented langs"`)
+	r.reject(t, `class="segmented langs"`)
+	get(t, h, "/docs/guide.md", off).reject(t, `class="segmented langs"`)
+	get(t, h, "/", withSettings(`{"languageSwitch":true}`)).expect(t, http.StatusOK, `class="segmented langs"`)
+}
+
+// With --translations off there are no translations, whatever the viewer
+// picked, and the setting says why it does nothing.
+func TestHandlerTranslationsOff(t *testing.T) {
+	srv := newServerFor(t, Options{Translations: "off"})
+	h := srv.Handler()
+	r := get(t, h, "/", withSettings(`{"languageSwitch":true}`), withCookie("gh-mini-lang", "ja"))
+	r.expect(t, http.StatusOK, `<h1 id="repo">Repo</h1>`,
+		`<div class="setting unavailable">`,
+		`--translations off</div>`,
+		`<input type="checkbox" role="switch" data-setting="languageSwitch" aria-labelledby="mini.setting-languageSwitch" disabled>`)
+	r.reject(t, `class="segmented langs"`)
+	get(t, h, "/docs/guide.md").reject(t, `class="segmented langs"`)
 }
 
 func TestHandlerTranslationsLayout(t *testing.T) {
@@ -230,14 +241,13 @@ func TestHandlerTranslationsLayout(t *testing.T) {
 	defer srv.Close()
 	h := srv.Handler()
 
-	get(t, h, "/").expect(t, http.StatusOK, `<option value="dir,{name}_{lang}.md" selected>{lang}/{name}.md, {name}_{lang}.md</option>`)
 	get(t, h, "/?lang=ja").expect(t, http.StatusOK, `>日本語</h1>`, `<a href="/ja/README.md">ja/README.md</a>`, `>JA</a>`)
 	get(t, h, "/docs/guide.md").expect(t, http.StatusOK, `<a href="/docs/guide_fr.md" data-lang="FR">FR</a>`)
 	if r := get(t, h, "/ja/"); strings.Contains(r.body, `class="segmented langs"`) || !strings.Contains(r.body, `>日本語</h1>`) {
 		t.Error("ja/: want its README without a language switch")
 	}
-	// The presets stay on offer
-	get(t, h, "/?lang=ja", withSettings(`{"translations":"suffix"}`)).expect(t, http.StatusOK, `>リポジトリ</h1>`)
+	// The layouts are the command line's; the viewer does not pick them
+	get(t, h, "/?lang=ja", withSettings(`{"translations":"suffix"}`)).expect(t, http.StatusOK, `>日本語</h1>`)
 
 	if _, err := New(Options{Root: root, Name: "repo", Translations: "{name}"}); err == nil {
 		t.Error("New with a layout without {lang} is no error")

@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"path"
 	"regexp"
-	"slices"
 	"sort"
 	"strings"
 )
@@ -58,49 +57,13 @@ var langCodes = map[string]bool{
 	"yo": true, "za": true, "zh": true, "zu": true,
 }
 
-// translationSettings parses the choices of the translations setting: off,
-// the presets and, when it is none of them, the --translations value.
-func translationSettings(value string) (map[string]translationLayouts, []choice, error) {
-	choices := []choice{{translationsOff, "Off"}}
-	for _, p := range translationPresets {
-		choices = append(choices, choice{p.name, translationsLabel(p.name)})
-	}
-	if !slices.ContainsFunc(choices, func(c choice) bool { return c.Value == value }) {
-		choices = append(choices, choice{value, translationsLabel(value)})
-	}
-	layouts := make(map[string]translationLayouts, len(choices))
-	for _, c := range choices {
-		ls, err := parseTranslations(c.Value)
-		if err != nil {
-			return nil, nil, fmt.Errorf("translations %w", err)
-		}
-		layouts[c.Value] = ls
-	}
-	return layouts, choices, nil
-}
-
-// translationsLabel shows layouts as the templates they are, with the
-// presets' spelled out and .md added, such as "{lang}/{name}.md", so that
-// the dialog tells patterns and not file names.
-func translationsLabel(value string) string {
-	var labels []string
-	for _, p := range strings.Split(value, ",") {
-		for _, preset := range translationPresets {
-			if p == preset.name {
-				p = preset.template
-			}
-		}
-		if !isMarkdown(p) {
-			p += ".md"
-		}
-		labels = append(labels, p)
-	}
-	return strings.Join(labels, ", ")
-}
-
-// translations are the layouts a page uses, as the viewer picked them.
+// translationsFor are the layouts a page uses: none when the viewer
+// turned the language switch off.
 func (s *Server) translationsFor(settings map[string]string) translationLayouts {
-	return s.translations[settings["translations"]]
+	if settings["languageSwitch"] == "false" {
+		return nil
+	}
+	return s.translations
 }
 
 // translationLayout is one layout, parsed.

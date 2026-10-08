@@ -149,16 +149,3 @@ func TestPickReadme(t *testing.T) {
 		t.Errorf("only a translation: got %q", got.Rel)
 	}
 }
-
-func TestTranslationsLabel(t *testing.T) {
-	for value, want := range map[string]string{
-		"suffix":                "{name}.{lang}.md",
-		"dir":                   "{lang}/{name}.md",
-		"{name}_{lang}":         "{name}_{lang}.md",
-		"dir,{name}_{lang}.mdx": "{lang}/{name}.md, {name}_{lang}.mdx",
-	} {
-		if got := translationsLabel(value); got != want {
-			t.Errorf("translationsLabel(%q) = %q, want %q", value, got, want)
-		}
-	}
-}

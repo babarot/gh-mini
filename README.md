@@ -17,7 +17,7 @@ It opens `http://localhost:6419/` with:
 - HTML files previewed as a browser shows them, scripts included (see [HTML previews](#html-previews))
 - every file on disk, including what git ignores; those are marked `local`
 - translations side by side: `guide.md` and `guide.ja.md` get a language switch, and a language picked on a README stays picked. Translations can be named otherwise, such as `ja/guide.md`, or left alone (see [Translations](#translations))
-- a menu behind the gear button, with the keyboard shortcuts (or press `?`), an About dialog that tells the version and the directory served, and the settings (or press `,`): built-in `github`, `nord` and `tokyo-night` themes or ones you write as CSS, a light, dark or automatic mode, a full-width page, wrapped lines in source files, whether HTML files open as a preview, how translations are named, whether directories git ignores are hidden, and whether to show commit authors' pictures from GitHub, which asks GitHub for them by email. They are kept per browser
+- a menu behind the gear button, with the keyboard shortcuts (or press `?`), an About dialog that tells the version and the directory served, and the settings (or press `,`): built-in `github`, `nord` and `tokyo-night` themes or ones you write as CSS, a light, dark or automatic mode, a full-width page, wrapped lines in source files, whether HTML files open as a preview, whether Markdown files get a language switch, whether directories git ignores are hidden, and whether to show commit authors' pictures from GitHub, which asks GitHub for them by email. They are kept per browser. A setting for something the command line turned off, such as HTML preview when no port could be had for it, is shown off with why
 - live reload of the page you are reading when its file changes, and of the tree when files are added or removed. Directories git ignores, such as a `.venv`, show in the tree without their files until you open them. On macOS the whole directory is watched through FSEvents; elsewhere directories git ignores are watched only while you look at a page in them. A new symlink shows in the tree only when its directory changes otherwise too, if it points to another directory
 
 Rendering uses [goldmark](https://github.com/yuin/goldmark) and the stylesheet of [github-markdown-css](https://github.com/sindresorhus/github-markdown-css).
@@ -40,7 +40,7 @@ go install github.com/babarot/gh-mini@latest
 | `--theme-dir` | `~/.config/gh-mini/themes` | Directory of themes |
 | `--preview-port` | a free one | Port HTML previews are served on, printed at start |
 | `--skip` | `.git,node_modules,.DS_Store` | Names left out of the tree |
-| `--translations` | `$GH_MINI_TRANSLATIONS`, else `suffix` | How translations are named until others are picked in the settings (see [Translations](#translations)) |
+| `--translations` | `$GH_MINI_TRANSLATIONS`, else `suffix` | How translations are named (see [Translations](#translations)) |
 
 ## HTML previews
 
@@ -66,7 +66,7 @@ A Markdown file and its translations get a language switch, and a directory's RE
 | `suffix` (the default) | `docs/guide.ja.md`, `docs/guide.zh-TW.md` |
 | `dir` | `docs/ja/guide.md`, `docs/zh-TW/guide.md` |
 
-Pick one, or Off for no switch, in the settings. `--translations` sets the layout used until one is picked, and takes templates too: the path of a translation from its original's directory, with `{name}` for the original's name and `{lang}` for the language, such as `{name}_{lang}` for `guide_ja.md` or `i18n/{lang}/{name}` for `docs/i18n/ja/guide.md`. Separate layouts with commas to use several; the first that fits a file is taken. The settings offer the value given as one more choice.
+`--translations` picks the layout, as the way a repository names its translations is its own, and takes templates too: the path of a translation from its original's directory, with `{name}` for the original's name and `{lang}` for the language, such as `{name}_{lang}` for `guide_ja.md` or `i18n/{lang}/{name}` for `docs/i18n/ja/guide.md`. Separate layouts with commas to use several; the first that fits a file is taken. `--translations off` leaves translations alone, as files of their own. Turning off Language switch in the settings does the same for you alone, in every gh-mini.
 
 A language is a two-letter code, such as `ja`, or one with a region, such as `zh-TW`. With `dir`, a directory named after a language, such as `id` or `it`, holds translations too, so pick `dir` only for a repository laid out that way.
 
