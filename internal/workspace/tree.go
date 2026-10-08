@@ -22,8 +22,11 @@ type Node struct {
 	Children []*Node `json:"children,omitempty"`
 }
 
-// buildTree returns the tree and its directories by path.
-func (w *Workspace) buildTree(ignored map[string]bool) (*Node, map[string]*Node) {
+// buildTree returns the tree, its directories by path, and the
+// repositories in it: directories other than the root with a .git, as
+// another repository cloned into it or a submodule has.
+func (w *Workspace) buildTree(ignored map[string]bool) (*Node, map[string]*Node, []string) {
+	var repos []string
 	snap := &Snapshot{ignored: ignored}
 	root := &Node{Name: w.opts.Name, Dir: true}
 	nodes := map[string]*Node{".": root}
@@ -33,6 +36,9 @@ func (w *Workspace) buildTree(ignored map[string]bool) (*Node, map[string]*Node)
 	_ = fs.WalkDir(os.DirFS(w.opts.Root), ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || p == "." {
 			return nil
+		}
+		if d.Name() == ".git" && path.Dir(p) != "." {
+			repos = append(repos, path.Dir(p))
 		}
 		if w.Skipped(d.Name()) {
 			if d.IsDir() {
@@ -59,7 +65,7 @@ func (w *Workspace) buildTree(ignored map[string]bool) (*Node, map[string]*Node)
 		return nil
 	})
 	sortTree(root)
-	return root, nodes
+	return root, nodes, repos
 }
 
 // sortTree orders directories first, then by name ignoring case, as GitHub

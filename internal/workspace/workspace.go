@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -171,8 +172,7 @@ func (w *Workspace) Snapshot() *Snapshot {
 	next.Version++
 	next.built = time.Now()
 	if prev == nil || bits&dirtyStructure != 0 {
-		next.ignored = gitIgnored(w.opts.Root)
-		next.Tree, next.dirs = w.buildTree(next.ignored)
+		next.ignored, next.Tree, next.dirs = w.ignoredTree()
 		next.TreeJSON, _ = json.Marshal(next.Tree)
 		sum := sha256.Sum256(next.TreeJSON)
 		next.TreeETag = `"` + hex.EncodeToString(sum[:8]) + `"`
@@ -182,6 +182,32 @@ func (w *Workspace) Snapshot() *Snapshot {
 	}
 	w.snap.Store(next)
 	return next
+}
+
+// ignoredTree builds the tree with what git ignores in it. git tells what
+// one repository ignores, and not what those in it do, such as the build
+// output of a repository cloned into another: so each found in the tree
+// is asked too, and the tree built again with what they ignore left out.
+func (w *Workspace) ignoredTree() (map[string]bool, *Node, map[string]*Node) {
+	ignored := gitIgnored(w.opts.Root)
+	asked := map[string]bool{}
+	for {
+		tree, dirs, repos := w.buildTree(ignored)
+		grown := false
+		for _, r := range repos {
+			if asked[r] {
+				continue
+			}
+			asked[r] = true
+			for p := range gitIgnored(filepath.Join(w.opts.Root, filepath.FromSlash(r))) {
+				ignored[r+"/"+p] = true
+				grown = true
+			}
+		}
+		if !grown {
+			return ignored, tree, dirs
+		}
+	}
 }
 
 // Ignored tells whether git ignores a path relative to the root, or one

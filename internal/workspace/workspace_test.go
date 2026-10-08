@@ -170,3 +170,39 @@ func TestDirLink(t *testing.T) {
 		t.Errorf("link/up = %+v", up)
 	}
 }
+
+// What a repository in the root ignores, such as one cloned into it, is
+// ignored too, and so is what one in that ignores.
+func TestNestedRepoIgnored(t *testing.T) {
+	dir := newRepo(t, "", "a.md")
+	inner := filepath.Join(dir, "inner")
+	deeper := filepath.Join(inner, "lib", "deeper")
+	for _, r := range []struct{ dir, ignore string }{{inner, "out/\n"}, {deeper, "*.tmp\n"}} {
+		write(t, filepath.Join(r.dir, ".gitignore"), r.ignore)
+		git(t, dir, "init", "-q", r.dir)
+	}
+	write(t, filepath.Join(inner, "out", "deep", "o.txt"), "x")
+	write(t, filepath.Join(inner, "src.go"), "x")
+	write(t, filepath.Join(deeper, "x.tmp"), "x")
+	write(t, filepath.Join(deeper, "y.go"), "x")
+	w, err := Open(Options{Root: dir, Name: "x", Skip: []string{".git"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	snap := w.Snapshot()
+	for rel, want := range map[string]bool{
+		"inner/out": true, "inner/out/deep/o.txt": true, "inner/lib/deeper/x.tmp": true,
+		"inner": false, "inner/src.go": false, "inner/lib/deeper/y.go": false, "a.md": false,
+	} {
+		if got := snap.Ignored(rel); got != want {
+			t.Errorf("Ignored(%q) = %v, want %v", rel, got, want)
+		}
+	}
+	out := snap.dirs["inner"]
+	for _, n := range out.Children {
+		if n.Name == "out" && (!n.Lazy || n.Children != nil) {
+			t.Errorf("inner/out = %+v, want it lazy", n)
+		}
+	}
+}
