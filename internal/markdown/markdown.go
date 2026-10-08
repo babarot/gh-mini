@@ -1,6 +1,8 @@
 // Package markdown renders Markdown as GitHub does: GitHub Flavored
-// Markdown with GitHub's additions, such as alerts, math, footnotes and
-// links to issues, in the markup github-markdown-css styles.
+// Markdown with GitHub's additions, such as alerts, math and footnotes,
+// in the markup github-markdown-css styles. Like GitHub's rendering of a
+// file, as opposed to an issue or a comment, it does not link #123 or
+// @user.
 package markdown
 
 import (
@@ -29,9 +31,8 @@ type Renderer struct {
 	md goldmark.Markdown
 }
 
-// New returns a Renderer that links #123 to the issues of repo, given as
-// "owner/name". With no repo, only owner/name#123 is linked.
-func New(repo string) *Renderer {
+// New returns a Renderer.
+func New() *Renderer {
 	md := goldmark.New(
 		goldmark.WithExtensions(
 			extension.Linkify,
@@ -56,8 +57,6 @@ func New(repo string) *Renderer {
 				util.Prioritized(alertTransformer{}, 100),
 				util.Prioritized(taskListTransformer{}, 100),
 				util.Prioritized(mathCodeTransformer{}, 100),
-				util.Prioritized(issueRefTransformer{repo: repo}, 100),
-				util.Prioritized(issueURLTransformer{repo: repo}, 100),
 				util.Prioritized(extension.NewFootnoteASTTransformer(), 999),
 			),
 		),

@@ -95,7 +95,7 @@ func New(opts Options) (*Server, error) {
 	s := &Server{
 		opts:    opts,
 		ws:      ws,
-		md:      markdown.New(ws.Repo()),
+		md:      markdown.New(),
 		tmpl:    tmpl,
 		hub:     &hub{subs: map[*subscriber]struct{}{}},
 		static:  newStaticFiles(),

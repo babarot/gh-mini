@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-func render(t *testing.T, repo, src string) (string, Features) {
+func render(t *testing.T, src string) (string, Features) {
 	t.Helper()
-	b, f, err := New(repo).Render([]byte(src))
+	b, f, err := New().Render([]byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,24 +76,15 @@ func TestRender(t *testing.T) {
 			},
 		},
 		{
-			name: "issue references",
-			src:  "#1, owner/repo#2, (#3) and **#4**\n",
-			want: []string{
-				`<a href="https://github.com/example/repo/issues/1" class="issue-link">#1</a>`,
-				`<a href="https://github.com/owner/repo/issues/2" class="issue-link">owner/repo#2</a>`,
-				`(<a href="https://github.com/example/repo/issues/3" class="issue-link">#3</a>)`,
-				`<strong><a href="https://github.com/example/repo/issues/4" class="issue-link">#4</a></strong>`,
-			},
+			name:   "references to issues and people are text, as in a file on GitHub",
+			src:    "#1, owner/repo#2, GH-3 and @octocat\n",
+			want:   []string{"<p>#1, owner/repo#2, GH-3 and @octocat</p>"},
+			reject: []string{"<a"},
 		},
 		{
-			name:   "no issue references in words, code and links",
-			src:    "a#1 #2x `#3` [#4](x) <https://example.com/#5> &#35;6\n",
-			reject: []string{"issue-link"},
-		},
-		{
-			name: "issue references across lines keep the line break",
-			src:  "see #1\nand #2\n",
-			want: []string{"issues/1\" class=\"issue-link\">#1</a>\nand <a"},
+			name: "a link to an issue shows its URL",
+			src:  "https://github.com/acme/widget/issues/9\n",
+			want: []string{`<a href="https://github.com/acme/widget/issues/9">https://github.com/acme/widget/issues/9</a>`},
 		},
 		{
 			name:   "hashtags are text",
@@ -170,7 +161,7 @@ func TestRender(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _ := render(t, "example/repo", tt.src)
+			got, _ := render(t, tt.src)
 			for _, w := range tt.want {
 				if !strings.Contains(got, w) {
 					t.Errorf("missing %q in\n%s", w, got)
@@ -185,16 +176,6 @@ func TestRender(t *testing.T) {
 	}
 }
 
-func TestIssueReferencesWithoutRepo(t *testing.T) {
-	got, _ := render(t, "", "#1 and owner/repo#2\n")
-	if strings.Contains(got, "issues/1") {
-		t.Errorf("#1 is linked without a repository: %s", got)
-	}
-	if !strings.Contains(got, `href="https://github.com/owner/repo/issues/2"`) {
-		t.Errorf("owner/repo#2 is not linked: %s", got)
-	}
-}
-
 func TestFeatures(t *testing.T) {
 	for src, want := range map[string]Features{
 		"# Plain\n":                        {},
@@ -203,14 +184,14 @@ func TestFeatures(t *testing.T) {
 		"```math\nx\n```\n":                {Math: true},
 		"$$\nx\n$$\n":                      {Math: true},
 	} {
-		if _, got := render(t, "", src); got.Mermaid != want.Mermaid || got.Math != want.Math {
+		if _, got := render(t, src); got.Mermaid != want.Mermaid || got.Math != want.Math {
 			t.Errorf("%q: features = %+v, want %+v", src, got, want)
 		}
 	}
 }
 
 func TestRenderBOM(t *testing.T) {
-	r := New("")
+	r := New()
 	for name, tt := range map[string]struct{ src, want string }{
 		"heading":      {"\xef\xbb\xbf# Title\n", `<h1 id="title">Title</h1>`},
 		"front matter": {"\xef\xbb\xbf---\ntitle: x\n---\n# Body\n", "<th>title</th>"},
@@ -226,7 +207,7 @@ func TestRenderBOM(t *testing.T) {
 }
 
 func TestHeadings(t *testing.T) {
-	_, f := render(t, "", "# Title :tada:\n\n## Use `go test` and [links](x.md)\n\n##### Deep\n\n## Title :tada:\n\n### <b>raw</b> text\n")
+	_, f := render(t, "# Title :tada:\n\n## Use `go test` and [links](x.md)\n\n##### Deep\n\n## Title :tada:\n\n### <b>raw</b> text\n")
 	want := []Heading{
 		{1, "title-tada", "Title 🎉"},
 		{2, "use-go-test-and-links", "Use go test and links"},
@@ -244,22 +225,8 @@ func TestHeadings(t *testing.T) {
 	}
 }
 
-// References in code or links written as HTML stay as they are.
-func TestIssueRefsNotInRawHTML(t *testing.T) {
-	out, _ := render(t, "acme/widget", "<code>#12</code> and <a href=\"x\">#13</a> and <pre>#14</pre> but #15\n")
-	html := string(out)
-	for _, n := range []string{"12", "13", "14"} {
-		if strings.Contains(html, "issues/"+n) {
-			t.Errorf("#%s linked: %s", n, html)
-		}
-	}
-	if !strings.Contains(html, "issues/15") {
-		t.Errorf("#15 not linked: %s", html)
-	}
-}
-
 func TestBrokenFrontMatter(t *testing.T) {
-	out, _ := render(t, "", "---\ntitle: [unclosed\ndate: x\n---\n# Body\n")
+	out, _ := render(t, "---\ntitle: [unclosed\ndate: x\n---\n# Body\n")
 	html := string(out)
 	for _, want := range []string{"Error in user YAML", "<pre><code>title: [unclosed\ndate: x\n</code></pre>", `<h1 id="body">Body</h1>`} {
 		if !strings.Contains(html, want) {
@@ -278,7 +245,7 @@ func TestInlineDoubleDollarMath(t *testing.T) {
 		"$$10 or $$20\n":          "$$10 or $$20",
 		"a $$y^2$$ b and $z$ c\n": `a <span class="math-inline">\(y^2\)</span> b and <span class="math-inline">\(z\)</span> c`,
 	} {
-		out, _ := render(t, "", src)
+		out, _ := render(t, src)
 		if !strings.Contains(string(out), want) {
 			t.Errorf("%q: got %s, want %q", src, out, want)
 		}
@@ -296,7 +263,7 @@ func TestHeadingIDsFromText(t *testing.T) {
 		"## Use `go test`\n":                   `id="use-go-test"`,
 		"## 日本語の見出し\n":                         `id="日本語の見出し"`,
 	} {
-		out, _ := render(t, "", src)
+		out, _ := render(t, src)
 		if !strings.Contains(string(out), want) {
 			t.Errorf("%q: got %s, want %s", src, out, want)
 		}
@@ -308,26 +275,12 @@ func TestImageLinks(t *testing.T) {
 		"![shot](shot.png)\n":             `<a href="shot.png" target="_blank" rel="noopener noreferrer"><img src="shot.png" alt="shot"></a>`,
 		"[![badge](b.svg)](https://ci)\n": `<a href="https://ci"><img src="b.svg" alt="badge"></a>`,
 	} {
-		out, _ := render(t, "", src)
+		out, _ := render(t, src)
 		if !strings.Contains(string(out), want) {
 			t.Errorf("%q: got %s, want %s", src, out, want)
 		}
 	}
-	if out, _ := render(t, "", "![x](data:image/png;base64,AAAA)\n"); strings.Contains(string(out), "<a") {
+	if out, _ := render(t, "![x](data:image/png;base64,AAAA)\n"); strings.Contains(string(out), "<a") {
 		t.Errorf("a data: image is linked: %s", out)
-	}
-}
-
-func TestMoreIssueRefs(t *testing.T) {
-	for src, want := range map[string]string{
-		"See GH-5.\n": `<a href="https://github.com/acme/widget/issues/5" class="issue-link">GH-5</a>`,
-		"https://github.com/acme/widget/issues/9\n":       `<a href="https://github.com/acme/widget/issues/9" class="issue-link">#9</a>`,
-		"https://github.com/other/repo/pull/12\n":         `<a href="https://github.com/other/repo/pull/12" class="issue-link">other/repo#12</a>`,
-		"https://github.com/acme/widget/blob/main/x.go\n": `>https://github.com/acme/widget/blob/main/x.go</a>`,
-	} {
-		out, _ := render(t, "acme/widget", src)
-		if !strings.Contains(string(out), want) {
-			t.Errorf("%q: got %s, want %s", src, out, want)
-		}
 	}
 }

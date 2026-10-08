@@ -26,7 +26,7 @@ func TestGolden(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			got, _, err := New("example/repo").Render(b)
+			got, _, err := New().Render(b)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -8,7 +8,7 @@ import (
 // HTML in a file must not run anything in the page, nor take the place of
 // its elements.
 func TestRawHTMLDropped(t *testing.T) {
-	r := New("")
+	r := New()
 	for name, src := range map[string]string{
 		"script block":      "<script>\nalert(1)\n</script>\n",
 		"inline script":     "a <script>alert(1)</script> b\n",
@@ -43,7 +43,7 @@ func TestRawHTMLDropped(t *testing.T) {
 
 // What READMEs use stays.
 func TestRawHTMLKept(t *testing.T) {
-	r := New("")
+	r := New()
 	for name, tt := range map[string]struct{ src, want string }{
 		"centered logo":   {`<p align="center"><img src="logo.png" width="100" alt="Build: ok"></p>` + "\n", `<p align="center"><img src="logo.png" width="100" alt="Build: ok"></p>`},
 		"details":         {"<details open>\n<summary>More</summary>\n\nText\n\n</details>\n", "<details open=\"\">\n<summary>More</summary>"},

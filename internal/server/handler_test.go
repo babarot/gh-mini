@@ -184,7 +184,7 @@ func TestHandlerRootDir(t *testing.T) {
 	r.expect(t, http.StatusOK,
 		`data-kind="dir"`,
 		`<h1 id="repo">Repo</h1>`,
-		`https://github.com/example/repo/issues/1`,
+		`<p>See #1.</p>`,
 		`>README.md</a>`,
 		"main\n",
 	)
