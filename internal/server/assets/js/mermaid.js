@@ -1,5 +1,5 @@
-// Mermaid diagrams, drawn in the colors of the mode and drawn again when
-// it changes, with buttons to zoom and pan as GitHub has.
+// Mermaid diagrams, drawn in the colors of the mode and the theme and drawn
+// again when either changes, with buttons to zoom and pan as GitHub has.
 
 const root = document.documentElement;
 
@@ -27,14 +27,12 @@ export function initMermaid() {
   };
   draw();
   new MutationObserver(draw).observe(root, { attributes: true, attributeFilter: ["data-mode"] });
+  // A theme picked, or saved, loads its stylesheet again
+  document.getElementById("mini.theme")?.addEventListener("load", draw);
 }
 
 async function drawAll(diagrams, sources) {
-  window.mermaid.initialize({
-    startOnLoad: false,
-    theme: root.dataset.mode === "dark" ? "dark" : "default",
-    logLevel: "error",
-  });
+  window.mermaid.initialize({ startOnLoad: false, logLevel: "error", ...themeConfig() });
   for (let i = 0; i < diagrams.length; i++) {
     const node = diagrams[i];
     try {
@@ -51,6 +49,63 @@ async function drawAll(diagrams, sources) {
     }
     node.classList.add("rendered");
   }
+}
+
+// themeConfig is Mermaid's theme for the page's. The github theme draws
+// diagrams as GitHub does, in Mermaid's own colors; another draws them in
+// its colors, read from the page.
+function themeConfig() {
+  const dark = root.dataset.mode === "dark";
+  const link = document.getElementById("mini.theme");
+  const name = link ? decodeURIComponent(link.href.split("?")[0].split("/").pop().replace(/\.css$/, "")) : "github";
+  if (name === "github") return { theme: dark ? "dark" : "default" };
+  const bg = color("--bgColor-default");
+  const muted = color("--bgColor-muted");
+  const fg = color("--fgColor-default");
+  const border = color("--borderColor-default");
+  // The block is drawn in the muted background, so a node stands out
+  // from it in the page's
+  return {
+    theme: "base",
+    themeVariables: {
+      darkMode: dark,
+      background: muted,
+      primaryColor: bg,
+      primaryTextColor: fg,
+      primaryBorderColor: border,
+      secondaryColor: bg,
+      tertiaryColor: muted,
+      lineColor: color("--fgColor-muted"),
+      textColor: fg,
+      mainBkg: bg,
+      nodeBorder: border,
+      clusterBkg: muted,
+      clusterBorder: border,
+      edgeLabelBackground: muted,
+      noteBkgColor: bg,
+      noteTextColor: fg,
+      noteBorderColor: border,
+      fontFamily: getComputedStyle(document.body).fontFamily,
+    },
+  };
+}
+
+// color reads a color variable of the page as #rrggbb, the form Mermaid
+// computes its shades from, whatever form the theme gives it in.
+const canvas = document.createElement("canvas");
+canvas.width = canvas.height = 1;
+function color(name) {
+  const probe = document.createElement("span");
+  probe.style.color = `var(${name})`;
+  document.body.append(probe);
+  const c = getComputedStyle(probe).color;
+  probe.remove();
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  ctx.clearRect(0, 0, 1, 1);
+  ctx.fillStyle = c;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
 }
 
 function controls(svg) {
