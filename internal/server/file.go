@@ -11,6 +11,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"unicode/utf16"
@@ -90,6 +91,9 @@ func (s *Server) servePath(w http.ResponseWriter, r *http.Request) {
 	case info.IsDir():
 		s.follow(snap, rel, rel)
 		s.serveDir(w, r, snap, rel)
+	case !info.Mode().IsRegular() && wantsRaw(r):
+		// A named pipe or a device would keep the request waiting on it
+		http.NotFound(w, r)
 	case wantsRaw(r):
 		s.serveRaw(w, r, rel, info)
 	default:
@@ -198,6 +202,8 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 		v.Views = []viewTab{{"Preview", "?", !plain}, {"Code", "?plain=1", plain}}
 	}
 	switch {
+	case !info.Mode().IsRegular():
+		p.Kind = "binary"
 	case isImage(rel):
 		p.Kind = "image"
 	case info.Size() > maxRender:
@@ -255,6 +261,25 @@ func (s *Server) lastCommit(rel string) *commitView {
 		}
 	}
 	return v
+}
+
+// errNotRegular is a file that is not a regular one, such as a named pipe,
+// which reading would wait on until something writes to it.
+var errNotRegular = errors.New("not a regular file")
+
+// readRegular reads a regular file, of which info is the Stat, or nil to
+// Stat it here.
+func readRegular(root *os.Root, name string, info fs.FileInfo) ([]byte, error) {
+	if info == nil {
+		var err error
+		if info, err = root.Stat(name); err != nil {
+			return nil, err
+		}
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errNotRegular
+	}
+	return root.ReadFile(name)
 }
 
 // wantsRaw tells a request for the file itself, such as an image in a page

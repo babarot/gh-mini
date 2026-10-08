@@ -70,6 +70,11 @@ func (s *Server) PreviewHandler() http.Handler {
 				return
 			}
 		}
+		if !info.Mode().IsRegular() {
+			// A named pipe or a device would keep the request waiting
+			http.NotFound(w, r)
+			return
+		}
 		f, err := s.ws.FS().Open(rel)
 		if err != nil {
 			http.NotFound(w, r)

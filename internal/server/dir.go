@@ -101,7 +101,7 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		info, err := s.ws.FS().Stat(name)
 		var b []byte
 		if err == nil {
-			b, err = s.ws.FS().ReadFile(name)
+			b, err = readRegular(s.ws.FS(), name, info)
 		}
 		if err == nil {
 			v.Readme = strings.TrimPrefix(name, rel+"/")
@@ -118,7 +118,7 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 			}
 		}
 	} else if plainReadme != "" {
-		if b, err := s.ws.FS().ReadFile(path.Join(rel, plainReadme)); err == nil {
+		if b, err := readRegular(s.ws.FS(), path.Join(rel, plainReadme), nil); err == nil {
 			if text, _, ok := decodeText(b); ok {
 				v.Readme = plainReadme
 				v.Content = template.HTML("<pre>" + template.HTMLEscapeString(string(text)) + "</pre>")
