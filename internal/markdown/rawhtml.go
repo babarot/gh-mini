@@ -41,6 +41,12 @@ var rawHTMLPolicy = func() *bluemonday.Policy {
 		"dl", "dt", "dd", "ruby", "rt", "rp", "time", "wbr", "bdo", "caption",
 	)
 	p.AllowAttrs("href").OnElements("a")
+	// Kept for links within the page, as <a name="top"> is, but named
+	// apart from the page's own elements by userContent
+	p.AllowAttrs("name").Matching(anchorName).OnElements("a")
+	p.AllowAttrs("id").Matching(anchorName).Globally()
+	p.AllowAttrs("dir").Matching(textDir).Globally()
+	p.AllowAttrs("lang").Matching(langTag).Globally()
 	p.AllowAttrs("open").OnElements("details")
 	p.AllowAttrs("align").OnElements("p", "div", "img", "h1", "h2", "h3", "h4", "h5", "h6", "table", "tr", "td", "th")
 	p.AllowAttrs("width", "height").Matching(bluemonday.NumberOrPercent).OnElements("img", "td", "th", "table")
@@ -58,6 +64,13 @@ var rawHTMLPolicy = func() *bluemonday.Policy {
 
 var (
 	anyText = regexp.MustCompile(`^[^\x00]*$`)
+	// anchorName is an id or name without spaces, as a fragment names it
+	anchorName = regexp.MustCompile(`^[^\s\x00]+$`)
+	textDir    = regexp.MustCompile(`^(?i:ltr|rtl|auto)$`)
+	langTag    = regexp.MustCompile(`^[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*$`)
+	// idAttr is an id or a name as bluemonday writes them, the only way:
+	// a quote in text or in another attribute's value is escaped
+	idAttr = regexp.MustCompile(`(\s(?:id|name)=")`)
 	// srcset is candidates of a URL and a descriptor, separated by commas;
 	// each URL is http(s) or relative
 	srcset = regexp.MustCompile(`^\s*(?:(?:https?://|[^:\s,]+(?:\s|,|$))[^\s,]*(?:\s+[0-9.]+[wx])?\s*(?:,\s*|$))+$`)
@@ -83,7 +96,7 @@ func renderRawHTML(w util.BufWriter, source []byte, node ast.Node, entering bool
 		segment := n.Segments.At(i)
 		b.Write(segment.Value(source))
 	}
-	_, _ = w.Write(rawHTMLPolicy.SanitizeBytes(b.Bytes()))
+	_, _ = w.Write(sanitize(b.Bytes()))
 	return ast.WalkSkipChildren, nil
 }
 
@@ -103,6 +116,17 @@ func renderHTMLBlock(w util.BufWriter, source []byte, node ast.Node, entering bo
 	if n.HasClosure() {
 		b.Write(n.ClosureLine.Value(source))
 	}
-	_, _ = w.Write(rawHTMLPolicy.SanitizeBytes(b.Bytes()))
+	_, _ = w.Write(sanitize(b.Bytes()))
 	return ast.WalkContinue, nil
 }
+
+// sanitize drops what rawHTMLPolicy does not allow, and puts user-content-
+// before ids and names, as GitHub does: a file's id="settings" must not
+// take the place of the page's own element, or a heading's. A link to
+// #top finds user-content-top in the page.
+func sanitize(b []byte) []byte {
+	return idAttr.ReplaceAll(rawHTMLPolicy.SanitizeBytes(b), []byte("${1}"+userContent))
+}
+
+// userContent is put before the ids and names a file's HTML gives.
+const userContent = "user-content-"

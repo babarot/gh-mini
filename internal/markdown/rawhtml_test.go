@@ -33,7 +33,7 @@ func TestRawHTMLDropped(t *testing.T) {
 			t.Fatal(err)
 		}
 		got := strings.ToLower(string(out))
-		for _, bad := range []string{"<script", "onerror", "onload", "javascript:", "<style", "style=", "<iframe", "<base", "<meta", "<form", "<input", "id=", "class=", "<object", "<svg"} {
+		for _, bad := range []string{"<script", "onerror", "onload", "javascript:", "<style", "style=", "<iframe", "<base", "<meta", "<form", "<input", `id="toc"`, "class=", "<object", "<svg"} {
 			if strings.Contains(got, bad) {
 				t.Errorf("%s: output has %q: %s", name, bad, out)
 			}
@@ -56,6 +56,10 @@ func TestRawHTMLKept(t *testing.T) {
 		"inline markup":   {"<b>bold</b> <i>it</i> <strong>s</strong> <em>e</em> <span>sp</span> <code>c</code>\n", "<b>bold</b> <i>it</i> <strong>s</strong> <em>e</em> <span>sp</span> <code>c</code>"},
 		"pre":             {"<pre>\n  indented\n</pre>\n", "<pre>\n  indented\n</pre>"},
 		"code in a cell":  {"<table><tr><td><code>x</code></td></tr></table>\n", "<td><code>x</code></td>"},
+		// Apart from the page's own ids, as GitHub keeps them
+		"anchor name":    {`<a name="top"></a>` + "\n", `<a name="user-content-top"></a>`},
+		"id":             {`<h2 id="toc">x</h2>` + "\n", `<h2 id="user-content-toc">x</h2>`},
+		"text direction": {`<p dir="rtl" lang="ar">x</p>` + "\n", `<p dir="rtl" lang="ar">x</p>`},
 	} {
 		out, _, err := r.Render([]byte(tt.src))
 		if err != nil {

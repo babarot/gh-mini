@@ -5,6 +5,7 @@ import { ICON_LINK } from "./util.js";
 export function initToc() {
   const article = document.querySelector(".markdown-body");
   if (!article) return;
+  initUserContent(article);
   article.querySelectorAll("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]").forEach((h) => {
     const a = document.createElement("a");
     a.className = "anchor";
@@ -66,6 +67,30 @@ export function initToc() {
   };
   document.addEventListener("scroll", spy, { passive: true });
   spy();
+}
+
+// initUserContent makes links within the page reach the ids and names a
+// file's HTML gives, as <a name="top">, which the server puts
+// user-content- before so that they stay apart from the page's own: #top
+// goes to user-content-top when nothing in the page is named top.
+function initUserContent(article) {
+  const target = (hash) => {
+    const id = decodeFragment(hash);
+    if (!id || document.getElementById(id)) return null;
+    return document.getElementById("user-content-" + id) || document.getElementsByName("user-content-" + id)[0] || null;
+  };
+  const follow = () => target(location.hash)?.scrollIntoView();
+  follow();
+  window.addEventListener("hashchange", follow);
+  // A link to the fragment already in the URL changes no hash
+  article.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    const el = a && target(a.getAttribute("href"));
+    if (!el) return;
+    e.preventDefault();
+    if (location.hash !== a.hash) history.pushState(history.state, "", a.hash);
+    el.scrollIntoView();
+  });
 }
 
 // decodeFragment turns "#id" into the id it names, decoded when it can be:
