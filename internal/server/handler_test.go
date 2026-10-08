@@ -187,7 +187,7 @@ func TestHandlerRootDir(t *testing.T) {
 		`<h1 id="repo">Repo</h1>`,
 		`<p>See #1.</p>`,
 		`>README.md</a>`,
-		"main\n",
+		`<span class="branch-name">main</span>`,
 	)
 	r.reject(t, "node_modules")
 	if row := r.row(t, "local-only"); !strings.Contains(row, `class="ignored hideable"`) {

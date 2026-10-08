@@ -70,15 +70,23 @@ a:hover { text-decoration: underline; }
 .repo {
   display: inline-flex;
   align-items: center;
+  /* Kept whole before the branch is, up to a share of the bar */
+  flex-shrink: 0;
+  max-width: 45vw;
+  min-width: 0;
   color: var(--fgColor-default);
   font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
 }
 .repo .octicon { margin-right: 4px; }
 /* Owner and repository are links of their own, shaded on hover as
    GitHub's are, rather than underlined */
 .repo a {
+  min-width: 0;
   padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   line-height: 32px;
   color: inherit;
   border-radius: var(--mini-radius);
@@ -94,7 +102,9 @@ a:hover { text-decoration: underline; }
 }
 
 .changes {
+  flex: none;
   display: inline-flex;
+  white-space: nowrap;
   align-items: center;
   gap: 6px;
   padding: 2px 10px;
@@ -108,10 +118,15 @@ a:hover { text-decoration: underline; }
 .changes[aria-current="page"] { background: var(--mini-selected); }
 .changes .octicon { color: var(--fgColor-attention); }
 .changes[hidden] { display: none; }
+/* The branch gives way first when the bar is short of room, cut short
+   rather than wrapped; its title tells it whole */
 .branch {
+  flex-shrink: 100;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
   padding: 2px 8px;
   color: var(--fgColor-muted);
   font-size: 12px;
@@ -363,6 +378,22 @@ body[data-kind="html"] .main > .box {
   color: var(--fgColor-muted);
   font-size: 12px;
   border-bottom: 1px solid var(--borderColor-default);
+}
+
+.branch-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A narrow bar keeps the repository's name, and the count of changes
+   without its lines */
+@media (max-width: 600px) {
+  .topbar { gap: 8px; padding: 0 12px; }
+  .repo .owner, .repo .sep { display: none; }
+}
+@media (max-width: 480px) {
+  .changes .added, .changes .deleted { display: none; }
+}
+/* Too narrow for a branch's name to be read: its icon, which tells it on
+   hover */
+@media (max-width: 420px) {
+  .branch-name { display: none; }
 }
 
 /* Settings dialog */
