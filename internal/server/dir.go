@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -104,9 +103,11 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 			}
 		}
 	} else if plainReadme != "" {
-		if b, err := s.ws.FS().ReadFile(path.Join(rel, plainReadme)); err == nil && isText(b) {
-			v.Readme = plainReadme
-			v.Content = template.HTML("<pre>" + template.HTMLEscapeString(string(bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")))) + "</pre>")
+		if b, err := s.ws.FS().ReadFile(path.Join(rel, plainReadme)); err == nil {
+			if text, _, ok := decodeText(b); ok {
+				v.Readme = plainReadme
+				v.Content = template.HTML("<pre>" + template.HTMLEscapeString(string(text)) + "</pre>")
+			}
 		}
 	}
 	s.render(w, p)

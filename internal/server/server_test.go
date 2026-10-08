@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 )
 
 func TestLangOf(t *testing.T) {
@@ -115,24 +116,33 @@ func TestAgo(t *testing.T) {
 	}
 }
 
-func TestIsText(t *testing.T) {
+func TestDecodeText(t *testing.T) {
 	for _, tt := range []struct {
-		name string
-		b    []byte
-		want bool
+		name   string
+		b      []byte
+		ok     bool
+		notice bool
 	}{
-		{"empty", nil, true},
-		{"ascii", []byte("hello\n"), true},
-		{"utf-8", []byte("日本語\n"), true},
-		{"nul byte", []byte("a\x00b"), false},
-		{"invalid utf-8", []byte{0xff, 0xfe, 'a', 'b', 'c', 'd'}, false},
-		// The 8000-byte head may cut a multibyte character in two
-		{"rune cut at the head's end", append(bytes.Repeat([]byte("a"), 7999), "日"...), true},
-		{"nul after the head", append(bytes.Repeat([]byte("a"), 8000), 0), true},
+		{"empty", nil, true, false},
+		{"ascii", []byte("hello\n"), true, false},
+		{"utf-8", []byte("日本語\n"), true, false},
+		{"utf-8 with a byte order mark", []byte("\xef\xbb\xbfhi\n"), true, false},
+		{"utf-16le", []byte{0xff, 0xfe, 'h', 0, 'i', 0}, true, false},
+		{"utf-16be", []byte{0xfe, 0xff, 0, 'h', 0, 'i'}, true, false},
+		{"nul byte", []byte("a\x00b"), false, false},
+		{"not utf-8", []byte{'a', 0xc3, 0x28, 'b'}, true, true},
+		{"nul after the head", append(bytes.Repeat([]byte("a"), 8000), 0), true, false},
 	} {
-		if got := isText(tt.b); got != tt.want {
-			t.Errorf("isText(%s) = %v, want %v", tt.name, got, tt.want)
+		text, notice, ok := decodeText(tt.b)
+		if ok != tt.ok || (notice != "") != tt.notice {
+			t.Errorf("decodeText(%s) = ok %v, notice %q; want ok %v, notice %v", tt.name, ok, notice, tt.ok, tt.notice)
 		}
+		if ok && !utf8.Valid(text) {
+			t.Errorf("decodeText(%s) gave text that is not UTF-8", tt.name)
+		}
+	}
+	if text, _, _ := decodeText([]byte{0xff, 0xfe, 'h', 0, 0xe9, 0}); string(text) != "hé" {
+		t.Errorf("utf-16le decoded to %q", text)
 	}
 }
 

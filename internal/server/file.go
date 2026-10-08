@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"html/template"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"unicode/utf16"
 	"unicode/utf8"
 
 	"github.com/babarot/gh-mini/internal/workspace"
@@ -28,6 +30,9 @@ type fileView struct {
 	PreviewURL string
 	Size       string
 	Lines      int
+	// Notice tells something about how the file is shown, such as bytes
+	// that are not UTF-8
+	Notice string
 }
 
 type viewTab struct {
@@ -144,13 +149,12 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 			s.serveError(w, r, snap, rel, err)
 			return
 		}
-		if !isText(b) {
+		text, notice, ok := decodeText(b)
+		if !ok {
 			p.Kind = "binary"
 			break
 		}
-		// Shown without a byte order mark, which has no place on screen;
-		// raw keeps the file as it is
-		b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
+		b, v.Notice = text, notice
 		v.Lines = countLines(b)
 		if isMarkdown(rel) && !plain {
 			p.Kind = "markdown"
@@ -195,17 +199,38 @@ func isImage(name string) bool {
 	return false
 }
 
-func isText(b []byte) bool {
+// decodeText returns a file's text as UTF-8 to show, without a byte order
+// mark, raw keeping the file as it is. UTF-16 with its byte order mark is
+// decoded. Other text that is not UTF-8, such as Shift_JIS, is shown with
+// what could not be read as U+FFFD, and a notice saying so; a NUL in the
+// first 8000 bytes makes it binary.
+func decodeText(b []byte) (text []byte, notice string, ok bool) {
+	switch {
+	case bytes.HasPrefix(b, []byte{0xff, 0xfe}):
+		return decodeUTF16(b[2:], binary.LittleEndian), "", true
+	case bytes.HasPrefix(b, []byte{0xfe, 0xff}):
+		return decodeUTF16(b[2:], binary.BigEndian), "", true
+	}
 	head := b
 	if len(head) > 8000 {
 		head = head[:8000]
 	}
-	for _, c := range head {
-		if c == 0 {
-			return false
-		}
+	if bytes.IndexByte(head, 0) >= 0 {
+		return nil, "", false
 	}
-	return utf8.Valid(head) || utf8.Valid(head[:max(0, len(head)-3)])
+	b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
+	if utf8.Valid(b) {
+		return b, "", true
+	}
+	return bytes.ToValidUTF8(b, []byte("\uFFFD")), "This file is not UTF-8: what could not be read shows as \uFFFD.", true
+}
+
+func decodeUTF16(b []byte, order binary.ByteOrder) []byte {
+	units := make([]uint16, len(b)/2)
+	for i := range units {
+		units[i] = order.Uint16(b[2*i:])
+	}
+	return []byte(string(utf16.Decode(units)))
 }
 
 func humanSize(n int64) string {

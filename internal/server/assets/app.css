@@ -248,6 +248,13 @@ body[data-kind="html"] .main > .box {
   margin-bottom: 0;
 }
 
+.notice {
+  padding: 8px 16px;
+  color: var(--fgColor-muted);
+  font-size: 12px;
+  border-bottom: 1px solid var(--borderColor-default);
+}
+
 /* Settings dialog */
 .settings {
   width: min(480px, calc(100vw - 32px));

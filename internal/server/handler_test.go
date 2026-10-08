@@ -739,3 +739,23 @@ func TestPlainReadme(t *testing.T) {
 	r.expect(t, http.StatusOK, `<h1 id="this">This</h1>`)
 	r.reject(t, "not this")
 }
+
+func TestHandlerEncodings(t *testing.T) {
+	root, _ := newTestRepo(t)
+	// "héllo\n" in UTF-16LE with its byte order mark
+	writeFile(t, filepath.Join(root, "utf16.txt"), []byte{0xff, 0xfe, 'h', 0, 0xe9, 0, 'l', 0, 'l', 0, 'o', 0, '\n', 0})
+	// "日本" in Shift_JIS
+	writeFile(t, filepath.Join(root, "sjis.txt"), []byte{0x93, 0xfa, 0x96, 0x7b, '\n'})
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+	get(t, h, "/utf16.txt").expect(t, http.StatusOK, `data-kind="code"`, "héllo")
+	get(t, h, "/sjis.txt").expect(t, http.StatusOK, `data-kind="code"`, `class="notice"`, "not UTF-8")
+	get(t, h, "/bin.dat").expect(t, http.StatusOK, `data-kind="binary"`)
+	if r := get(t, h, "/README.md"); strings.Contains(r.body, `class="notice"`) {
+		t.Error("a notice for UTF-8")
+	}
+}
