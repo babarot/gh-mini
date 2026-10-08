@@ -331,12 +331,19 @@ body[data-kind="html"] .main > .box {
 
 /* The settings dialog has a page per section, listed on the left */
 .settings:has(.settings-body) { width: min(680px, calc(100vw - 32px)); }
-.settings-body { display: grid; grid-template-columns: 168px minmax(0, 1fr); min-height: 320px; }
+/* Of one size whatever a section holds, so that the dialog stays put from
+   section to section; a section that does not fit scrolls */
+.settings-body {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  height: min(520px, calc(100dvh - 120px));
+}
 .settings-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 8px;
+  overflow-y: auto;
   background: var(--bgColor-muted);
   border-right: 1px solid var(--borderColor-default);
 }
@@ -356,12 +363,12 @@ body[data-kind="html"] .main > .box {
   background: var(--mini-selected);
   box-shadow: inset 2px 0 0 var(--fgColor-accent);
 }
-.settings-pane { padding-top: 4px; }
+.settings-pane { min-height: 0; padding-top: 4px; overflow-y: auto; }
 /* One section needs no list */
-.settings-body.single { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.settings-body.single { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
 .settings-body.single .settings-nav { display: none; }
 @media (max-width: 600px) {
-  .settings-body { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .settings-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
   .settings-nav {
     flex-direction: row;
     overflow-x: auto;
