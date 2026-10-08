@@ -39,6 +39,10 @@ type FileStatus struct {
 	// git does not track.
 	X string `json:"x"`
 	Y string `json:"y"`
+	// Letter is the one letter that tells how the file changed, as a
+	// file tree shows it: M modified, A added, D deleted, R renamed, U
+	// untracked, or C in a conflict.
+	Letter string `json:"letter"`
 	// Unmerged is set for a file in a merge conflict.
 	Unmerged bool `json:"unmerged,omitempty"`
 	// From is the old path of a file renamed or copied.
@@ -50,6 +54,30 @@ type FileStatus struct {
 	Binary  bool `json:"binary,omitempty"`
 	// Uncounted is set on an untracked file whose lines were not counted.
 	Uncounted bool `json:"uncounted,omitempty"`
+}
+
+func (f *FileStatus) letter() string {
+	switch {
+	case f.Unmerged:
+		return "C"
+	case f.X == "?":
+		return "U"
+	case f.Y == "D":
+		// Gone from the working tree, whatever the index has
+		return "D"
+	}
+	l := f.X
+	if l == "." {
+		l = f.Y
+	}
+	switch l {
+	case "T":
+		return "M"
+	case "C":
+		// A copy is a file added
+		return "A"
+	}
+	return l
 }
 
 // gitPrefix is where dir is in its repository, such as "docs/", or "" at
@@ -132,6 +160,7 @@ func gitStatus(root, prefix string, skip []string, untracked func(dir string) []
 	}
 	countUntracked(root, st.Files)
 	for _, f := range st.Files {
+		f.Letter = f.letter()
 		st.Added += f.Added
 		st.Deleted += f.Deleted
 	}

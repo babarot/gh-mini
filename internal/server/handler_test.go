@@ -727,6 +727,42 @@ func TestHandlerStatus(t *testing.T) {
 	}
 }
 
+// A directory's page tells how its files changed, and lists a deleted one
+// and a directory left with nothing.
+func TestHandlerDirStatus(t *testing.T) {
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Guide\n\nMore.\n"))
+	writeFile(t, filepath.Join(root, "docs", "new.md"), []byte("# New\n"))
+	if err := os.Remove(filepath.Join(root, "docs", "math.md")); err != nil {
+		t.Fatal(err)
+	}
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git", "node_modules"}, ThemesDir: themes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+
+	r := get(t, h, "/docs/")
+	if row := r.row(t, "guide.md"); !strings.Contains(row, `class="changed s-M"`) || !strings.Contains(row, "+1") || !strings.Contains(row, "modified") {
+		t.Errorf("guide.md: %s", row)
+	}
+	if row := r.row(t, "new.md"); !strings.Contains(row, "s-U") || !strings.Contains(row, "untracked") {
+		t.Errorf("new.md: %s", row)
+	}
+	if row := r.row(t, "math.md"); !strings.Contains(row, "gone") || !strings.Contains(row, "deleted") {
+		t.Errorf("math.md: %s", row)
+	}
+	if row := r.row(t, "README.md"); strings.Contains(row, "changed") {
+		t.Errorf("README.md: %s", row)
+	}
+	// The root sums up docs
+	if row := get(t, h, "/").row(t, "docs"); !strings.Contains(row, `class="dot"`) || !strings.Contains(row, "+2") {
+		t.Errorf("docs: %s", row)
+	}
+	get(t, h, "/").expect(t, http.StatusOK, `id="mini.changes"`, "3 changes", "mini.changed-only")
+}
+
 func TestHandlerTreeETag(t *testing.T) {
 	root, themes := newTestRepo(t)
 	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git"}, ThemesDir: themes, Reload: true})

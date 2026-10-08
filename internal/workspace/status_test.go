@@ -82,6 +82,11 @@ func TestStatus(t *testing.T) {
 		"newdir/a.md":      {x: "?", y: "?", added: 1},
 		"newdir/deep/b.md": {x: "?", y: "?", added: 2},
 	})
+	for p, l := range map[string]string{"mod.md": "M", "staged.md": "M", "gone.md": "D", "new.md": "R", "added.md": "U"} {
+		if got := st.Files[p].Letter; got != l {
+			t.Errorf("%s: letter %q, want %q", p, got, l)
+		}
+	}
 	if st.Added != 2+1+2+3+1+2 || st.Deleted != 1+1+1+1 {
 		t.Errorf("totals +%d -%d", st.Added, st.Deleted)
 	}

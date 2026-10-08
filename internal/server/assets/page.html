@@ -19,7 +19,7 @@
 {{- end}}
 <script type="module" src="{{.Static}}/assets/js/main.js"></script>
 </head>
-<body data-path="{{.Path}}" data-kind="{{.Kind}}" data-name="{{.Name}}"{{if .Reload}} data-reload="1" data-seq="{{.Seq}}" data-boot="{{.Boot}}"{{end}}{{if .SidebarHidden}} class="sidebar-hidden"{{end}}>
+<body data-path="{{.Path}}" data-kind="{{.Kind}}" data-name="{{.Name}}"{{if .Reload}} data-reload="1" data-seq="{{.Seq}}" data-boot="{{.Boot}}"{{with .Changes}} data-status="{{.ETag}}"{{end}}{{end}}{{if .SidebarHidden}} class="sidebar-hidden"{{end}}>
 
 <header class="topbar">
   <button class="icon-btn" id="mini.sidebar-toggle" title="Toggle file tree" aria-label="Toggle file tree" aria-controls="mini.sidebar" aria-expanded="{{if .SidebarHidden}}false{{else}}true{{end}}">
@@ -37,6 +37,14 @@
   <span class="branch" title="Current branch">
     <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M9.5 3.25a2.25 2.25 0 1 1 3 2.122V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.128a2.251 2.251 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.5 0v1.836A2.493 2.493 0 0 1 6 7h4a1 1 0 0 0 1-1v-.628A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z"></path></svg>
     {{.Branch}}
+  </span>
+  {{- end}}
+  {{- with .Changes}}
+  <span class="changes" id="mini.changes" title="Uncommitted changes"{{if not .Files}} hidden{{end}}>
+    <svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M1 1.75C1 .784 1.784 0 2.75 0h7.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 15H2.75A1.75 1.75 0 0 1 1 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v11.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V4.664a.25.25 0 0 0-.073-.177l-2.914-2.914a.25.25 0 0 0-.177-.073ZM8 3.25a.75.75 0 0 1 .75.75v1.5h1.5a.75.75 0 0 1 0 1.5h-1.5v1.5a.75.75 0 0 1-1.5 0V7h-1.5a.75.75 0 0 1 0-1.5h1.5V4A.75.75 0 0 1 8 3.25Zm-3 8a.75.75 0 0 1 .75-.75h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1-.75-.75Z"></path></svg>
+    <span data-files>{{.Files}} {{if eq .Files 1}}change{{else}}changes{{end}}</span>
+    <span class="added" data-added>+{{.Added}}</span>
+    <span class="deleted" data-deleted>−{{.Deleted}}</span>
   </span>
   {{- end}}
   <span class="spacer"></span>
@@ -177,6 +185,9 @@
       <input type="search" id="mini.tree-filter" aria-label="Go to file" placeholder="Go to file  (t)" autocomplete="off" spellcheck="false">
       <div class="sidebar-row">
         <label class="md-only"><input type="checkbox" id="mini.md-only"> Markdown only</label>
+        {{- if .Changes}}
+        <label class="md-only"><input type="checkbox" id="mini.changed-only"> Changed only</label>
+        {{- end}}
         <button type="button" class="link-btn" id="mini.collapse-all">Collapse all</button>
       </div>
     </div>
@@ -203,10 +214,10 @@
     <div class="box">
       <table class="files">
         {{- if ne $.Path "."}}
-        <tr><td colspan="2"><a class="up" href="..">..</a></td></tr>
+        <tr><td colspan="3"><a class="up" href="..">..</a></td></tr>
         {{- end}}
         {{- range .Entries}}
-        <tr{{if .Ignored}} class="ignored{{if and .Dir (not $.Ignored)}} hideable{{end}}"{{end}}>
+        <tr{{with .Class}} class="{{.}}"{{end}}>
           <td class="name"><div>
             {{- if .Dir}}
             <svg class="octicon dir" viewBox="0 0 16 16" width="16" height="16"><path d="M1.75 1A1.75 1.75 0 0 0 0 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0 0 16 13.25v-8.5A1.75 1.75 0 0 0 14.25 3H7.5a.25.25 0 0 1-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75Z"></path></svg>
@@ -216,7 +227,17 @@
             <a href="{{.Href}}">{{.Name}}</a>
             {{- if .Link}}<span class="hint">symlink</span>{{end}}
             {{- if .Ignored}}<span class="badge">local</span>{{end}}
+            {{- with .Status}}{{with .Label}}<span class="status-badge">{{.}}</span>{{end}}{{end}}
           </div>
+          </td>
+          <td class="stat">
+            {{- with .Status}}
+            {{- if .Letter}}
+            {{- if .Binary}}<span class="meta">binary</span>{{else}}<span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span>{{end}}
+            {{- else}}
+            <span class="dot" title="{{.Files}} changed"></span> <span class="added">+{{.Added}}</span> <span class="deleted">−{{.Deleted}}</span>
+            {{- end}}
+            {{- end -}}
           </td>
           <td class="ago"{{with .Date}} title="{{.}}"{{end}}>{{.Ago}}</td>
         </tr>

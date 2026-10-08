@@ -53,6 +53,9 @@ type layout struct {
 	Owner   string
 	Repo    string
 	Branch  string
+	// Changes counts what changed since the last commit, in a git
+	// repository only
+	Changes *changesView
 	Path    string
 	Crumbs  []crumb
 	Ignored bool
@@ -83,6 +86,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 	p := &page{Kind: kind, csp: s.contentSecurityPolicy(r), layout: layout{
 		Name:     s.opts.Name,
 		Branch:   snap.Branch,
+		Changes:  newChangesView(snap),
 		Path:     rel,
 		Settings: s.settings(r),
 		Reload:   s.opts.Reload,

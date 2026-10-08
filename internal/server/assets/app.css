@@ -93,6 +93,18 @@ a:hover { text-decoration: underline; }
   color: var(--fgColor-muted);
 }
 
+.changes {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--borderColor-default);
+  border-radius: 2em;
+}
+.changes .octicon { color: var(--fgColor-attention); }
+.changes[hidden] { display: none; }
 .branch {
   display: inline-flex;
   align-items: center;
@@ -164,11 +176,13 @@ body.sidebar-hidden .sidebar { display: none; }
   gap: 6px;
   color: var(--fgColor-muted);
   font-size: 12px;
+  white-space: nowrap;
   user-select: none;
 }
 .md-only input { margin: 0; }
-.sidebar-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.link-btn { padding: 0; color: var(--fgColor-muted); font: inherit; font-size: 12px; background: none; border: 0; cursor: pointer; }
+.sidebar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.sidebar-row .link-btn { margin-left: auto; }
+.link-btn { white-space: nowrap; padding: 0; color: var(--fgColor-muted); font: inherit; font-size: 12px; background: none; border: 0; cursor: pointer; }
 .link-btn:hover { color: var(--fgColor-accent); text-decoration: underline; }
 
 .tree {
@@ -200,6 +214,26 @@ body.sidebar-hidden .sidebar { display: none; }
 .tree .ignored > .row .label { opacity: .6; }
 [data-hideignoreddirs="true"] .tree li.hideable { display: none; }
 .tree .indent { width: 12px; flex: none; }
+/* How a file changed since the last commit: a letter after its name, and
+   the name in the same color; a dot on a directory with changes under it */
+.tree .row .status-letter {
+  margin-left: auto;
+  padding-left: 6px;
+  font-family: var(--mini-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+}
+.tree .row.changed .label, .tree .row .status-letter { color: var(--mini-status-color); }
+.tree .row.gone .label { text-decoration: line-through; }
+.tree .row .status-dot,
+.files .stat .dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--fgColor-attention);
+}
 .tree .empty { padding: 8px; color: var(--fgColor-muted); }
 
 .main {
@@ -514,6 +548,27 @@ body[data-kind="html"] .main > .box {
 .files .ignored .name a { color: var(--fgColor-muted); }
 [data-hideignoreddirs="true"] .files tr.hideable { display: none; }
 .files .ago { color: var(--fgColor-muted); text-align: right; white-space: nowrap; }
+.files .stat { text-align: right; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; }
+.files .stat .dot { display: inline-block; margin: 0 2px 1px 0; vertical-align: middle; }
+.files .changed .name a { color: var(--mini-status-color); }
+.files .gone .name a { text-decoration: line-through; }
+.files .status-badge {
+  padding: 0 7px;
+  color: var(--mini-status-color);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  border: 1px solid currentColor;
+  border-radius: 2em;
+}
+
+/* The colors of the letters, M, A and so on, as git status shows them */
+.s-M { --mini-status-color: var(--fgColor-attention); }
+.s-A, .s-U { --mini-status-color: var(--fgColor-success); }
+.s-D, .s-C { --mini-status-color: var(--fgColor-danger); }
+.s-R { --mini-status-color: var(--fgColor-accent); }
+.added { color: var(--fgColor-success); }
+.deleted { color: var(--fgColor-danger); }
 
 .markdown-body { padding: 32px; background: transparent; }
 .readme .markdown-body { padding: 32px 32px 24px; }
@@ -662,6 +717,7 @@ body[data-kind="html"] .main > .box {
   .markdown-body { padding: 16px; }
   /* As on GitHub, a narrow list drops the dates for the names */
   .files .ago { display: none; }
+  .files .status-badge { display: none; }
 }
 
 /* Images marked for one color mode, as GitHub's README logos are */

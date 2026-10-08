@@ -8,6 +8,8 @@ The finder takes a file whose path holds the letters typed in their order, as `r
 
 Every file on disk is shown, including what git ignores; those are marked `local`. What a repository inside the directory ignores, such as one cloned into it, counts too. Directories git ignores, such as a `.venv`, show in the tree without their files until you open them, and Hide ignored directories in the settings keeps them out of sight. Names given to `--skip` are left out of the tree altogether, and gh-mini does not read or watch them.
 
+In a git repository, the tree also marks the files changed since the last commit; see [Changes](changes.md).
+
 ## Live reload
 
 The page you are reading reloads when its file changes, and the tree when files are added or removed. `--no-reload` turns this off. A page that missed changes, as one gone back to or one open while the server restarted, catches up with them. A change to the `.gitignore` of a directory above the one served, or to `.git/info/exclude`, is followed too.

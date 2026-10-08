@@ -23,6 +23,7 @@ It opens `http://localhost:6419/` with:
 - HTML files previewed as a browser shows them, scripts included
 - translations side by side, such as `guide.md` and `guide.ja.md`
 - themes, built in or written as CSS, each in light and dark
+- what changed since the last commit, in the tree and on directory pages
 - live reload when files change
 
 <picture>
@@ -69,6 +70,7 @@ An HTML file's preview runs its scripts. They run in an origin of their own and 
 
 - [Markdown](docs/guides/markdown.md): what is rendered as GitHub renders it, and which HTML is kept
 - [Files and live reload](docs/guides/files.md): what the tree shows, and what is watched
+- [Changes](docs/guides/changes.md): what changed since the last commit, and where it shows
 - [Settings](docs/guides/settings.md): the settings and keyboard shortcuts, and how they meet the flags
 - [HTML previews](docs/guides/html-previews.md): how previews are served, and what their scripts can do
 - [Translations](docs/guides/translations.md): how translations are named, and how to name yours otherwise

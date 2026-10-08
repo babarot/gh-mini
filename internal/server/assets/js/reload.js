@@ -53,8 +53,9 @@ function restore() {
 
 // initReload listens for changes. onTheme runs when a theme was saved,
 // onStructure when files were added or removed, and onFiles with the
-// changed paths otherwise.
-export function initReload({ onTheme, onStructure, onFiles }) {
+// changed paths otherwise. onStatus runs when what changed since the last
+// commit changed, and tells the paths whose status is not what it was.
+export function initReload({ onTheme, onStructure, onFiles, onStatus }) {
   restore();
   if (!page.reload) return;
   // The latest change the page has been told, or rendered with: a change
@@ -63,6 +64,13 @@ export function initReload({ onTheme, onStructure, onFiles }) {
   const onChange = (c) => {
     if (!c.resync && c.seq <= last) return;
     last = Math.max(last, c.seq || 0);
+    if (c.status) {
+      // A directory's page lists how its files changed: staging one or
+      // committing it changes no file, but the page
+      onStatus().then(({ changed }) => {
+        if (page.kind === "dir" && changed.some(inPageDir)) reload();
+      });
+    }
     if (!c.theme && !c.structure && !c.resync && !c.paths?.length && !c.dirs?.length) return;
     if (c.theme) onTheme();
     if (c.structure || c.resync) onStructure();
@@ -98,6 +106,17 @@ export function initReload({ onTheme, onStructure, onFiles }) {
     else catchUp();
   };
   subscribe(onChange, onBoot, catchUp);
+}
+
+// inPageDir tells whether a path is under the directory the page shows.
+const inPageDir = (p) => page.path === "." || p.startsWith(page.path + "/");
+
+// checkStatus reloads a directory's page rendered with another status
+// than the one read since: a change between the two would be missed, as
+// the status read already has it.
+export function checkStatus(etag) {
+  const rendered = document.body.dataset.status;
+  if (page.reload && page.kind === "dir" && rendered && etag && etag !== rendered) reload();
 }
 
 // underDir tells whether a path is in the directory of the page's file or
