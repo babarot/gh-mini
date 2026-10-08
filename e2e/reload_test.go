@@ -78,8 +78,12 @@ func TestCatchUp(t *testing.T) {
 	ctx := tab(t)
 	paused := make(chan fetch.RequestID, 1)
 	chromedp.ListenTarget(ctx, func(ev any) {
+		// This runs on the tab's event loop, which must not wait
 		if e, ok := ev.(*fetch.EventRequestPaused); ok {
-			paused <- e.RequestID
+			select {
+			case paused <- e.RequestID:
+			default:
+			}
 		}
 	})
 	run(t, ctx, fetch.Enable().WithPatterns([]*fetch.RequestPattern{{URLPattern: "*/assets/js/main.js"}}))
@@ -93,6 +97,8 @@ func TestCatchUp(t *testing.T) {
 	case <-time.After(15 * time.Second):
 		t.Fatal("main.js was never asked for")
 	}
+	// main.js is asked for from the head, maybe before the body is read
+	waitFor(t, ctx, `document.body?.dataset.seq`)
 	seq := eval[string](t, ctx, `document.body.dataset.seq`)
 	a.write("a.md", "# After\n")
 	a.waitChange(seq)

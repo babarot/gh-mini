@@ -20,15 +20,17 @@ import (
 	"time"
 
 	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/storage"
 	"github.com/chromedp/chromedp"
 
 	"github.com/babarot/gh-mini/internal/server"
 )
 
 // browser is the Chrome the tests share, each in a tab of its own. The
-// tests run one at a time, each on a port of its own, so none sees
-// another's storage; the cookies, which ignore ports, are cleared for
-// each. skip tells why there is no browser.
+// tests run one at a time, and the cookies and storage are cleared for
+// each: the cookies ignore ports, and a port may be given again to a
+// later test, whose storage, kept by the same name, would carry over.
+// skip tells why there is no browser.
 var (
 	browser context.Context
 	skip    string
@@ -59,7 +61,8 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// tab opens a tab of its own, closed when the test ends, with no cookies.
+// tab opens a tab of its own, closed when the test ends, with no cookies
+// or storage.
 func tab(t *testing.T) context.Context {
 	t.Helper()
 	if browser == nil {
@@ -74,7 +77,7 @@ func tab(t *testing.T) context.Context {
 		cancelTimeout()
 		cancel()
 	})
-	run(t, ctx, network.ClearBrowserCookies())
+	run(t, ctx, network.ClearBrowserCookies(), storage.ClearDataForOrigin("*", "all"))
 	return ctx
 }
 
@@ -176,9 +179,11 @@ func (a *app) start(ln net.Listener) {
 		a.t.Fatal(err)
 	}
 	a.srv = srv
-	a.hs = &http.Server{Handler: srv.Handler()}
+	hs := &http.Server{Handler: srv.Handler()}
+	a.hs = hs
+	// Not a.hs, which stop may have cleared before this runs
 	go func() {
-		if err := a.hs.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := hs.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			a.t.Error(err)
 		}
 	}()
