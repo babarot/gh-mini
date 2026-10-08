@@ -74,7 +74,8 @@ func TestSettingsDialog(t *testing.T) {
 	h := newTestServer(t)
 	r := get(t, h, "/", withSettings(`{"theme":"sepia","mode":"dark"}`))
 	r.expect(t, http.StatusOK,
-		`id="mini.settings-open"`,
+		`popovertarget="mini.menu"`,
+		`data-open="mini.settings"`,
 		`<dialog class="settings" id="mini.settings"`,
 		`<select data-setting="theme"`,
 		`<option value="sepia" selected>sepia</option>`,

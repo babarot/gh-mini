@@ -16,9 +16,8 @@ import (
 	"strings"
 
 	"github.com/babarot/gh-mini/internal/server"
+	"github.com/babarot/gh-mini/internal/version"
 )
-
-var version = "dev"
 
 const usage = `gh-mini serves a directory as a small, local GitHub: a file tree, directory
 pages with their README, and Markdown and code rendered as GitHub does.
@@ -125,7 +124,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	if c.version {
-		fmt.Fprintln(stdout, "gh-mini", version)
+		fmt.Fprintln(stdout, "gh-mini", version.String())
 		return nil
 	}
 
@@ -153,6 +152,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		Theme:     c.theme,
 		ThemesDir: c.themesDir,
 		Reload:    !c.noReload,
+		Version:   version.String(),
+		Revision:  version.Revision(),
 	}
 	if pln != nil {
 		opts.PreviewPort = pln.Addr().(*net.TCPAddr).Port

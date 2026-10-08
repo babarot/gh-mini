@@ -3,7 +3,7 @@
 // cookie, so the next page is rendered with it, and applied to this page
 // at once.
 
-import { page, setCookie } from "./util.js";
+import { page, setCookie, closeOnBackdrop } from "./util.js";
 import { reload } from "./reload.js";
 
 const COOKIE = "gh-mini-settings";
@@ -132,25 +132,20 @@ export function initSettings() {
   });
   dialog.addEventListener("click", (e) => {
     const button = e.target.closest("button[data-setting]");
-    if (button) {
-      choose(button);
-      return;
-    }
-    // A click on the backdrop lands on the dialog itself, outside its box
-    const r = dialog.getBoundingClientRect();
-    if (e.target === dialog && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) {
-      dialog.close();
-    }
+    if (button) choose(button);
   });
+  closeOnBackdrop(dialog);
 
-  document.getElementById("mini.settings-open").addEventListener("click", () => dialog.showModal());
   document.getElementById("mini.settings-close").addEventListener("click", () => dialog.close());
   document.addEventListener("keydown", (e) => {
     const t = e.target;
     if (t.matches && t.matches("input, textarea, select, [contenteditable]")) return;
-    if (e.metaKey || e.ctrlKey || e.altKey || dialog.open) return;
+    // Not over a dialog already open, the About one included
+    if (e.metaKey || e.ctrlKey || e.altKey || document.querySelector("dialog[open]")) return;
     if (e.key === ",") {
       e.preventDefault();
+      // The menu may be open; it would stay above the dialog
+      document.getElementById("mini.menu").hidePopover();
       dialog.showModal();
     }
   });

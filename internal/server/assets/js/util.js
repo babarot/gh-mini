@@ -27,6 +27,16 @@ export function setCookie(name, value) {
   document.cookie = name + "=" + encodeURIComponent(value) + "; path=/; max-age=31536000; samesite=lax";
 }
 
+// closeOnBackdrop closes a modal dialog on a click on its backdrop, which
+// lands on the dialog itself, outside its box.
+export function closeOnBackdrop(dialog) {
+  dialog.addEventListener("click", (e) => {
+    if (e.target !== dialog) return;
+    const r = dialog.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) dialog.close();
+  });
+}
+
 export function href(path, dir) {
   if (!path || path === ".") return "/";
   const u = "/" + path.split("/").map(encodeURIComponent).join("/");

@@ -1,5 +1,6 @@
 import { initTree, fetchTree, refresh } from "./tree.js";
 import { initSettings, refreshTheme } from "./settings.js";
+import { initMenu } from "./menu.js";
 import { initLangs } from "./langs.js";
 import { initToc } from "./toc.js";
 import { initReload } from "./reload.js";
@@ -11,6 +12,7 @@ import { initPictures } from "./pictures.js";
 for (const init of [
   initTree,
   initSettings,
+  initMenu,
   initLangs,
   initToc,
   initCopy,

@@ -37,6 +37,10 @@ type Options struct {
 	// PreviewPort is the port PreviewHandler is served on, on the same
 	// host; zero turns HTML previews off.
 	PreviewPort int
+	// Version and Revision are shown in the About dialog; Revision is the
+	// full hash of the commit built from, or empty.
+	Version  string
+	Revision string
 }
 
 // Server serves one directory.
@@ -51,6 +55,8 @@ type Server struct {
 	renders *renderCache
 	// previewToken is the value of the preview cookie
 	previewToken string
+	// serving is the root as the About dialog shows it
+	serving string
 }
 
 // New opens the root and, when reloading is on, starts watching it.
@@ -81,6 +87,7 @@ func New(opts Options) (*Server, error) {
 		hub:     &hub{subs: map[*subscriber]struct{}{}},
 		static:  newStaticFiles(),
 		renders: newRenderCache(maxRenderCache),
+		serving: shortenHome(opts.Root, homeDir()),
 	}
 	if opts.PreviewPort != 0 {
 		s.previewToken = newPreviewToken()

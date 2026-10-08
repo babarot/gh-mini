@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/babarot/gh-mini/internal/version"
 )
 
 func TestSplitList(t *testing.T) {
@@ -259,8 +261,8 @@ func TestRunVersion(t *testing.T) {
 	if err := run([]string{"--version"}, &stdout, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	if got := stdout.String(); got != "gh-mini dev\n" {
-		t.Errorf("got %q", got)
+	if got, want := stdout.String(), "gh-mini "+version.String()+"\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 // testdata/pages. The static files' version, a hash of them, is replaced
 // so that a change to a script or a stylesheet does not change every page,
 // and so are the commit's hash and date, which change with the time it was
-// made.
+// made, and the root the About dialog shows, a new directory each run.
 func TestGoldenPages(t *testing.T) {
 	root, themes := newTestRepo(t)
 	srv, err := New(Options{
@@ -21,6 +21,7 @@ func TestGoldenPages(t *testing.T) {
 		Name:      "repo",
 		Skip:      []string{".git", "node_modules", ".DS_Store"},
 		ThemesDir: themes,
+		Version:   "1.2.3",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -51,6 +52,7 @@ func TestGoldenPages(t *testing.T) {
 			body := strings.ReplaceAll(r.body, srv.static.prefix(), "/_mini/static/VERSION")
 			body = strings.ReplaceAll(body, head.Short, "SHA")
 			body = strings.ReplaceAll(body, head.Date, "DATE")
+			body = strings.ReplaceAll(body, srv.serving, "ROOT")
 			golden.Check(t, filepath.Join("testdata", "pages", name+".html"), []byte(body))
 		})
 	}

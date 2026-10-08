@@ -62,6 +62,7 @@ type layout struct {
 	// SidebarHidden closes the file tree from the first paint, as the
 	// viewer left it.
 	SidebarHidden bool
+	About         aboutView
 }
 
 func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind string) *page {
@@ -75,6 +76,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 		Settings: s.settings(r),
 		Reload:   s.opts.Reload,
 		Static:   s.static.prefix(),
+		About:    s.about(),
 	}}
 	p.Title = s.opts.Name
 	p.SettingAttrs = settingAttrs(p.Settings)
