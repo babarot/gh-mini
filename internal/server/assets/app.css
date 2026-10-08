@@ -557,6 +557,8 @@ body[data-kind="html"] .main > .box {
 }
 .markdown-body .mermaid:hover .mermaid-controls, .mermaid-controls:focus-within { opacity: 1; }
 .mermaid-controls .icon-btn { width: 28px; height: 28px; background: var(--bgColor-default); }
+/* Without a pointer to hover, as on a phone, the buttons stay shown */
+@media (hover: none) { .copy-btn, .mermaid-controls { opacity: 1; } }
 .mermaid-controls .zoomIn { grid-area: 1 / 3; }
 .mermaid-controls .zoomOut { grid-area: 3 / 3; }
 .mermaid-controls .reset { grid-area: 2 / 2; }
