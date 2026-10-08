@@ -6,7 +6,9 @@ export const page = {
   path: body.dataset.path || ".",
   kind: body.dataset.kind,
   reload: Boolean(body.dataset.reload),
-  boot: body.dataset.boot,
+  // The latest change the page shows, and the server's start
+  seq: Number(body.dataset.seq || 0),
+  boot: body.dataset.boot || "",
 };
 
 const storeKey = "gh-mini:" + (body.dataset.name || "");

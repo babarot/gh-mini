@@ -57,12 +57,13 @@ function restore() {
 export function initReload({ onTheme, onStructure, onFiles }) {
   restore();
   if (!page.reload) return;
-  subscribe((c) => {
-    // The server was restarted, perhaps with other code: read it all again
-    if (c.boot) {
-      if (c.boot !== page.boot) reload();
-      return;
-    }
+  // The latest change the page has been told, or rendered with: a change
+  // told twice, by the stream and by catching up, is taken once
+  let last = page.seq;
+  const onChange = (c) => {
+    if (!c.resync && c.seq <= last) return;
+    last = Math.max(last, c.seq || 0);
+    if (!c.theme && !c.structure && !c.resync && !c.paths?.length && !c.dirs?.length) return;
     if (c.theme) onTheme();
     if (c.structure || c.resync) onStructure();
     else onFiles(c.paths, c.dirs);
@@ -80,7 +81,23 @@ export function initReload({ onTheme, onStructure, onFiles }) {
       // A Markdown page shows the images next to it
       ((page.kind === "markdown" || page.kind === "dir") && isImage(p) && underDir(p)));
     if (hit || (page.kind === "notfound" && c.structure)) reload();
-  });
+  };
+  // Changes may be missed before the page subscribes, while it is in the
+  // back/forward cache and while the stream is lost: ask for them then
+  const catchUp = async () => {
+    try {
+      const r = await fetch(`/_mini/api/changes?since=${last}&boot=${encodeURIComponent(page.boot)}`, { cache: "no-store" });
+      if (r.ok) onChange(await r.json());
+    } catch (e) {}
+  };
+  // Every stream starts by telling the server's boot ID. Another server,
+  // perhaps with other code, means reading it all again; the same one, a
+  // stream opened again, may have missed changes meanwhile
+  const onBoot = (boot) => {
+    if (boot !== page.boot) reload();
+    else catchUp();
+  };
+  subscribe(onChange, onBoot, catchUp);
 }
 
 // underDir tells whether a path is in the directory of the page's file or
@@ -90,18 +107,30 @@ function underDir(p) {
   return dir === "." || p.startsWith(dir + "/");
 }
 
-// subscribe calls onChange with every change the server tells. The tabs
-// share one connection through a shared worker where there is one.
-function subscribe(onChange) {
+// subscribe calls onChange with every change the server tells, onBoot with
+// the boot ID a stream starts with, and catchUp once subscribed and when
+// the page comes back from the back/forward cache, as changes may have
+// been missed then. The tabs share one connection through a shared worker
+// where there is one.
+function subscribe(onChange, onBoot, catchUp) {
+  window.addEventListener("pageshow", (e) => { if (e.persisted) catchUp(); });
   if (!window.SharedWorker) {
     const es = new EventSource("/_mini/events");
     es.onmessage = (e) => onChange(JSON.parse(e.data));
-    es.addEventListener("boot", (e) => onChange({ boot: e.data }));
+    es.addEventListener("boot", (e) => onBoot(e.data));
+    catchUp();
     return;
   }
   const worker = new SharedWorker(new URL("./events-worker.js", import.meta.url), { name: "gh-mini-events" });
-  worker.port.onmessage = (e) => onChange(JSON.parse(e.data));
+  worker.port.onmessage = (e) => {
+    const c = JSON.parse(e.data);
+    if (c.boot !== undefined) onBoot(c.boot);
+    else onChange(c);
+  };
   worker.port.start();
+  // The worker may have its stream open already, and tells no boot ID to
+  // a tab that comes later
+  catchUp();
   window.addEventListener("pagehide", () => worker.port.postMessage("close"));
   window.addEventListener("pageshow", (e) => { if (e.persisted) worker.port.postMessage("open"); });
 }

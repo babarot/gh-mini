@@ -63,7 +63,10 @@ type layout struct {
 	// SettingAttrs are the settings set on <html> for CSS.
 	SettingAttrs template.HTMLAttr
 	Reload       bool
-	// Boot is the server's boot ID, for the page to tell a restart.
+	// Seq is the latest change the page shows, for the page to ask for
+	// the changes it missed, and Boot the server's boot ID, for it to
+	// tell a restart
+	Seq  uint64
 	Boot string
 	// Static is the URL of the server's own files.
 	Static string
@@ -83,6 +86,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 		Path:     rel,
 		Settings: s.settings(r),
 		Reload:   s.opts.Reload,
+		Seq:      seqOf(r),
 		Boot:     s.boot,
 		Static:   s.static.prefix(),
 		About:    s.about(),

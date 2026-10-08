@@ -73,6 +73,7 @@ func (s *Server) servePath(w http.ResponseWriter, r *http.Request) {
 	if rel == "" {
 		rel = "."
 	}
+	r = s.withSeq(r)
 	snap := s.ws.Snapshot()
 	info, err := s.ws.FS().Stat(rel)
 	switch {

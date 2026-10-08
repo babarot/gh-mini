@@ -102,7 +102,7 @@ func New(opts Options) (*Server, error) {
 		ws:      ws,
 		md:      markdown.New(),
 		tmpl:    tmpl,
-		hub:     &hub{subs: map[*subscriber]struct{}{}},
+		hub:     newHub(),
 		static:  newStaticFiles(),
 		renders: newRenderCache(maxRenderCache),
 		serving: shortenHome(opts.Root, homeDir()),
@@ -145,6 +145,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/_mini/theme/", s.serveTheme)
 	mux.HandleFunc("/_mini/api/tree", s.serveTree)
 	mux.HandleFunc("/_mini/events", s.serveEvents)
+	mux.HandleFunc("/_mini/api/changes", s.serveChanges)
 	mux.HandleFunc("/", s.servePath)
 	return s.checkHost(mux)
 }
