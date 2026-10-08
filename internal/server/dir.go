@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -106,6 +107,11 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		if err == nil {
 			v.Readme = strings.TrimPrefix(name, rel+"/")
 			v.Content, p.Features, _ = s.renderMarkdownFile(name, info, b)
+			// A README elsewhere, as a translation in ja/ is, links next
+			// to itself
+			if d := path.Dir(name); d != rel {
+				v.Content = rebase(v.Content, readmePrefix(rel, d))
+			}
 			for _, m := range readmes {
 				v.Langs = append(v.Langs, langTab{
 					Label:   langLabel(m.Lang),
@@ -126,6 +132,16 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		}
 	}
 	s.render(w, p)
+}
+
+// readmePrefix is the way from a directory to the one of its README, as
+// "ja/" from docs to docs/ja. Both are relative to the root.
+func readmePrefix(dir, readmeDir string) string {
+	r, err := filepath.Rel(filepath.FromSlash(dir), filepath.FromSlash(readmeDir))
+	if err != nil || r == "." {
+		return ""
+	}
+	return filepath.ToSlash(r) + "/"
 }
 
 func ago(t time.Time) string {

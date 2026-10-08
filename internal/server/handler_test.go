@@ -233,7 +233,7 @@ func TestHandlerTranslationsOff(t *testing.T) {
 
 func TestHandlerTranslationsLayout(t *testing.T) {
 	root, _ := newTestRepo(t)
-	writeFile(t, filepath.Join(root, "ja", "README.md"), []byte("# 日本語\n"))
+	writeFile(t, filepath.Join(root, "ja", "README.md"), []byte("# 日本語\n\n![](pic.png) [guide](guide.md) [top](#top)\n"))
 	writeFile(t, filepath.Join(root, "docs", "guide_fr.md"), []byte("# Guide en français\n"))
 	srv, err := New(Options{Root: root, Name: "repo", Translations: "dir, {name}_{lang}.md"})
 	if err != nil {
@@ -242,7 +242,11 @@ func TestHandlerTranslationsLayout(t *testing.T) {
 	defer srv.Close()
 	h := srv.Handler()
 
-	get(t, h, "/?lang=ja").expect(t, http.StatusOK, `>日本語</h1>`, `<a href="/ja/README.md">ja/README.md</a>`, `>JA</a>`)
+	get(t, h, "/?lang=ja").expect(t, http.StatusOK, `>日本語</h1>`, `<a href="/ja/README.md">ja/README.md</a>`, `>JA</a>`,
+		// Its links lead next to it, not to the page's directory
+		`<img src="ja/pic.png"`, `<a href="ja/guide.md">`, `<a href="#top">`)
+	// On its own page, from its own directory, they stay as written
+	get(t, h, "/ja/README.md").expect(t, http.StatusOK, `<img src="pic.png"`, `<a href="guide.md">`)
 	get(t, h, "/docs/guide.md").expect(t, http.StatusOK, `<a href="/docs/guide_fr.md" data-lang="FR">FR</a>`)
 	if r := get(t, h, "/ja/"); strings.Contains(r.body, `class="segmented langs"`) || !strings.Contains(r.body, `>日本語</h1>`) {
 		t.Error("ja/: want its README without a language switch")
