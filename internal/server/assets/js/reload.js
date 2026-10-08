@@ -56,7 +56,9 @@ function restore() {
 // onStructure when files were added or removed, and onFiles with the
 // changed paths otherwise. onStatus runs when what changed since the last
 // commit changed, and tells the paths whose status is not what it was.
-export function initReload({ onTheme, onStructure, onFiles, onStatus }) {
+// onHead runs when HEAD or a branch of origin moved, which reloads no
+// page.
+export function initReload({ onTheme, onStructure, onFiles, onStatus, onHead }) {
   restore();
   if (!page.reload) return;
   // The latest change the page has been told, or rendered with: a change
@@ -65,6 +67,7 @@ export function initReload({ onTheme, onStructure, onFiles, onStatus }) {
   const onChange = (c) => {
     if (!c.resync && c.seq <= last) return;
     last = Math.max(last, c.seq || 0);
+    if (c.head) onHead();
     if (c.status) {
       // A directory's page lists how its files changed: staging one or
       // committing it changes no file, but the page

@@ -2,6 +2,8 @@
 
 When the directory served is in a git repository, gh-mini shows what changed since the last commit, as `git status` and `git diff` tell it: files edited, staged, added, deleted and renamed, and files git does not track yet.
 
+On a branch other than the base, origin's default branch, it shows what changed since the branch left the base instead, as a pull request does: the commits since and what is not committed yet together (see [Since the base](#since-the-base)).
+
 ## Where they show
 
 The top bar counts the files changed and the lines added and removed, next to the branch, and leads to the Changes page below. It is gone while nothing is changed.
@@ -35,7 +37,23 @@ All shows everything changed since the last commit. Staged and Unstaged show the
 
 A binary file is listed without its diff. A diff longer than 1500 lines, or past 20000 lines on the page, is folded, and shown on a page of its own when opened. The page follows the files and git as the tree does.
 
+On a branch other than the base, Since main and Uncommitted pick between what changed since the branch left the base and what changed since the last commit. Since main lists the commits since, those no remote branch has marked not pushed, and tags each file committed, uncommitted or both. Uncommitted is the page as on the base, with its own tabs.
+
 Untracked is not ignored: a file git ignores is marked `local` (see [Files and live reload](files.md)) and is never counted as changed.
+
+## Since the base
+
+The base is the branch origin's HEAD names, the default branch the repository was cloned with, or else origin's `main` or `master`. It is origin's, `origin/main`, and not the local `main`, which a worktree seldom updates.
+
+On a branch other than the base, the top bar, the tree, directories' pages and files' pages show what changed since the branch left the base: the working tree against the commit where it left it, as `git diff $(git merge-base origin/main HEAD)` tells it, with untracked files. A file committed and then changed back is not listed. A changed file's page tells whether it was committed on the branch, and its diff is that since the base. The commit where the branch left the base is found again as it moves, as when the base is merged into the branch.
+
+The branch in the top bar tells how many commits it is ahead of the base and behind it, the second in another color, as a sign that the branch may want a rebase. The tab's title ends with the branch, so that the tabs of a repository's worktrees tell apart.
+
+The branch opens a panel, as `b` does, that tells where the branch left the base and whether its commits are pushed. gh-mini does not fetch: how far behind the base the branch is, is as of the last fetch. A commit, a fetch or a push shows without reloading.
+
+A branch pushed to a repository on GitHub shows its pull request after the branch, open, draft, merged or closed, leading to it on GitHub: a merged one tells that the branch, and its worktree, are done with. gh-mini asks [gh](https://cli.github.com/) for it, after the page is shown, and keeps what it told for a minute. Without gh, signed out, or offline, none shows.
+
+On the base itself, outside a repository with an origin, and with `--no-changes`, the branch shows as before, a name alone, and the changes are those since the last commit.
 
 ## Settings
 

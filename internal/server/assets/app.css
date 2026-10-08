@@ -133,6 +133,78 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--borderColor-default);
   border-radius: 2em;
 }
+/* On a branch other than the base, the branch is a button: it opens the
+   panel, and tells how far it is ahead of the base and behind it */
+button.branch {
+  font: inherit;
+  font-size: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+button.branch:hover,
+button.branch:has(+ .branch-panel:popover-open) { color: var(--fgColor-default); background: var(--mini-selected); }
+.branch .ab {
+  display: inline-flex;
+  gap: 6px;
+  padding-left: 6px;
+  color: var(--fgColor-default);
+  font-family: var(--mini-font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--borderColor-default);
+}
+.branch .ab[hidden] { display: none; }
+.branch .behind { color: var(--fgColor-attention); font-weight: 600; }
+.branch .caret { flex: none; }
+.branch-panel {
+  position: fixed;
+  inset: auto;
+  width: min(340px, calc(100vw - 16px));
+  margin: 0;
+  padding: 6px;
+  color: var(--fgColor-default);
+  background: var(--bgColor-default);
+  border: 1px solid var(--borderColor-default);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+.branch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--mini-radius);
+}
+.branch-row .octicon { margin-top: 2px; color: var(--fgColor-muted); }
+.branch-row small { display: block; color: var(--fgColor-muted); font-size: 12px; }
+.branch-row .behind,
+.branch-row.attention > span { color: var(--fgColor-attention); }
+.branch-row.attention small { color: var(--fgColor-muted); }
+a.branch-row { color: var(--fgColor-default); }
+a.branch-row:hover { text-decoration: none; background: var(--mini-selected); }
+.branch-panel hr { margin: 4px 0; border: 0; border-top: 1px solid var(--borderColor-muted); }
+/* The branch's pull request, colored by its state as GitHub colors it */
+.pr-chip {
+  --mini-pr-color: #1f883d;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: var(--mini-pr-color);
+  border-radius: 2em;
+}
+.pr-chip .octicon { width: 14px; height: 14px; }
+.pr-chip:hover { text-decoration: none; filter: brightness(1.1); }
+.branch-row.pr { --mini-pr-color: #1f883d; }
+.pr-chip.draft, .branch-row.draft { --mini-pr-color: #59636e; }
+.pr-chip.merged, .branch-row.merged { --mini-pr-color: #8250df; }
+.pr-chip.closed, .branch-row.closed { --mini-pr-color: #cf222e; }
+.branch-row.pr .octicon { color: var(--mini-pr-color); }
 
 
 select, input[type="search"] {
@@ -405,6 +477,7 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
 }
 @media (max-width: 480px) {
   .changes .added, .changes .deleted { display: none; }
+  .branch .ab { display: none; }
 }
 /* Too narrow for a branch's name to be read: its icon, which tells it on
    hover */
@@ -803,6 +876,13 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
 .diff-path { min-width: 0; overflow-wrap: anywhere; font-family: var(--mini-font-mono); font-size: 12px; font-weight: 600; }
 .diff-path .from { font-weight: 400; color: var(--fgColor-muted); }
 .stage { padding: 0 7px; color: var(--fgColor-muted); font-size: 12px; line-height: 18px; border: 1px dashed var(--borderColor-default); border-radius: 2em; }
+.stage-committed { border-style: solid; }
+.stage-uncommitted { color: var(--fgColor-attention); border-color: var(--fgColor-attention); }
+/* The commits since the base, as a pull request lists them */
+.commits .commit { padding: 8px 16px; }
+.commits .commit + .commit { border-top: 1px solid var(--borderColor-muted); }
+.commits .commit-subject { color: var(--fgColor-default); }
+.unpushed { padding: 0 6px; color: var(--fgColor-attention); font-size: 11px; white-space: nowrap; border: 1px dashed currentColor; border-radius: 2em; }
 .diff-stat { font-family: var(--mini-font-mono); font-size: 12px; white-space: nowrap; }
 .blocks { display: inline-flex; gap: 1px; }
 .blocks i { width: 8px; height: 8px; border-radius: 1px; background: var(--bgColor-neutral-muted); }

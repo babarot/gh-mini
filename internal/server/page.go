@@ -59,6 +59,9 @@ type layout struct {
 	Owner  string
 	Repo   string
 	Branch string
+	// BranchInfo is where the branch stands against its base, set on a
+	// branch other than the base
+	BranchInfo *workspace.BranchInfo
 	// Changes counts what changed since the last commit, in a git
 	// repository only
 	Changes *changesView
@@ -122,6 +125,11 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 			p.Crumbs = append(p.Crumbs, crumb{Name: name, Href: dirHref(strings.Join(parts[:i+1], "/"))})
 		}
 		p.Ignored = snap.Ignored(rel)
+	}
+	if b := s.ws.Branch(); b != nil && !b.OnBase {
+		p.BranchInfo, p.Branch = b, b.Branch
+		// Tabs of worktrees of one repository tell apart by it
+		p.Title += " · " + p.Branch
 	}
 	return p
 }

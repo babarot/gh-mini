@@ -30,7 +30,9 @@ type Event struct {
 	// Structure is set when files were added, removed or renamed, or a
 	// .gitignore changed.
 	Structure bool
-	// GitHead is set when HEAD moved, as when switching branches.
+	// GitHead is set when HEAD moved, as when switching branches or
+	// committing, or a branch of origin did, as a fetch or a push moves
+	// one.
 	GitHead bool
 	// Status is set when what changed since the last commit is not what
 	// it was: a file edited, staged, committed or restored.
@@ -75,6 +77,10 @@ type Watcher struct {
 	ws        *Workspace
 	recursive bool
 	gitDir    string
+	// commonDir is the git directory a worktree shares with its
+	// repository, where the refs are; the git directory itself outside a
+	// worktree
+	commonDir string
 	// ignores are the directories outside the root holding what tells git
 	// what to ignore in it, each with the file names that do: the
 	// .gitignore of the directories between the repository's top and the
@@ -87,6 +93,10 @@ type Watcher struct {
 	handlers []func(Event)
 	stop     chan struct{}
 	wg       sync.WaitGroup
+	// head is HEAD's commit as last told, so that a commit, which moves
+	// HEAD without writing HEAD itself, is told as HEAD moving; only the
+	// flushing goroutine uses it
+	head string
 
 	// bmu guards the burst gathered by the reading goroutine and taken by
 	// the flushing one, so that reading never waits for a flush
@@ -119,9 +129,12 @@ type burst struct {
 	seen        map[string]bool
 	gitHead     bool
 	gitIndex    bool
-	theme       bool
-	gitignore   bool
-	resync      bool
+	// headLog is set when logs/HEAD was written, as every move of HEAD
+	// writes it, and some writes that move nothing
+	headLog   bool
+	theme     bool
+	gitignore bool
+	resync    bool
 }
 
 func (b *burst) empty() bool { return b.first.IsZero() }
@@ -159,6 +172,7 @@ func Watch(ws *Workspace, themesDir string, handlers ...func(Event)) (*Watcher, 
 	// is kept rather than built again on the next request
 	ws.watched.Store(true)
 	snap := ws.Snapshot()
+	w.head = gitOutput(root, "rev-parse", "-q", "--verify", "HEAD")
 	if w.recursive {
 		if err := fw.AddRecursive(root, fswatcher.All); err != nil {
 			fw.Close()
@@ -183,6 +197,9 @@ func Watch(ws *Workspace, themesDir string, handlers ...func(Event)) (*Watcher, 
 				log.Printf("watch %s: %v", filepath.Join(gitDir, "logs"), err)
 			}
 		}
+	}
+	if w.gitDir != "" {
+		w.watchRefs(root)
 	}
 	w.ignores = ignoreDirs(root)
 	for dir := range w.ignores {
@@ -238,6 +255,47 @@ func (w *Watcher) WatchThemes() {
 	if err := w.fw.Add(w.themesDir, fswatcher.All); err == nil {
 		w.themesOn.Store(true)
 	}
+}
+
+// watchRefs follows the refs a fetch or a push moves, origin's branches,
+// which tell where the branch stands against its base. They are in the
+// common git directory, which a worktree shares with its repository. A
+// fetch writes FETCH_HEAD there and a pull or a push may write
+// packed-refs or refs/remotes/origin/<name>; elsewhere than on macOS a
+// watch is not recursive, so a branch of origin named with a slash, as
+// origin/feature/x, is not followed, and is read again on the next page.
+func (w *Watcher) watchRefs(root string) {
+	common := gitOutput(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if common == "" {
+		return
+	}
+	if real, err := filepath.EvalSymlinks(common); err == nil {
+		common = real
+	}
+	w.commonDir = common
+	// The git directory itself is watched already, and the root on macOS
+	// with all under it
+	covered := func(dir string) bool {
+		return dir == w.gitDir || w.recursive && strings.HasPrefix(dir, root+string(filepath.Separator))
+	}
+	for _, dir := range []string{common, filepath.Join(common, "refs", "remotes", "origin")} {
+		if covered(dir) {
+			continue
+		}
+		if err := w.fw.Add(dir, fswatcher.All); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			log.Printf("watch %s: %v", dir, err)
+		}
+	}
+}
+
+// refMoved tells whether a path in the common git directory is one a
+// fetch, a pull or a push writes when a branch of origin moves.
+func (w *Watcher) refMoved(name string) bool {
+	switch name {
+	case filepath.Join(w.commonDir, "FETCH_HEAD"), filepath.Join(w.commonDir, "packed-refs"):
+		return true
+	}
+	return strings.HasPrefix(name, filepath.Join(w.commonDir, "refs", "remotes")+string(filepath.Separator))
 }
 
 // rel returns a path under the root relative to it, slash-separated, or
@@ -313,11 +371,20 @@ func (w *Watcher) add(e fswatcher.Event) {
 		switch {
 		case e.Name == filepath.Join(w.gitDir, "HEAD"):
 			b.gitHead = true
-		case e.Name == filepath.Join(w.gitDir, "index"), e.Name == filepath.Join(w.gitDir, "logs", "HEAD"):
+		case e.Name == filepath.Join(w.gitDir, "index"):
 			b.gitIndex = true
+		case e.Name == filepath.Join(w.gitDir, "logs", "HEAD"):
+			b.gitIndex, b.headLog = true, true
+		case w.refMoved(e.Name):
+			b.gitHead = true
 		default:
 			return
 		}
+	case w.commonDir != w.gitDir && (e.Name == w.commonDir || strings.HasPrefix(e.Name, w.commonDir+string(filepath.Separator))):
+		if !w.refMoved(e.Name) {
+			return
+		}
+		b.gitHead = true
 	case w.themesDir != "" && e.Name == w.themesDir:
 		// The watch ends with the directory; WatchThemes starts it again
 		if _, err := os.Stat(w.themesDir); err != nil {
@@ -378,6 +445,12 @@ func (w *Watcher) flushLoop() {
 }
 
 func (w *Watcher) flush(b burst) {
+	if b.headLog || b.gitHead || b.resync {
+		if head := gitOutput(w.ws.opts.Root, "rev-parse", "-q", "--verify", "HEAD"); head != w.head {
+			w.head = head
+			b.gitHead = true
+		}
+	}
 	snap := w.ws.Snapshot()
 	structure := b.gitignore || b.resync || w.structureChanged(snap, b.paths)
 	// A change under a directory git ignores changes no file git sees
@@ -392,7 +465,10 @@ func (w *Watcher) flush(b burst) {
 	// git writes its index for other reasons too, such as a status run
 	// by an editor: only a change of status is told
 	if status {
-		e.Status = w.ws.Snapshot().StatusETag != snap.StatusETag
+		now := w.ws.Snapshot()
+		// What changed since the base changes alone when the base is
+		// merged, or a commit is amended with nothing left uncommitted
+		e.Status = now.StatusETag != snap.StatusETag || now.BaseStatusETag != snap.BaseStatusETag
 	}
 	e.Paths, e.Dirs = limitPaths(snap, b.paths)
 	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.GitHead && !e.Status && !e.Theme && !e.Resync {

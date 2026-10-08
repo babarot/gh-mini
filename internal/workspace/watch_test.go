@@ -461,6 +461,9 @@ func TestWatchPerDirectory(t *testing.T) {
 		"symlink":              TestWatchSymlink,
 		"past dangling":        TestWatchPastDanglingSymlink,
 		"themes created later": TestWatchThemesCreatedLater,
+		"refs":                 TestWatchRefs,
+		"refs of worktree":     TestWatchRefsOfWorktree,
+		"commit moves head":    TestWatchCommitMovesHead,
 	} {
 		t.Run(name, test)
 	}

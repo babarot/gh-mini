@@ -10,6 +10,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os/exec"
 	"path"
 	"slices"
 	"time"
@@ -73,6 +74,10 @@ type Server struct {
 	// boot tells this process from the one before it: a page from an
 	// earlier run reloads when the event stream gives another one
 	boot string
+	// gh is the path of gh, which tells the branch's pull request, or ""
+	// when it is not found
+	gh  string
+	prs prCache
 }
 
 // New opens the root and, when reloading is on, starts watching it.
@@ -116,6 +121,7 @@ func New(opts Options) (*Server, error) {
 	if opts.PreviewPort != 0 {
 		s.previewToken = newPreviewToken()
 	}
+	s.gh, _ = exec.LookPath("gh")
 	// A default theme that does not exist would leave pages unstyled
 	// with nothing to say why
 	if opts.Theme != "" && !slices.Contains(s.themes(), opts.Theme) {
@@ -148,6 +154,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/_mini/theme/", s.serveTheme)
 	mux.HandleFunc("/_mini/api/tree", s.serveTree)
 	mux.HandleFunc("/_mini/api/status", s.serveStatus)
+	mux.HandleFunc("/_mini/api/branch", s.serveBranch)
+	mux.HandleFunc("/_mini/api/pr", s.servePR)
 	mux.HandleFunc("/_mini/changes", s.serveChangesPage)
 	mux.HandleFunc("/_mini/events", s.serveEvents)
 	mux.HandleFunc("/_mini/api/changes", s.serveChanges)
@@ -180,6 +188,19 @@ func (s *Server) serveTree(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(snap.TreeJSON)
+}
+
+// serveBranch serves where the branch stands against its base as JSON,
+// null on the base itself or without one. It is read again whenever HEAD
+// or a branch of origin moves.
+func (s *Server) serveBranch(w http.ResponseWriter, r *http.Request) {
+	b := s.ws.Branch()
+	if b != nil && b.OnBase {
+		b = nil
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(b)
 }
 
 // serveStatus serves what changed since the last commit as JSON, with an

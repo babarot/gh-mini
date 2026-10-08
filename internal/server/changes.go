@@ -14,6 +14,9 @@ type changesView struct {
 	Files   int
 	Added   int
 	Deleted int
+	// Base is the base they are counted from on a branch, or "" for
+	// those since the last commit
+	Base string
 	// ETag tells which status the page was rendered with, without the
 	// quotes of the header
 	ETag string
@@ -23,23 +26,38 @@ func newChangesView(st *workspace.Status, etag string) *changesView {
 	if st == nil {
 		return nil
 	}
-	return &changesView{Files: len(st.Files), Added: st.Added, Deleted: st.Deleted, ETag: strings.Trim(etag, `"`)}
+	return &changesView{Files: len(st.Files), Added: st.Added, Deleted: st.Deleted, Base: st.Base, ETag: strings.Trim(etag, `"`)}
 }
 
-// statusFor is what changed since the last commit as the viewer's settings
-// show it, encoded, and an ETag of that: nil outside a git repository and
-// with Changes off, and without untracked files when those are left out.
+// statusFor is what the pages show as changed, as the viewer's settings
+// show it, encoded, and an ETag of that: on a branch other than the base,
+// what changed since it left the base, and else since the last commit.
+// It is nil outside a git repository and with Changes off, and without
+// untracked files when those are left out.
 func (s *Server) statusFor(snap *workspace.Snapshot, settings map[string]string) (*workspace.Status, []byte, string) {
-	st := snap.Status
+	if snap.BaseStatus != nil {
+		return settingsApplied(snap.BaseStatus, snap.BaseStatusJSON, snap.BaseStatusETag, settings)
+	}
+	return settingsApplied(snap.Status, snap.StatusJSON, snap.StatusETag, settings)
+}
+
+// headStatusFor is what changed since the last commit, on any branch, as
+// statusFor tells it.
+func (s *Server) headStatusFor(snap *workspace.Snapshot, settings map[string]string) *workspace.Status {
+	st, _, _ := settingsApplied(snap.Status, snap.StatusJSON, snap.StatusETag, settings)
+	return st
+}
+
+func settingsApplied(st *workspace.Status, b []byte, etag string, settings map[string]string) (*workspace.Status, []byte, string) {
 	if st == nil || !st.Git || settings["changes"] == "false" {
 		return nil, nil, ""
 	}
 	if settings["untracked"] != "false" {
-		return st, snap.StatusJSON, snap.StatusETag
+		return st, b, etag
 	}
 	st = st.WithoutUntracked()
-	b, _ := json.Marshal(st)
-	return st, b, strings.TrimSuffix(snap.StatusETag, `"`) + `-tracked"`
+	b, _ = json.Marshal(st)
+	return st, b, strings.TrimSuffix(etag, `"`) + `-tracked"`
 }
 
 // statusLabels name the letters of workspace.FileStatus.

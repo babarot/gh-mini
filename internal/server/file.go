@@ -65,6 +65,8 @@ type commitView struct {
 	Date string
 	// URL is the commit on GitHub, when it was pushed there
 	URL string
+	// Unpushed is set when no remote branch has the commit
+	Unpushed bool
 }
 
 type viewTab struct {
@@ -290,12 +292,19 @@ func (s *Server) lastCommit(rel string) *commitView {
 	if c == nil {
 		return nil
 	}
+	return s.commitView(c)
+}
+
+// commitView is how a commit is shown, with its author's picture and a
+// link to it on GitHub when the repository is there.
+func (s *Server) commitView(c *workspace.Commit) *commitView {
 	v := &commitView{
-		Author:  c.Author,
-		Subject: c.Subject,
-		Short:   c.SHA[:min(7, len(c.SHA))],
-		Ago:     ago(c.Time),
-		Date:    c.Time.Format(dateLayout),
+		Author:   c.Author,
+		Subject:  c.Subject,
+		Short:    c.SHA[:min(7, len(c.SHA))],
+		Ago:      ago(c.Time),
+		Date:     c.Time.Format(dateLayout),
+		Unpushed: !c.Pushed,
 	}
 	if repo := s.ws.Repo(); repo != "" {
 		// GitHub answers an email it does not know with a generated

@@ -71,8 +71,9 @@ type Workspace struct {
 	gen atomic.Uint64
 	// watched is set once a Watcher invalidates the snapshot on changes.
 	// Until then, every Snapshot is rebuilt from scratch.
-	watched atomic.Bool
-	commits commitCache
+	watched  atomic.Bool
+	commits  commitCache
+	branches branchCache
 }
 
 // Snapshot is the state of a workspace at one time. It is never modified,
@@ -94,8 +95,14 @@ type Snapshot struct {
 	Status     *Status
 	StatusJSON []byte
 	StatusETag string
-	ignored    map[string]bool
-	gen        uint64
+	// BaseStatus is what changed since the branch left its base, on a
+	// branch other than the base, encoded and hashed as Status is; nil on
+	// the base or without one
+	BaseStatus     *Status
+	BaseStatusJSON []byte
+	BaseStatusETag string
+	ignored        map[string]bool
+	gen            uint64
 	// dirs are the tree's directories by path, "." for the root
 	dirs  map[string]*Node
 	built time.Time
@@ -207,9 +214,14 @@ func (w *Workspace) Snapshot() *Snapshot {
 	// Files added or removed change it too, and the tree it reads
 	if prev == nil || bits&(dirtyStatus|dirtyStructure|dirtyGitHead) != 0 {
 		next.Status = w.status(next)
-		next.StatusJSON, _ = json.Marshal(next.Status)
-		sum := sha256.Sum256(next.StatusJSON)
-		next.StatusETag = `"` + hex.EncodeToString(sum[:8]) + `"`
+		next.StatusJSON, next.StatusETag = encodeStatus(next.Status)
+		// Where the branch left its base is found again each time: a
+		// merge of the base moves it, and writes no HEAD
+		next.BaseStatus = w.baseStatus(next.Status)
+		next.BaseStatusJSON, next.BaseStatusETag = nil, ""
+		if next.BaseStatus != nil {
+			next.BaseStatusJSON, next.BaseStatusETag = encodeStatus(next.BaseStatus)
+		}
 	}
 	w.snap.Store(next)
 	return next
@@ -239,6 +251,22 @@ func (w *Workspace) ignoredTree() (map[string]bool, *Node, map[string]*Node) {
 			return ignored, tree, dirs
 		}
 	}
+}
+
+func encodeStatus(st *Status) ([]byte, string) {
+	b, _ := json.Marshal(st)
+	sum := sha256.Sum256(b)
+	return b, `"` + hex.EncodeToString(sum[:8]) + `"`
+}
+
+// baseStatus is what changed since the branch left its base, or nil on the
+// base, without one, or outside a repository.
+func (w *Workspace) baseStatus(head *Status) *Status {
+	b := w.Branch()
+	if b == nil || b.OnBase || !head.Git {
+		return nil
+	}
+	return gitBaseStatus(w.opts.Root, b.Base, b.mergeBase, w.opts.Skip, head)
 }
 
 func (w *Workspace) status(s *Snapshot) *Status {
