@@ -274,6 +274,10 @@ func TestImageLinks(t *testing.T) {
 	for src, want := range map[string]string{
 		"![shot](shot.png)\n":             `<a href="shot.png" target="_blank" rel="noopener noreferrer"><img src="shot.png" alt="shot"></a>`,
 		"[![badge](b.svg)](https://ci)\n": `<a href="https://ci"><img src="b.svg" alt="badge"></a>`,
+		// In a link written in HTML, inline and around a block
+		`<a href="https://ci">![badge](b.svg)</a>` + "\n":                  `<a href="https://ci" rel="nofollow"><img src="b.svg" alt="badge"></a>`,
+		"<a href=\"https://ci\">\n\n![badge](b.svg)\n\n</a>\n":             `<p><img src="b.svg" alt="badge"></p>`,
+		`<a href="https://ci">x</a> ![after](a.png) <abbr>y</abbr>` + "\n": `<a href="a.png" target="_blank" rel="noopener noreferrer"><img src="a.png" alt="after"></a>`,
 	} {
 		out, _ := render(t, src)
 		if !strings.Contains(string(out), want) {
