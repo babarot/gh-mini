@@ -125,8 +125,15 @@ func renderHTMLBlock(w util.BufWriter, source []byte, node ast.Node, entering bo
 // take the place of the page's own element, or a heading's. A link to
 // #top finds user-content-top in the page.
 func sanitize(b []byte) []byte {
+	b = tagFilter.ReplaceAll(b, []byte("&lt;$1"))
 	return idAttr.ReplaceAll(rawHTMLPolicy.SanitizeBytes(b), []byte("${1}"+userContent))
 }
+
+// tagFilter is the tags GFM's tagfilter shows as text, as GitHub does,
+// that the policy would drop leaving their content as if it were the
+// page's: <textarea>x</textarea> shows as written. Scripts, styles and
+// frames are dropped with their content instead.
+var tagFilter = regexp.MustCompile(`(?i)<(/?(?:textarea|title|xmp|noembed|noframes|plaintext)\b)`)
 
 // userContent is put before the ids and names a file's HTML gives.
 const userContent = "user-content-"
