@@ -42,6 +42,8 @@ go install github.com/babarot/gh-mini@latest
 | `--skip` | `.git,node_modules,.DS_Store` | Names left out of the tree |
 | `--translations` | `$GH_MINI_TRANSLATIONS`, else `suffix` | How translations are named (see [Translations](#translations)) |
 
+Flags set up what a gh-mini serves and what it can do. The settings in the page are how you like to see it, within that, and are kept per browser for every gh-mini. A flag that gives a setting's default, as `--theme` does, gives way to what you pick in the settings.
+
 ## HTML previews
 
 An HTML file's Preview shows it as a browser does, with its styles, images and scripts, module scripts and `fetch` included. Turn on HTML preview in the settings to open HTML files that way; the Preview / Code switch works either way.
@@ -109,7 +111,7 @@ go run ./hack/gencss internal/server/assets/vendor/github-markdown-light.css \
   internal/server/assets/vendor/github-markdown-dark.css internal/server/assets/markdown.css
 ```
 
-Settings are listed in [settings.go](internal/server/settings.go); adding one there adds it to the dialog, and the comment at the top of the file tells how its value reaches the page.
+Settings are listed in [settings.go](internal/server/settings.go); adding one there adds it to the dialog, and the comment at the top of the file tells how its value reaches the page. Whether a new option is a flag or a setting is told in [Flags and settings](docs/concepts/flags-and-settings.md).
 
 ## License
 

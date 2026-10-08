@@ -14,6 +14,10 @@ import (
 // renders the first paint with them; localStorage would only be read after
 // the page shows.
 //
+// A setting is how the viewer likes to see what is served, never a fact
+// of the directory served; docs/concepts/flags-and-settings.md tells what
+// is a flag and what a setting.
+//
 // The cookie holds only the keys the viewer picked. A key left out follows
 // the server's default, such as --theme, and is never written back. Every
 // gh-mini on localhost shares the cookie, whatever its port, so the page
