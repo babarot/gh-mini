@@ -5,7 +5,7 @@ import "testing"
 // The preview of an HTML file takes the height of the window, and the box
 // of its last commit above it stays a line.
 func TestHTMLPreviewLayout(t *testing.T) {
-	a := newRepoApp(t, map[string]string{"page.html": "<!doctype html><h1>Page</h1>\n"})
+	a := newRepoApp(t, map[string]string{"page.html": "<!doctype html><h1>Page</h1>\n"}, func(a *app) {})
 	ctx := tab(t)
 	open(t, ctx, a.URL("/page.html?preview=1"))
 	waitFor(t, ctx, `document.body.dataset.kind === "html" && document.querySelector(".commit") !== null`)
