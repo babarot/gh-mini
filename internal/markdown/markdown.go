@@ -57,6 +57,7 @@ func New(repo string) *Renderer {
 				util.Prioritized(taskListTransformer{}, 100),
 				util.Prioritized(mathCodeTransformer{}, 100),
 				util.Prioritized(issueRefTransformer{repo: repo}, 100),
+				util.Prioritized(issueURLTransformer{repo: repo}, 100),
 				util.Prioritized(extension.NewFootnoteASTTransformer(), 999),
 			),
 		),

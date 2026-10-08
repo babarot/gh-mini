@@ -8,7 +8,9 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-var issueRef = regexp.MustCompile(`(?:([A-Za-z0-9][-A-Za-z0-9]*)/([-A-Za-z0-9_.]+))?#([0-9]+)\b`)
+// issueRef finds #123, owner/name#123 and GH-123, GitHub's other way to
+// write #123.
+var issueRef = regexp.MustCompile(`(?:([A-Za-z0-9][-A-Za-z0-9]*)/([-A-Za-z0-9_.]+))?#([0-9]+)\b|\bGH-([0-9]+)\b`)
 
 // issueRefTransformer links #123 to an issue of the repository, and
 // owner/name#123 to one of another, as GitHub does. It leaves alone what
@@ -105,8 +107,10 @@ func (t issueRefTransformer) link(src []byte, run []*ast.Text) {
 		switch {
 		case m[2] >= 0:
 			url = "https://github.com/" + string(src[m[2]:m[5]]) + "/issues/" + string(src[m[6]:m[7]])
-		case t.repo != "":
+		case m[6] >= 0 && t.repo != "":
 			url = "https://github.com/" + t.repo + "/issues/" + string(src[m[6]:m[7]])
+		case m[8] >= 0 && t.repo != "":
+			url = "https://github.com/" + t.repo + "/issues/" + string(src[m[8]:m[9]])
 		default:
 			continue
 		}
@@ -141,4 +145,41 @@ func (t issueRefTransformer) link(src []byte, run []*ast.Text) {
 func isRefGlue(c byte) bool {
 	return c == '_' || c == '/' || c == '\\' || c == '&' || c == '#' || c == '.' || c == '-' ||
 		'0' <= c && c <= '9' || 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z'
+}
+
+// issueURL finds a link to an issue, a pull request or a discussion on
+// GitHub, which GitHub shows as owner/name#123, or #123 in its own
+// repository.
+var issueURL = regexp.MustCompile(`^https://github\.com/([^/]+/[^/]+)/(?:issues|pull|discussions)/([0-9]+)/?$`)
+
+// issueURLTransformer shortens a bare link to an issue as GitHub does.
+type issueURLTransformer struct {
+	repo string
+}
+
+func (t issueURLTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
+	src := reader.Source()
+	var links []*ast.AutoLink
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if l, ok := n.(*ast.AutoLink); ok && entering && l.AutoLinkType == ast.AutoLinkURL {
+			links = append(links, l)
+		}
+		return ast.WalkContinue, nil
+	})
+	for _, l := range links {
+		url := l.URL(src)
+		m := issueURL.FindSubmatch(url)
+		if m == nil {
+			continue
+		}
+		label := string(m[1]) + "#" + string(m[2])
+		if string(m[1]) == t.repo {
+			label = "#" + string(m[2])
+		}
+		link := ast.NewLink()
+		link.Destination = url
+		link.SetAttributeString("class", "issue-link")
+		link.AppendChild(link, ast.NewString([]byte(label)))
+		l.Parent().ReplaceChild(l.Parent(), l, link)
+	}
 }

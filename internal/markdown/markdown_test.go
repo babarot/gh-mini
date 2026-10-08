@@ -304,7 +304,7 @@ func TestHeadingIDsFromText(t *testing.T) {
 
 func TestImageLinks(t *testing.T) {
 	for src, want := range map[string]string{
-		"![shot](shot.png)\n": `<a href="shot.png" target="_blank" rel="noopener noreferrer"><img src="shot.png" alt="shot"></a>`,
+		"![shot](shot.png)\n":             `<a href="shot.png" target="_blank" rel="noopener noreferrer"><img src="shot.png" alt="shot"></a>`,
 		"[![badge](b.svg)](https://ci)\n": `<a href="https://ci"><img src="b.svg" alt="badge"></a>`,
 	} {
 		out, _ := render(t, "", src)
@@ -314,5 +314,19 @@ func TestImageLinks(t *testing.T) {
 	}
 	if out, _ := render(t, "", "![x](data:image/png;base64,AAAA)\n"); strings.Contains(string(out), "<a") {
 		t.Errorf("a data: image is linked: %s", out)
+	}
+}
+
+func TestMoreIssueRefs(t *testing.T) {
+	for src, want := range map[string]string{
+		"See GH-5.\n": `<a href="https://github.com/acme/widget/issues/5" class="issue-link">GH-5</a>`,
+		"https://github.com/acme/widget/issues/9\n":       `<a href="https://github.com/acme/widget/issues/9" class="issue-link">#9</a>`,
+		"https://github.com/other/repo/pull/12\n":         `<a href="https://github.com/other/repo/pull/12" class="issue-link">other/repo#12</a>`,
+		"https://github.com/acme/widget/blob/main/x.go\n": `>https://github.com/acme/widget/blob/main/x.go</a>`,
+	} {
+		out, _ := render(t, "acme/widget", src)
+		if !strings.Contains(string(out), want) {
+			t.Errorf("%q: got %s, want %s", src, out, want)
+		}
 	}
 }
