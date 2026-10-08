@@ -88,7 +88,7 @@ func parseArgs(args []string, stderr io.Writer) (config, error) {
 		return server.CheckTranslations(v)
 	})
 	fs.StringVar(&skip, "skip", ".git,node_modules,.DS_Store", "comma-separated names left out of the tree")
-	fs.StringVar(&c.themesDir, "themes", c.themesDir, "directory of themes")
+	fs.StringVar(&c.themesDir, "theme-dir", c.themesDir, "directory of themes")
 	fs.BoolVar(&c.version, "version", false, "print the version")
 	fs.Usage = func() {
 		fmt.Fprintf(stderr, usage, c.themesDir)

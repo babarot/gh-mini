@@ -178,7 +178,7 @@ func TestParseArgs(t *testing.T) {
 	t.Setenv("GH_MINI_THEME", "sepia")
 	c, err := parseArgs([]string{
 		"-p", "8000", "--host", "0.0.0.0", "--no-open", "--no-reload",
-		"--skip", "dist, .cache", "--themes", "/t", "docs",
+		"--skip", "dist, .cache", "--theme-dir", "/t", "docs",
 	}, io.Discard)
 	if err != nil {
 		t.Fatal(err)

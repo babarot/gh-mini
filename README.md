@@ -37,7 +37,7 @@ go install github.com/babarot/gh-mini@latest
 | `--no-open` | | Do not open the browser |
 | `--no-reload` | | Do not reload pages when files change |
 | `--theme` | `$GH_MINI_THEME` | Theme until one is picked in the settings |
-| `--themes` | `~/.config/gh-mini/themes` | Directory of themes |
+| `--theme-dir` | `~/.config/gh-mini/themes` | Directory of themes |
 | `--preview-port` | a free one | Port HTML previews are served on, printed at start |
 | `--skip` | `.git,node_modules,.DS_Store` | Names left out of the tree |
 | `--translations` | `$GH_MINI_TRANSLATIONS`, else `suffix` | How translations are named until others are picked in the settings (see [Translations](#translations)) |
