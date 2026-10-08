@@ -4,17 +4,19 @@ import (
 	"container/list"
 	"html/template"
 	"io/fs"
+	"path"
 	"sync"
 
 	"github.com/babarot/gh-mini/internal/markdown"
 )
 
-// maxRenderCache bounds the rendered Markdown kept, in bytes of HTML.
+// maxRenderCache bounds the rendered files kept, in bytes of HTML.
 const maxRenderCache = 32 << 20
 
-// renderCache keeps rendered Markdown by file, its modification time and
-// size, dropping the least recently used first. Rendering a large file
-// takes long enough to be felt: about 80ms for 200KB.
+// renderCache keeps rendered Markdown and highlighted code by file, its
+// modification time and size, dropping the least recently used first.
+// Rendering a large file takes long enough to be felt: about 80ms for
+// 200KB of Markdown, and half a second for 512KB of code.
 type renderCache struct {
 	mu    sync.Mutex
 	max   int
@@ -27,6 +29,8 @@ type renderKey struct {
 	path string
 	mod  int64
 	size int64
+	// code is the file shown as code, rather than Markdown rendered
+	code bool
 }
 
 type rendered struct {
@@ -84,4 +88,19 @@ func (s *Server) renderMarkdownFile(rel string, info fs.FileInfo, src []byte) (t
 	}
 	s.renders.put(&rendered{key: k, html: html, f: f})
 	return html, f, nil
+}
+
+// renderCodeFile highlights the source file at rel, whose contents are src,
+// reusing what was rendered while the file is unchanged.
+func (s *Server) renderCodeFile(rel string, info fs.FileInfo, src []byte, highlight bool) (template.HTML, error) {
+	k := renderKey{path: rel, mod: info.ModTime().UnixNano(), size: info.Size(), code: true}
+	if r, ok := s.renders.get(k); ok {
+		return r.html, nil
+	}
+	html, err := renderCode(path.Base(rel), src, highlight)
+	if err != nil {
+		return "", err
+	}
+	s.renders.put(&rendered{key: k, html: html})
+	return html, nil
 }

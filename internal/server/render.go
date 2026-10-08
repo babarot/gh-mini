@@ -21,11 +21,15 @@ func (s *Server) renderMarkdown(src []byte) (template.HTML, markdown.Features, e
 }
 
 // renderCode highlights a source file with line numbers that link to #L<n>,
-// as GitHub's blob view does.
-func renderCode(name string, src []byte) (template.HTML, error) {
-	lexer := lexers.Match(name)
-	if lexer == nil {
-		lexer = lexers.Analyse(string(src))
+// as GitHub's blob view does. Without highlight, the file keeps its line
+// numbers but is shown as plain text.
+func renderCode(name string, src []byte, highlight bool) (template.HTML, error) {
+	var lexer chroma.Lexer
+	if highlight {
+		lexer = lexers.Match(name)
+		if lexer == nil {
+			lexer = lexers.Analyse(string(src))
+		}
 	}
 	if lexer == nil {
 		lexer = lexers.Fallback

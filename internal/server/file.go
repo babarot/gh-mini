@@ -22,6 +22,12 @@ import (
 // maxRender is the largest file rendered; larger ones only get a raw link.
 const maxRender = 2 << 20
 
+// maxHighlight is the largest source file highlighted; larger ones are
+// shown as plain text with their line numbers. Highlighting takes about a
+// second for each megabyte and puts around 28 elements on each line,
+// which the browser takes longer still to lay out.
+const maxHighlight = 512 << 10
+
 // fileView is a file's page.
 type fileView struct {
 	Content template.HTML
@@ -214,7 +220,11 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 			v.Content, p.Features, err = s.renderMarkdownFile(rel, info, b)
 		} else {
 			p.Kind = "code"
-			v.Content, err = renderCode(path.Base(rel), b)
+			highlight := len(b) <= maxHighlight
+			if !highlight && v.Notice == "" {
+				v.Notice = "This file is too large to highlight, so it is shown as plain text."
+			}
+			v.Content, err = s.renderCodeFile(rel, info, b, highlight)
 		}
 		if err != nil {
 			s.serveError(w, r, snap, rel, err)

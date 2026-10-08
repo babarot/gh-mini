@@ -384,6 +384,27 @@ func TestHandlerTooLarge(t *testing.T) {
 	}
 }
 
+// A source file too large to highlight is shown as plain text, its lines
+// still numbered.
+func TestHandlerTooLargeToHighlight(t *testing.T) {
+	root, _ := newTestRepo(t)
+	line := []byte("func f() {}\n")
+	writeFile(t, filepath.Join(root, "big.go"), bytes.Repeat(line, maxHighlight/len(line)+1))
+	writeFile(t, filepath.Join(root, "small.go"), line)
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { srv.Close() })
+	h := srv.Handler()
+	r := get(t, h, "/big.go")
+	r.expect(t, http.StatusOK, `data-kind="code"`, "too large to highlight", `id="L1"`)
+	r.reject(t, `class="kd"`)
+	r = get(t, h, "/small.go")
+	r.expect(t, http.StatusOK, `class="kd"`)
+	r.reject(t, "too large to highlight")
+}
+
 func TestHandlerNotFound(t *testing.T) {
 	get(t, newTestServer(t), "/nope").expect(t, http.StatusNotFound, `data-kind="notfound"`)
 }

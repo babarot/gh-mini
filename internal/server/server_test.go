@@ -112,7 +112,7 @@ func TestRenderCodeLexer(t *testing.T) {
 		// Neither: plain text, still with line numbers
 		{"notes", "just words\n", "just words"},
 	} {
-		got, err := renderCode(tt.name, []byte(tt.src))
+		got, err := renderCode(tt.name, []byte(tt.src), true)
 		if err != nil {
 			t.Fatalf("renderCode(%q): %v", tt.name, err)
 		}
