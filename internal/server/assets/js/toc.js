@@ -5,7 +5,7 @@ import { ICON_LINK } from "./util.js";
 export function initToc() {
   const article = document.querySelector(".markdown-body");
   if (!article) return;
-  article.querySelectorAll("h1[id], h2[id], h3[id], h4[id]").forEach((h) => {
+  article.querySelectorAll("h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]").forEach((h) => {
     const a = document.createElement("a");
     a.className = "anchor";
     a.href = "#" + h.id;
@@ -27,6 +27,7 @@ export function initToc() {
     }
   });
   if (!heads.length) return;
+  initToggle(toc, links);
   // Headings near the end of a page never reach the top of the window,
   // because the page stops scrolling first. At the bottom, the heading
   // the reader jumped to stays active while it is in view; otherwise the
@@ -76,4 +77,27 @@ function decodeFragment(hash) {
   } catch (e) {
     return raw;
   }
+}
+
+// initToggle lets the Outline button open the table of contents over the
+// page when the window is too narrow for its column. A choice, a click
+// elsewhere or Esc closes it.
+function initToggle(toc, links) {
+  const buttons = Array.from(document.querySelectorAll("[data-toc-toggle]"));
+  if (!buttons.length) return;
+  const set = (open) => {
+    document.body.classList.toggle("toc-open", open);
+    buttons.forEach((b) => b.setAttribute("aria-expanded", String(open)));
+  };
+  buttons.forEach((b) => b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    set(!document.body.classList.contains("toc-open"));
+  }));
+  links.forEach((a) => a.addEventListener("click", () => set(false)));
+  document.addEventListener("click", (e) => {
+    if (!toc.contains(e.target)) set(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") set(false);
+  });
 }

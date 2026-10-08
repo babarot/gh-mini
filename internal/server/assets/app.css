@@ -386,8 +386,28 @@ body[data-kind="html"] .main > .box {
 .toc a.active { color: var(--fgColor-accent); font-weight: 600; }
 .toc .l3 { padding-left: 12px; }
 .toc .l4 { padding-left: 24px; }
+.toc .l5 { padding-left: 36px; }
+.toc .l6 { padding-left: 48px; }
+.toc-toggle { display: none; }
 
-@media (max-width: 1279px) { .toc { display: none; } }
+/* Too narrow for the column: an Outline button opens it over the page */
+@media (max-width: 1279px) {
+  .toc { display: none; }
+  .toc-toggle { display: inline-flex; align-items: center; padding: 3px 8px; }
+  body.toc-open .toc {
+    display: block;
+    position: fixed;
+    z-index: 30;
+    top: calc(var(--mini-topbar-height) + 8px);
+    right: 16px;
+    width: min(320px, calc(100vw - 32px));
+    max-height: 70vh;
+    background: var(--bgColor-default);
+    border: 1px solid var(--borderColor-default);
+    border-radius: var(--mini-radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  }
+}
 @media (max-width: 767px) {
   .sidebar { display: none; }
   body.sidebar-shown .sidebar {

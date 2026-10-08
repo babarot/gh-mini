@@ -133,6 +133,9 @@
         <a href="{{href (join $.Path .Readme)}}">{{.Readme}}</a>
         <span class="spacer"></span>
         {{template "langs" .Langs}}
+        {{- if gt (len $.Features.Headings) 1}}
+        <button type="button" class="btn toc-toggle" data-toc-toggle aria-controls="mini.toc" aria-expanded="false" title="Outline"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M5.75 2.5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5ZM2 14a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-6a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg></button>
+        {{- end}}
       </div>
       <article class="markdown-body">{{.Content}}</article>
     </div>
@@ -165,6 +168,9 @@
         <span class="meta">{{.Size}}</span>
         <span class="spacer"></span>
         {{template "langs" .Langs}}
+        {{- if gt (len $.Features.Headings) 1}}
+        <button type="button" class="btn toc-toggle" data-toc-toggle aria-controls="mini.toc" aria-expanded="false" title="Outline"><svg class="octicon" viewBox="0 0 16 16" width="16" height="16"><path d="M5.75 2.5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5Zm0 5h8.5a.75.75 0 0 1 0 1.5h-8.5a.75.75 0 0 1 0-1.5ZM2 14a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1-6a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM2 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"></path></svg></button>
+        {{- end}}
         <a class="btn" href="?raw">Raw</a>
       </div>
       {{- with .Notice}}

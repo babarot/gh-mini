@@ -17,13 +17,10 @@ type Heading struct {
 	Text  string
 }
 
-// maxTocLevel is the deepest heading in the table of contents.
-const maxTocLevel = 4
-
 // headingOf returns the heading n is, if it goes in the table of contents.
 func headingOf(n ast.Node, src []byte) (Heading, bool) {
 	h, ok := n.(*ast.Heading)
-	if !ok || h.Level > maxTocLevel {
+	if !ok {
 		return Heading{}, false
 	}
 	id, ok := h.AttributeString("id")

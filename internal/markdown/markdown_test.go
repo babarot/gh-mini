@@ -226,10 +226,11 @@ func TestRenderBOM(t *testing.T) {
 }
 
 func TestHeadings(t *testing.T) {
-	_, f := render(t, "", "# Title :tada:\n\n## Use `go test` and [links](x.md)\n\n##### Too deep\n\n## Title :tada:\n\n### <b>raw</b> text\n")
+	_, f := render(t, "", "# Title :tada:\n\n## Use `go test` and [links](x.md)\n\n##### Deep\n\n## Title :tada:\n\n### <b>raw</b> text\n")
 	want := []Heading{
 		{1, "title-tada", "Title 🎉"},
 		{2, "use-go-test-and-links", "Use go test and links"},
+		{5, "deep", "Deep"},
 		{2, "title-tada-1", "Title 🎉"},
 		{3, "raw-text", "raw text"},
 	}
