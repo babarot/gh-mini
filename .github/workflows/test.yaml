@@ -1,9 +1,14 @@
 name: Test
 
+# On main, Release runs this before it releases
 on:
-  push:
-    branches: [main]
   pull_request:
+    # What tagpr's pull request changes, released only once this passes on
+    # main; its runs wait for an approval anyway, made with GITHUB_TOKEN
+    paths-ignore:
+      - CHANGELOG.md
+      - internal/version/version.go
+  workflow_call:
 
 permissions:
   contents: read
