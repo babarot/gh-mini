@@ -636,6 +636,14 @@ body[data-kind="html"] .main > .box {
     left: 0;
     background: var(--bgColor-default);
   }
+  /* The page under the tree is dimmed, and a click on it puts the tree away */
+  body.sidebar-shown::after {
+    content: "";
+    position: fixed;
+    inset: var(--mini-topbar-height) 0 0 0;
+    z-index: 19;
+    background: rgba(0, 0, 0, 0.4);
+  }
   .main { padding: 16px; }
   .markdown-body { padding: 16px; }
   /* As on GitHub, a narrow list drops the dates for the names */

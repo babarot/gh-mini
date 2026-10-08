@@ -82,6 +82,9 @@ function before(a, b) {
   return 0;
 }
 
+// unpeek puts away the tree shown for the moment, once initTree has run.
+let unpeek = () => {};
+
 // hits are the files found, and selected the one Enter opens.
 let hits = [];
 let selected = 0;
@@ -276,6 +279,7 @@ export function initTree() {
       filterEl.value = "";
       render();
       filterEl.blur();
+      unpeek();
     }
   });
   mdOnlyEl.addEventListener("change", () => {
@@ -283,37 +287,43 @@ export function initTree() {
     render();
   });
 
-  document.addEventListener("keydown", (e) => {
-    const t = e.target;
-    if (t.matches && t.matches("input, textarea, select, [contenteditable]")) return;
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === "t" || e.key === "/") {
-      e.preventDefault();
-      body.classList.remove("sidebar-hidden");
-      // A narrow screen shows the tree over the page instead
-      if (window.matchMedia("(max-width: 767px)").matches) body.classList.add("sidebar-shown");
-      filterEl.focus();
-      filterEl.select();
-    }
-  });
-
   // The server renders the tree closed from a cookie. It was kept in
   // localStorage before: move it over once
   const toggle = document.getElementById("mini.sidebar-toggle");
+  const sidebar = document.getElementById("mini.sidebar");
   if (!document.cookie.split("; ").some((c) => c.startsWith("gh-mini-sidebar=")) && load("sidebarHidden", false)) {
     setCookie("gh-mini-sidebar", "hidden");
     body.classList.add("sidebar-hidden");
   }
+  const narrow = () => window.matchMedia("(max-width: 767px)").matches;
   const expanded = () => {
-    const narrow = window.matchMedia("(max-width: 767px)").matches;
-    const shown = narrow ? body.classList.contains("sidebar-shown") : !body.classList.contains("sidebar-hidden");
+    const shown = narrow() ? body.classList.contains("sidebar-shown") : !body.classList.contains("sidebar-hidden");
     toggle.setAttribute("aria-expanded", String(shown));
   };
+  // A narrow screen shows the tree over the page, and a wide one with the
+  // tree closed shows it for the moment only: either is put away again by
+  // Escape or a click elsewhere, and neither is kept for the next page
+  let peeking = false;
+  const peek = () => {
+    if (narrow()) body.classList.add("sidebar-shown");
+    else if (body.classList.contains("sidebar-hidden")) {
+      body.classList.remove("sidebar-hidden");
+      peeking = true;
+    }
+    expanded();
+  };
+  unpeek = () => {
+    body.classList.remove("sidebar-shown");
+    if (peeking) body.classList.add("sidebar-hidden");
+    peeking = false;
+    expanded();
+  };
   toggle.addEventListener("click", () => {
-    if (window.matchMedia("(max-width: 767px)").matches) {
+    if (narrow()) {
       body.classList.toggle("sidebar-shown");
     } else {
       const hidden = body.classList.toggle("sidebar-hidden");
+      peeking = false;
       setCookie("gh-mini-sidebar", hidden ? "hidden" : "shown");
       save("sidebarHidden", hidden);
     }
@@ -321,6 +331,28 @@ export function initTree() {
   });
   window.matchMedia("(max-width: 767px)").addEventListener("change", expanded);
   expanded();
+
+  document.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (e.key === "Escape" && !document.querySelector("dialog[open]")) {
+      if (body.classList.contains("sidebar-shown") || peeking) unpeek();
+      return;
+    }
+    if (t.matches && t.matches("input, textarea, select, [contenteditable]")) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (document.querySelector("dialog[open]")) return;
+    if (e.key === "t" || e.key === "/") {
+      e.preventDefault();
+      peek();
+      filterEl.focus();
+      filterEl.select();
+    }
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (!body.classList.contains("sidebar-shown") && !peeking) return;
+    if (sidebar.contains(e.target) || toggle.contains(e.target)) return;
+    unpeek();
+  });
 
   window.addEventListener("pagehide", keepScroll);
   window.addEventListener("pagehide", keepFilter);
