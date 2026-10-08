@@ -8,4 +8,4 @@ HTML in Markdown is kept as far as GitHub keeps it. `<details>`, `align`, image 
 
 ## Preview and code
 
-Markdown and HTML files have a Preview / Code switch. Code shows the source highlighted, with line numbers you can link to, such as `#L10`. Other source files are shown that way too, but for those over 512 KB, shown as plain text.
+Markdown and HTML files have a Preview / Code switch. Code shows the source highlighted, with line numbers you can link to, such as `#L10`, or `#L10-L20` for the lines picked with a Shift-click. Other source files are shown that way too, but for those over 512 KB, shown as plain text.

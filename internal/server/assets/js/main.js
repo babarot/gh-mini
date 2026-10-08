@@ -7,6 +7,7 @@ import { initReload } from "./reload.js";
 import { initCopy } from "./copy.js";
 import { initMermaid } from "./mermaid.js";
 import { initPictures } from "./pictures.js";
+import { initLines } from "./lines.js";
 
 // Each part starts on its own, so that one failing leaves the rest working
 for (const init of [
@@ -18,6 +19,7 @@ for (const init of [
   initCopy,
   initMermaid,
   initPictures,
+  initLines,
   () => initReload({ onTheme: refreshTheme, onStructure: fetchTree, onFiles: refresh }),
 ]) {
   try {

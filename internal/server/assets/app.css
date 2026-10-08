@@ -581,7 +581,7 @@ body[data-kind="html"] .main > .box {
 .code .ln a { color: var(--fgColor-muted); }
 .code .ln a:hover { color: var(--fgColor-default); text-decoration: none; }
 .code .cl { flex: 1; padding-left: 6px; }
-.code .line:has(> .ln:target) { background: var(--bgColor-attention-muted, color-mix(in srgb, var(--fgColor-attention) 20%, transparent)); }
+.code .line.selected { background: var(--bgColor-attention-muted, color-mix(in srgb, var(--fgColor-attention) 20%, transparent)); }
 /* The code scrolls sideways, unless lines are wrapped */
 .code .chroma { width: max-content; min-width: 100%; }
 [data-wrap="true"] .code .chroma { width: auto; }
