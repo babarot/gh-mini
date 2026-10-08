@@ -30,6 +30,8 @@ type entry struct {
 	Ignored bool
 	Link    bool
 	Ago     string
+	// Date is when it was modified, which Ago tells roughly
+	Date string
 }
 
 func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspace.Snapshot, rel string) {
@@ -57,6 +59,7 @@ func (s *Server) serveDir(w http.ResponseWriter, r *http.Request, snap *workspac
 		e := entry{Name: d.Name(), Dir: d.IsDir(), Ignored: snap.Ignored(child)}
 		if info, err := d.Info(); err == nil {
 			e.Ago = ago(info.ModTime())
+			e.Date = info.ModTime().Format(dateLayout)
 			if info.Mode()&fs.ModeSymlink != 0 {
 				e.Link = true
 				if st, err := s.ws.FS().Stat(child); err == nil {

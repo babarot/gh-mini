@@ -218,7 +218,7 @@
             {{- if .Ignored}}<span class="badge">local</span>{{end}}
           </div>
           </td>
-          <td class="ago">{{.Ago}}</td>
+          <td class="ago"{{with .Date}} title="{{.}}"{{end}}>{{.Ago}}</td>
         </tr>
         {{- end}}
       </table>

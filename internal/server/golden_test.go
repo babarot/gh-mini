@@ -3,17 +3,22 @@ package server
 import (
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/babarot/gh-mini/internal/golden"
 )
 
+// fullDate is a date as dateLayout writes it.
+var fullDate = regexp.MustCompile(`[A-Z][a-z]{2} \d{1,2}, \d{4}, \d{2}:\d{2} [A-Za-z0-9+-]+`)
+
 // TestGoldenPages compares whole pages, one of each kind, with
 // testdata/pages. The static files' version, a hash of them, is replaced
 // so that a change to a script or a stylesheet does not change every page,
-// and so are the commit's hash and date, which change with the time it was
-// made, and the root the About dialog shows, a new directory each run.
+// and so are the commit's hash and the dates, of the commit and of the
+// files listed, which change with the time they were made, and the root
+// the About dialog shows, a new directory each run.
 func TestGoldenPages(t *testing.T) {
 	root, themes := newTestRepo(t)
 	srv, err := New(Options{
@@ -51,7 +56,7 @@ func TestGoldenPages(t *testing.T) {
 			}
 			body := strings.ReplaceAll(r.body, srv.static.prefix(), "/_mini/static/VERSION")
 			body = strings.ReplaceAll(body, head.Short, "SHA")
-			body = strings.ReplaceAll(body, head.Date, "DATE")
+			body = fullDate.ReplaceAllString(body, "DATE")
 			body = strings.ReplaceAll(body, srv.serving, "ROOT")
 			golden.Check(t, filepath.Join("testdata", "pages", name+".html"), []byte(body))
 		})

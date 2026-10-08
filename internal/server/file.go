@@ -20,6 +20,9 @@ import (
 	"github.com/babarot/gh-mini/internal/workspace"
 )
 
+// dateLayout is how a date is told in full, where its age is told.
+const dateLayout = "Jan 2, 2006, 15:04 MST"
+
 // maxRender is the largest file rendered; larger ones only get a raw link.
 const maxRender = 2 << 20
 
@@ -260,7 +263,7 @@ func (s *Server) lastCommit(rel string) *commitView {
 		Subject: c.Subject,
 		Short:   c.SHA[:min(7, len(c.SHA))],
 		Ago:     ago(c.Time),
-		Date:    c.Time.Format("Jan 2, 2006, 15:04 MST"),
+		Date:    c.Time.Format(dateLayout),
 	}
 	if repo := s.ws.Repo(); repo != "" {
 		// GitHub answers an email it does not know with a generated
