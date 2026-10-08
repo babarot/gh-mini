@@ -22,3 +22,5 @@ The settings are kept per browser, and hold for every gh-mini on `localhost`.
 Flags set up what a gh-mini serves and what it can do. The settings are how you like to see it, within that.
 
 A flag that gives a setting's default, as `--theme` does, gives way to what you pick in the settings. A setting for something the command line turned off, such as HTML preview when no port could be had for it, is shown off with why.
+
+gh-mini answers only when it is opened at `localhost`, at an IP address, at the name given to `--host`, or, with `--host 0.0.0.0`, at the machine's name. A page on another site that makes its own name lead to your machine, by DNS rebinding, so gets nothing.

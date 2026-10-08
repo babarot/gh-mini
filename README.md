@@ -61,8 +61,6 @@ go install github.com/babarot/gh-mini@latest
 
 How you like to see the pages, such as the theme, is picked in the settings in the page (press `,`).
 
-gh-mini answers only when it is opened at `localhost`, at an IP address, at the name given to `--host`, or, with `--host 0.0.0.0`, at the machine's name. A page on another site that makes its own name lead to your machine, by DNS rebinding, so gets nothing.
-
 ## HTML previews
 
 An HTML file's preview runs its scripts. They run in an origin of their own and cannot reach gh-mini's pages, but, as with `python -m http.server`, they can read the files gh-mini serves and send them anywhere. Preview only files you trust.

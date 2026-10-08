@@ -1,6 +1,6 @@
 # Themes
 
-The built-in themes are `github` (the default), `nord` and `tokyo-night`; each has a light and a dark version. Pick one in the settings, or give the default with `--theme` (or `$GH_MINI_THEME`).
+The built-in themes are `github` (the default), `nord` and `tokyo-night`; each has a light and a dark version. Pick one in the settings, or give the default with `--theme` (or `$GH_MINI_THEME`). Mermaid diagrams are drawn in the theme's colors, but under `github`, which draws them as GitHub does.
 
 ## Writing a theme
 
