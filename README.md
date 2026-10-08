@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="internal/server/assets/favicon.svg" alt="gh-mini" width="160">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="internal/server/assets/logo-dark.svg">
+    <img src="internal/server/assets/logo.svg" alt="gh-mini" width="160">
+  </picture>
 </p>
 
 # gh-mini

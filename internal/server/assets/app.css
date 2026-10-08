@@ -462,6 +462,12 @@ body[data-kind="html"] .main > .box {
 .about-close { position: absolute; top: 12px; right: 12px; border-color: transparent; }
 .about-body { padding: 28px 24px 20px; }
 .about-logo { display: block; margin: 0 auto; }
+
+/* The logo's black ink is lost on a dark background, so the dark mode has its own */
+:root[data-mode="light"] .logo-dark,
+:root[data-mode="dark"] .logo-light {
+  display: none;
+}
 .about h2 { margin: 10px 0 0; font-size: 20px; }
 .about-tagline { margin: 2px 0 16px; color: var(--fgColor-muted); font-size: 13px; }
 .about-facts {
