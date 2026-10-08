@@ -127,3 +127,46 @@ func TestLazyIgnoredDir(t *testing.T) {
 		}
 	}
 }
+
+// A symlink to a directory under the root is a lazy directory, and Subtree
+// reads it; one that leads out of the root stays a file.
+func TestDirLink(t *testing.T) {
+	dir := t.TempDir()
+	out := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "docs", "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "docs", "a.md"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for link, target := range map[string]string{"link": "docs", "away": out, "docs/up": ".."} {
+		if err := os.Symlink(target, filepath.Join(dir, link)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w, err := Open(Options{Root: dir, Name: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	byName := map[string]*Node{}
+	for _, n := range w.Snapshot().Tree.Children {
+		byName[n.Name] = n
+	}
+	if n := byName["link"]; n == nil || !n.Dir || !n.Lazy || n.Children != nil {
+		t.Errorf("link = %+v", n)
+	}
+	if n := byName["away"]; n == nil || n.Dir {
+		t.Errorf("away = %+v", n)
+	}
+	sub, err := w.Subtree("link")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := names(sub); len(got) != 3 || got[0] != "sub" || got[1] != "up" || got[2] != "a.md" {
+		t.Errorf("link's entries = %v", got)
+	}
+	if up := sub.Children[1]; !up.Dir || !up.Lazy {
+		t.Errorf("link/up = %+v", up)
+	}
+}

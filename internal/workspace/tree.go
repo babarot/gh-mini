@@ -16,7 +16,8 @@ type Node struct {
 	Ignored bool   `json:"ignored,omitempty"`
 	// Lazy is set on a directory git ignores: its entries are left out,
 	// as such directories are often a build's output or a tool's state
-	// with many files, and Subtree gives them when it is opened.
+	// with many files, and Subtree gives them when it is opened. It is
+	// set on a symlink to a directory too, which a walk does not enter.
 	Lazy     bool    `json:"lazy,omitempty"`
 	Children []*Node `json:"children,omitempty"`
 }
@@ -45,6 +46,9 @@ func (w *Workspace) buildTree(ignored map[string]bool) (*Node, map[string]*Node)
 		}
 		n := &Node{Name: d.Name(), Path: p, Dir: d.IsDir(), Ignored: snap.Ignored(p)}
 		parent.Children = append(parent.Children, n)
+		if w.dirLink(p, d) {
+			n.Dir, n.Lazy = true, true
+		}
 		if d.IsDir() && n.Ignored {
 			n.Lazy = true
 			return fs.SkipDir
@@ -92,10 +96,23 @@ func (w *Workspace) Subtree(rel string) (*Node, error) {
 			continue
 		}
 		p := path.Join(rel, e.Name())
+		dir := e.IsDir() || w.dirLink(p, e)
 		n.Children = append(n.Children, &Node{
-			Name: e.Name(), Path: p, Dir: e.IsDir(), Ignored: snap.Ignored(p), Lazy: e.IsDir(),
+			Name: e.Name(), Path: p, Dir: dir, Ignored: snap.Ignored(p), Lazy: dir,
 		})
 	}
 	sortTree(n)
 	return n, nil
+}
+
+// dirLink reports whether d, at p, is a symlink to a directory under the
+// root. The directory's page follows it there, so the tree shows it as a
+// directory; one that leads out of the root stays a file, as its page is
+// not found.
+func (w *Workspace) dirLink(p string, d fs.DirEntry) bool {
+	if d.Type()&fs.ModeSymlink == 0 {
+		return false
+	}
+	fi, err := w.root.Stat(p)
+	return err == nil && fi.IsDir()
 }
