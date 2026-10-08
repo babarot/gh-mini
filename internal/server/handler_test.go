@@ -570,6 +570,7 @@ func waitFor(t *testing.T, ch <-chan change, want func(change) bool) {
 			}
 			got.Theme = got.Theme || c.Theme
 			got.Structure = got.Structure || c.Structure
+			got.Status = got.Status || c.Status
 			got.Paths = append(got.Paths, c.Paths...)
 		case <-timeout:
 			t.Fatalf("got %+v", got)
@@ -583,6 +584,17 @@ func TestHandlerEvents(t *testing.T) {
 	writeFile(t, filepath.Join(root, "docs", "guide.md"), []byte("# Changed\n"))
 	writeFile(t, filepath.Join(themes, "sepia.css"), []byte(":root {}\n"))
 	waitFor(t, ch, func(c change) bool { return c.Theme && slices.Contains(c.Paths, "docs/guide.md") })
+}
+
+// Staging a file changes only git's index, and is told as a change of
+// status.
+func TestHandlerEventsStatus(t *testing.T) {
+	root, _, url := newReloadServer(t)
+	writeFile(t, filepath.Join(root, "README.md"), []byte("# Changed\n"))
+	ch := events(t, url)
+	waitFor(t, ch, func(c change) bool { return c.Status })
+	git(t, root, "add", "README.md")
+	waitFor(t, ch, func(c change) bool { return c.Status && len(c.Paths) == 0 })
 }
 
 // The stream names the server's boot ID first, the one its pages carry,
@@ -680,6 +692,38 @@ func TestHandlerScriptsForFeatures(t *testing.T) {
 		if got := strings.Contains(r.body, mathjax); got != want[1] {
 			t.Errorf("%s: MathJax loaded = %v, want %v", target, got, want[1])
 		}
+	}
+}
+
+func TestHandlerStatus(t *testing.T) {
+	root, themes := newTestRepo(t)
+	writeFile(t, filepath.Join(root, "README.md"), []byte("# Repo\n\nChanged.\n"))
+	writeFile(t, filepath.Join(root, "docs", "new.md"), []byte("# New\n"))
+	writeFile(t, filepath.Join(root, "node_modules", "y.js"), []byte("y\n"))
+	srv, err := New(Options{Root: root, Name: "repo", Skip: []string{".git", "node_modules"}, ThemesDir: themes})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+	h := srv.Handler()
+
+	r := get(t, h, "/_mini/api/status")
+	var st workspace.Status
+	if err := json.Unmarshal([]byte(r.body), &st); err != nil {
+		t.Fatal(err)
+	}
+	if len(st.Files) != 2 || st.Files["README.md"] == nil || st.Files["docs/new.md"] == nil {
+		t.Fatalf("files = %+v", st.Files)
+	}
+	if f := st.Files["README.md"]; f.Y != "M" || f.Added != 1 || f.Deleted != 1 {
+		t.Errorf("README.md = %+v", f)
+	}
+	if st.Added != 2 || st.Deleted != 1 {
+		t.Errorf("totals +%d -%d", st.Added, st.Deleted)
+	}
+	etag := r.header.Get("ETag")
+	if r := get(t, h, "/_mini/api/status", withHeader("If-None-Match", etag)); r.code != http.StatusNotModified {
+		t.Errorf("same status: %d", r.code)
 	}
 }
 

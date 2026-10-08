@@ -144,6 +144,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/_mini/static/", s.static)
 	mux.HandleFunc("/_mini/theme/", s.serveTheme)
 	mux.HandleFunc("/_mini/api/tree", s.serveTree)
+	mux.HandleFunc("/_mini/api/status", s.serveStatus)
 	mux.HandleFunc("/_mini/events", s.serveEvents)
 	mux.HandleFunc("/_mini/api/changes", s.serveChanges)
 	mux.HandleFunc("/", s.servePath)
@@ -175,4 +176,18 @@ func (s *Server) serveTree(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(snap.TreeJSON)
+}
+
+// serveStatus serves what changed since the last commit as JSON, with an
+// ETag as the tree has.
+func (s *Server) serveStatus(w http.ResponseWriter, r *http.Request) {
+	snap := s.ws.Snapshot()
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("ETag", snap.StatusETag)
+	if r.Header.Get("If-None-Match") == snap.StatusETag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(snap.StatusJSON)
 }

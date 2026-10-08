@@ -448,6 +448,7 @@ func TestWatchPerDirectory(t *testing.T) {
 	for name, test := range map[string]func(*testing.T){
 		"file changes":         TestWatchFileChanges,
 		"git head":             TestWatchGitHead,
+		"status":               TestWatchStatus,
 		"git internals":        TestWatchIgnoresGitInternals,
 		"no longer ignored":    TestWatchFollowsDirsNoLongerIgnored,
 		"new dir":              TestWatchNewDir,

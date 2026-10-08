@@ -20,6 +20,8 @@ type change struct {
 	Dirs      []string `json:"dirs,omitempty"`
 	Structure bool     `json:"structure"`
 	Theme     bool     `json:"theme"`
+	// Status tells that what changed since the last commit changed
+	Status bool `json:"status,omitempty"`
 	// Resync tells that changes may have been missed: read everything
 	Resync bool `json:"resync,omitempty"`
 	// Seq numbers the changes, the latest one merged into this
@@ -132,6 +134,7 @@ func (sub *subscriber) add(c change) {
 	}
 	sub.pending.Structure = sub.pending.Structure || c.Structure
 	sub.pending.Theme = sub.pending.Theme || c.Theme
+	sub.pending.Status = sub.pending.Status || c.Status
 	sub.pending.Resync = sub.pending.Resync || c.Resync
 	sub.pending.Seq = max(sub.pending.Seq, c.Seq)
 	select {
@@ -224,10 +227,11 @@ func seqOf(r *http.Request) uint64 {
 }
 
 // notify tells the browsers what changed. HEAD moving alone changes
-// nothing they show but the branch, which the next page load picks up.
+// nothing they show but the branch, which the next page load picks up;
+// when it changes what is uncommitted, Status tells that.
 func (s *Server) notify(e workspace.Event) {
-	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.Theme && !e.Resync {
+	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.Theme && !e.Resync && !e.Status {
 		return
 	}
-	s.hub.publish(change{Paths: e.Paths, Dirs: e.Dirs, Structure: e.Structure, Theme: e.Theme, Resync: e.Resync})
+	s.hub.publish(change{Paths: e.Paths, Dirs: e.Dirs, Structure: e.Structure, Theme: e.Theme, Resync: e.Resync, Status: e.Status})
 }
