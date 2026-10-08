@@ -60,7 +60,15 @@ func gitHubRepo(dir string) string {
 // HTTPS or SSH, and nowhere else: github.company.com is another host.
 var gitHubRemote = regexp.MustCompile(`(?:^|[@/.])github\.com[:/]+([^/:]+)/([^/]+?)(?:\.git)?(?:/.*)?$`)
 
+// gitHubPort is a port after the host, as in
+// ssh://git@ssh.github.com:443/owner/name. Only a URL with a scheme has
+// one; the scp-like form puts the owner after the colon.
+var gitHubPort = regexp.MustCompile(`github\.com:\d+/`)
+
 func parseGitHubRepo(url string) string {
+	if strings.Contains(url, "://") {
+		url = gitHubPort.ReplaceAllString(url, "github.com/")
+	}
 	m := gitHubRemote.FindStringSubmatch(url)
 	if m == nil {
 		return ""

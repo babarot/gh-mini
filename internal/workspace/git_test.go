@@ -9,6 +9,8 @@ func TestParseGitHubRepo(t *testing.T) {
 		"https://github.com/owner/name/":              "owner/name",
 		"git@github.com:owner/name.git":               "owner/name",
 		"ssh://git@github.com/owner/name.git":         "owner/name",
+		"ssh://git@ssh.github.com:443/owner/name.git": "owner/name",
+		"git@ssh.github.com:owner/name.git":           "owner/name",
 		"https://user@github.com/owner/name.git":      "owner/name",
 		"https://github.com/owner/name/tree/main.git": "owner/name",
 		"https://gitlab.com/owner/name.git":           "",
