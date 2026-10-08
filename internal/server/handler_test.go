@@ -571,6 +571,7 @@ func waitFor(t *testing.T, ch <-chan change, want func(change) bool) {
 			got.Theme = got.Theme || c.Theme
 			got.Structure = got.Structure || c.Structure
 			got.Status = got.Status || c.Status
+			got.Head = got.Head || c.Head
 			got.Paths = append(got.Paths, c.Paths...)
 		case <-timeout:
 			t.Fatalf("got %+v", got)

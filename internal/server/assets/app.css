@@ -133,6 +133,55 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--borderColor-default);
   border-radius: 2em;
 }
+/* On a branch other than the base, the branch is a button: it opens the
+   panel, and tells how far it is ahead of the base and behind it */
+button.branch {
+  font: inherit;
+  font-size: 12px;
+  background: transparent;
+  cursor: pointer;
+}
+button.branch:hover,
+button.branch:has(+ .branch-panel:popover-open) { color: var(--fgColor-default); background: var(--mini-selected); }
+.branch .ab {
+  display: inline-flex;
+  gap: 6px;
+  padding-left: 6px;
+  color: var(--fgColor-default);
+  font-family: var(--mini-font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--borderColor-default);
+}
+.branch .ab[hidden] { display: none; }
+.branch .behind { color: var(--fgColor-attention); font-weight: 600; }
+.branch .caret { flex: none; }
+.branch-panel {
+  position: fixed;
+  inset: auto;
+  width: min(340px, calc(100vw - 16px));
+  margin: 0;
+  padding: 6px;
+  color: var(--fgColor-default);
+  background: var(--bgColor-default);
+  border: 1px solid var(--borderColor-default);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+.branch-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--mini-radius);
+}
+.branch-row .octicon { margin-top: 2px; color: var(--fgColor-muted); }
+.branch-row small { display: block; color: var(--fgColor-muted); font-size: 12px; }
+.branch-row .behind,
+.branch-row.attention > span { color: var(--fgColor-attention); }
+.branch-row.attention small { color: var(--fgColor-muted); }
+a.branch-row { color: var(--fgColor-default); }
+a.branch-row:hover { text-decoration: none; background: var(--mini-selected); }
 
 
 select, input[type="search"] {
@@ -405,6 +454,7 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
 }
 @media (max-width: 480px) {
   .changes .added, .changes .deleted { display: none; }
+  .branch .ab { display: none; }
 }
 /* Too narrow for a branch's name to be read: its icon, which tells it on
    hover */
