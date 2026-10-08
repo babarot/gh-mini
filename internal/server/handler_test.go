@@ -783,7 +783,9 @@ func TestHandlerChangesPage(t *testing.T) {
 		`<span class="kd">func</span>`, `class="text add"`, `class="text del"`,
 		// Escaped, and without a newline at its end
 		"&lt;b&gt;", `class="no-newline"`,
-		`<span class="stage">staged</span>`)
+		`<span class="stage">staged</span>`,
+		// The word changed in a line, within its highlighting
+		`println</span></mark>`)
 	if r := get(t, h, "/_mini/changes?show=staged"); !strings.Contains(r.body, "1 file changed") || strings.Contains(r.body, "main.go") {
 		t.Errorf("staged: %s", r.body[strings.Index(r.body, "changes-summary"):][:200])
 	}

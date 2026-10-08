@@ -1,4 +1,10 @@
-// Package diff reads the patches git diff gives, file by file.
+// Package diff reads the patches git diff gives, file by file, and finds
+// the words that differ between a line and the one that replaced it.
+//
+// git computes the diffs; this only reads them, as the commands gh-mini
+// runs give them. Should it need to read what they do not cover, such as
+// copies, github.com/bluekeyes/go-gitdiff reads git's patches whole, and
+// Parse could fill File from it instead.
 package diff
 
 import (

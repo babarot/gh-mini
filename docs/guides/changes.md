@@ -29,7 +29,7 @@ A file deleted still has a page, of its deletion, until the deletion is committe
 
 ## The Changes page
 
-The count in the top bar leads to the Changes page, `/_mini/changes`, which shows the diff of every file changed, as a pull request on GitHub does: highlighted, with the lines' numbers before and after. A file's header folds it, tells how many lines it changed, and leads to its page.
+The count in the top bar leads to the Changes page, `/_mini/changes`, which shows the diff of every file changed, as a pull request on GitHub does: highlighted, with the lines' numbers before and after. Where a line was replaced by another much like it, the words that differ are marked. A file's header folds it, tells how many lines it changed, and leads to its page.
 
 All shows everything changed since the last commit. Staged and Unstaged show the two parts of it, what `git diff --cached` and `git diff` show, and Untracked the files git does not track. A file changed in both is tagged staged and unstaged.
 

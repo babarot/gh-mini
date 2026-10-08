@@ -11,6 +11,7 @@ import (
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+	"github.com/babarot/gh-mini/internal/diff"
 	_ "github.com/babarot/gh-mini/internal/lexers"
 	"github.com/babarot/gh-mini/internal/markdown"
 )
@@ -52,11 +53,17 @@ func renderCode(name string, src []byte, highlight bool) (template.HTML, error) 
 	return template.HTML(buf.String()), nil
 }
 
+// segment is a run of a line's text with the class chroma gives it.
+type segment struct {
+	class string
+	text  string
+}
+
 // highlightLines highlights a file line by line, for a diff to show the
 // lines it has: the file is read whole, so that a line in a comment or a
 // string that began above it is colored as one. It is nil when nothing
 // knows the language.
-func highlightLines(name string, src []byte) []template.HTML {
+func highlightLines(name string, src []byte) [][]segment {
 	lexer := lexers.Match(name)
 	if lexer == nil {
 		lexer = lexers.Analyse(string(src))
@@ -68,31 +75,55 @@ func highlightLines(name string, src []byte) []template.HTML {
 	if err != nil {
 		return nil
 	}
-	var lines []template.HTML
-	var b strings.Builder
+	var lines [][]segment
+	var line []segment
 	for t := it(); t != chroma.EOF; t = it() {
 		cls := tokenClass(t.Type)
 		for i, part := range strings.Split(t.Value, "\n") {
 			if i > 0 {
-				lines = append(lines, template.HTML(b.String()))
-				b.Reset()
+				lines = append(lines, line)
+				line = nil
 			}
-			if part == "" {
-				continue
-			}
-			if cls != "" {
-				b.WriteString(`<span class="` + cls + `">`)
-			}
-			b.WriteString(template.HTMLEscapeString(part))
-			if cls != "" {
-				b.WriteString("</span>")
+			if part != "" {
+				line = append(line, segment{cls, part})
 			}
 		}
 	}
-	if b.Len() > 0 {
-		lines = append(lines, template.HTML(b.String()))
+	if line != nil {
+		lines = append(lines, line)
 	}
 	return lines
+}
+
+// segmentsHTML writes a line's segments, with the spans of it marked.
+func segmentsHTML(segs []segment, marks []diff.Span) string {
+	var b strings.Builder
+	at := 0
+	for _, s := range segs {
+		for len(s.text) > 0 {
+			// The piece up to the next edge of a mark
+			n, marked := len(s.text), false
+			for _, m := range marks {
+				switch {
+				case at >= m.Start && at < m.End:
+					n, marked = min(n, m.End-at), true
+				case m.Start > at:
+					n = min(n, m.Start-at)
+				}
+			}
+			piece := template.HTMLEscapeString(s.text[:n])
+			if s.class != "" {
+				piece = `<span class="` + s.class + `">` + piece + "</span>"
+			}
+			if marked {
+				piece = "<mark>" + piece + "</mark>"
+			}
+			b.WriteString(piece)
+			s.text = s.text[n:]
+			at += n
+		}
+	}
+	return b.String()
 }
 
 // tokenClass is the class chroma's HTML gives a token, which chroma.css

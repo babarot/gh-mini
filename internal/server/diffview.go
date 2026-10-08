@@ -324,7 +324,7 @@ func statBlocks(added, deleted int) []string {
 
 // sides reads the file before and after the change, to highlight them.
 type sides struct {
-	old, new         []template.HTML
+	old, new         [][]segment
 	oldText, newText []string
 }
 
@@ -362,13 +362,39 @@ func (s *Server) readSides(st *workspace.Status, which string, df *diff.File) si
 	return sd
 }
 
-// lineHTML is a line of the diff, highlighted when the file read has the
-// same line there: it may have changed since git read it.
-func lineHTML(l diff.Line, hl []template.HTML, text []string, n int) string {
+// lineSegments are a line of the diff, highlighted when the file read has
+// the same line there: it may have changed since git read it.
+func lineSegments(l diff.Line, hl [][]segment, text []string, n int) []segment {
 	if n > 0 && n <= len(hl) && n <= len(text) && text[n-1] == l.Text {
-		return string(hl[n-1])
+		return hl[n-1]
 	}
-	return template.HTMLEscapeString(l.Text)
+	return []segment{{text: l.Text}}
+}
+
+// inlineMarks finds, in each run of lines deleted followed by lines added,
+// the words that differ between a line and the one in its place, paired
+// in order as GitHub pairs them.
+func inlineMarks(lines []diff.Line) map[int][]diff.Span {
+	marks := map[int][]diff.Span{}
+	for i := 0; i < len(lines); {
+		if lines[i].Kind != diff.Deleted {
+			i++
+			continue
+		}
+		j := i
+		for j < len(lines) && lines[j].Kind == diff.Deleted {
+			j++
+		}
+		k := j
+		for k < len(lines) && lines[k].Kind == diff.Added {
+			k++
+		}
+		for x := 0; x < min(j-i, k-j); x++ {
+			marks[i+x], marks[j+x] = diff.Inline(lines[i+x].Text, lines[j+x].Text)
+		}
+		i = k
+	}
+	return marks
 }
 
 // diffTable shows a file's patch as GitHub's unified view does: the two
@@ -385,20 +411,23 @@ func (s *Server) diffTable(st *workspace.Status, which string, df *diff.File) te
 		b.WriteString("</td>")
 	}
 	for _, h := range df.Hunks {
+		marks := inlineMarks(h.Lines)
 		b.WriteString(`<tr class="hunk"><td class="num"></td><td class="num"></td><td class="text">`)
 		b.WriteString(template.HTMLEscapeString("@@ -" + strconv.Itoa(h.OldStart) + "," + strconv.Itoa(h.OldLines) +
 			" +" + strconv.Itoa(h.NewStart) + "," + strconv.Itoa(h.NewLines) + " @@ " + h.Section))
 		b.WriteString("</td></tr>")
-		for _, l := range h.Lines {
-			var cls, sign, text string
+		for i, l := range h.Lines {
+			var cls, sign string
+			var segs []segment
 			switch l.Kind {
 			case diff.Added:
-				cls, sign, text = " add", "+", lineHTML(l, sd.new, sd.newText, l.New)
+				cls, sign, segs = " add", "+", lineSegments(l, sd.new, sd.newText, l.New)
 			case diff.Deleted:
-				cls, sign, text = " del", "-", lineHTML(l, sd.old, sd.oldText, l.Old)
+				cls, sign, segs = " del", "-", lineSegments(l, sd.old, sd.oldText, l.Old)
 			default:
-				cls, sign, text = "", " ", lineHTML(l, sd.new, sd.newText, l.New)
+				cls, sign, segs = "", " ", lineSegments(l, sd.new, sd.newText, l.New)
 			}
+			text := segmentsHTML(segs, marks[i])
 			b.WriteString(`<tr>`)
 			num(l.Old, cls)
 			num(l.New, cls)

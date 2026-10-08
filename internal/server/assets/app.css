@@ -778,6 +778,10 @@ body[data-kind="html"] .main > .box {
 .diff .del { background: var(--mini-diff-del); }
 .diff .num.add { background: color-mix(in srgb, var(--fgColor-success) 25%, transparent); }
 .diff .num.del { background: color-mix(in srgb, var(--fgColor-danger) 25%, transparent); }
+/* The words that differ between a line and the one in its place */
+.diff mark { color: inherit; border-radius: 2px; }
+.diff .text.add mark { background: color-mix(in srgb, var(--fgColor-success) 40%, transparent); }
+.diff .text.del mark { background: color-mix(in srgb, var(--fgColor-danger) 40%, transparent); }
 .diff .no-newline { margin-left: 4px; color: var(--fgColor-danger); user-select: none; }
 
 /* Above a changed file's page: how it changed since the last commit */
