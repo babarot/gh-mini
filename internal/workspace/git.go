@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // gitIgnored lists what git ignores under dir, so that local-only files
@@ -74,4 +76,45 @@ func parseGitHubRepo(url string) string {
 		return ""
 	}
 	return m[1] + "/" + m[2]
+}
+
+// Commit is the last commit that changed a file.
+type Commit struct {
+	SHA     string
+	Author  string
+	Email   string
+	Subject string
+	Time    time.Time
+	// Pushed tells whether a remote branch has the commit, so that a link
+	// to it on GitHub finds it
+	Pushed bool
+}
+
+// LastCommit returns the last commit that changed a file or directory
+// under the root, or nil outside a repository and for what is not
+// committed.
+func (w *Workspace) LastCommit(rel string) *Commit {
+	return gitLastCommit(w.opts.Root, rel)
+}
+
+func gitLastCommit(dir, rel string) *Commit {
+	// Literal, so that a name with * or : is not taken for a pattern
+	out, err := exec.Command("git", "--literal-pathspecs", "-C", dir, "log", "-1",
+		"--format=%H%x00%an%x00%ae%x00%at%x00%s", "--", rel).Output()
+	if err != nil {
+		return nil
+	}
+	f := strings.SplitN(strings.TrimSuffix(string(out), "\n"), "\x00", 5)
+	if len(f) != 5 {
+		return nil
+	}
+	sec, err := strconv.ParseInt(f[3], 10, 64)
+	if err != nil {
+		return nil
+	}
+	c := &Commit{SHA: f[0], Author: f[1], Email: f[2], Time: time.Unix(sec, 0), Subject: f[4]}
+	out, err = exec.Command("git", "-C", dir, "for-each-ref", "--contains", c.SHA,
+		"--count=1", "--format=%(refname)", "refs/remotes").Output()
+	c.Pushed = err == nil && len(bytes.TrimSpace(out)) > 0
+	return c
 }

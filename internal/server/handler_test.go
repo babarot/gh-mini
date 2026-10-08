@@ -231,6 +231,39 @@ func TestHandlerCode(t *testing.T) {
 	get(t, newTestServer(t), "/main.go").expect(t, http.StatusOK, `data-kind="code"`, `href="#L1"`, "3 lines")
 }
 
+func TestHandlerLastCommit(t *testing.T) {
+	h := newTestServer(t)
+	r := get(t, h, "/main.go")
+	r.expect(t, http.StatusOK, `<span class="commit-subject">init</span>`,
+		`src="https://avatars.githubusercontent.com/u/e?s=40&amp;email=t%40example.com"`)
+	// Not pushed, so not on GitHub to link to
+	r.reject(t, "github.com/example/repo/commit/")
+	get(t, h, "/docs/guide.ja.md").reject(t, `class="box commit"`)
+}
+
+func TestHandlerLastCommitPushed(t *testing.T) {
+	root, _ := newTestRepo(t)
+	git(t, root, "update-ref", "refs/remotes/origin/main", "HEAD")
+	srv, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { srv.Close() })
+	sha := srv.ws.LastCommit("main.go").SHA
+	get(t, srv.Handler(), "/main.go").expect(t, http.StatusOK,
+		`<a class="commit-subject" href="https://github.com/example/repo/commit/`+sha+`">init</a>`)
+
+	// Pushed elsewhere than GitHub: nothing to link to or to ask for a
+	// picture
+	git(t, root, "remote", "set-url", "origin", "https://gitlab.com/example/repo.git")
+	other, err := New(Options{Root: root, Name: "repo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { other.Close() })
+	get(t, other.Handler(), "/main.go").reject(t, "avatars.githubusercontent.com", "/commit/")
+}
+
 func TestHandlerImageAndRaw(t *testing.T) {
 	h := newTestServer(t)
 	get(t, h, "/img.png").expect(t, http.StatusOK, `data-kind="image"`, `<img src="?raw"`)

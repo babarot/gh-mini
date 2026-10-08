@@ -201,6 +201,30 @@ body.sidebar-hidden .sidebar { display: none; }
 .box-header a { color: var(--fgColor-default); font-weight: 600; }
 .meta { color: var(--fgColor-muted); font-size: 12px; }
 
+.commit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+.commit .avatar {
+  flex: none;
+  border-radius: 50%;
+  /* Shows in place of the picture when GitHub cannot be reached */
+  background: var(--borderColor-default);
+}
+.commit-author { font-weight: 600; white-space: nowrap; }
+.commit-subject {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--fgColor-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.commit-sha { font-family: var(--mini-font-mono); }
+.commit .meta { white-space: nowrap; }
+
 .btn, .segmented a, .segmented button {
   display: inline-block;
   padding: 3px 12px;

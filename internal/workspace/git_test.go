@@ -1,6 +1,50 @@
 package workspace
 
-import "testing"
+import (
+	"path/filepath"
+	"testing"
+)
+
+func TestGitLastCommit(t *testing.T) {
+	dir := newRepo(t, "*.local\n", "a.md", "b*.md", "skip.local")
+	write(t, filepath.Join(dir, "a.md"), "y\n")
+	git(t, dir, "-c", "user.name=Ann", "-c", "user.email=a@example.com", "commit", "-q", "-am", "Change a\n\nbody")
+
+	c := gitLastCommit(dir, "a.md")
+	if c == nil || c.Author != "Ann" || c.Email != "a@example.com" || c.Subject != "Change a" || len(c.SHA) != 40 {
+		t.Fatalf("a.md: got %+v", c)
+	}
+	if c.Pushed {
+		t.Error("a.md: pushed without a remote")
+	}
+	if c := gitLastCommit(dir, "README.md"); c == nil || c.Subject != "init" {
+		t.Errorf("README.md: got %+v, want init", c)
+	}
+	// Names are taken literally: as a pattern, a.md* would match a.md
+	if c := gitLastCommit(dir, "a.md*"); c != nil {
+		t.Errorf("a.md*: got %+v, want none", c)
+	}
+	if c := gitLastCommit(dir, "b*.md"); c == nil || c.Subject != "init" {
+		t.Errorf("b*.md: got %+v, want init", c)
+	}
+	write(t, filepath.Join(dir, "new.md"), "x\n")
+	for _, rel := range []string{"skip.local", "new.md"} {
+		if c := gitLastCommit(dir, rel); c != nil {
+			t.Errorf("%s: got %+v, want none", rel, c)
+		}
+	}
+	if c := gitLastCommit(t.TempDir(), "a.md"); c != nil {
+		t.Errorf("not a repository: got %+v", c)
+	}
+
+	git(t, dir, "update-ref", "refs/remotes/origin/main", "HEAD~1")
+	if c := gitLastCommit(dir, "a.md"); c.Pushed {
+		t.Error("a.md: pushed before its commit was")
+	}
+	if c := gitLastCommit(dir, "README.md"); !c.Pushed {
+		t.Error("README.md: not pushed")
+	}
+}
 
 func TestParseGitHubRepo(t *testing.T) {
 	for url, want := range map[string]string{

@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"path"
 	"strings"
 	"unicode/utf16"
@@ -33,6 +34,21 @@ type fileView struct {
 	// Notice tells something about how the file is shown, such as bytes
 	// that are not UTF-8
 	Notice string
+	Commit *commitView
+}
+
+// commitView is the last commit that changed a file.
+type commitView struct {
+	Author string
+	// Avatar is the author's picture on GitHub, found by email
+	Avatar  string
+	Subject string
+	Short   string
+	Ago     string
+	// Date is the time in full, shown on hover
+	Date string
+	// URL is the commit on GitHub, when it was pushed there
+	URL string
 }
 
 type viewTab struct {
@@ -117,6 +133,9 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 	p := s.newPage(r, snap, rel, "")
 	v := &fileView{Size: humanSize(info.Size()), Langs: s.langTabs(rel)}
 	p.File = v
+	if !p.Ignored {
+		v.Commit = s.lastCommit(rel)
+	}
 	plain := r.URL.Query().Get("plain") == "1"
 	if isHTML(rel) && s.opts.PreviewPort != 0 {
 		preview := s.htmlPreview(r, p.Settings)
@@ -169,6 +188,29 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, snap *workspa
 		}
 	}
 	s.render(w, p)
+}
+
+func (s *Server) lastCommit(rel string) *commitView {
+	c := s.ws.LastCommit(rel)
+	if c == nil {
+		return nil
+	}
+	v := &commitView{
+		Author:  c.Author,
+		Subject: c.Subject,
+		Short:   c.SHA[:min(7, len(c.SHA))],
+		Ago:     ago(c.Time),
+		Date:    c.Time.Format("Jan 2, 2006, 15:04 MST"),
+	}
+	if repo := s.ws.Repo(); repo != "" {
+		// GitHub answers an email it does not know with a generated
+		// picture, never an error
+		v.Avatar = "https://avatars.githubusercontent.com/u/e?s=40&email=" + url.QueryEscape(c.Email)
+		if c.Pushed {
+			v.URL = "https://github.com/" + repo + "/commit/" + c.SHA
+		}
+	}
+	return v
 }
 
 // wantsRaw tells a request for the file itself, such as an image in a page

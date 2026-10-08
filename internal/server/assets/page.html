@@ -155,6 +155,27 @@
     {{- end}}
 
     {{- with .File}}
+    {{- with .Commit}}
+    <div class="box commit">
+      {{- with .Avatar}}
+      <img class="avatar" src="{{.}}" alt="" width="20" height="20">
+      {{- end}}
+      <span class="commit-author">{{.Author}}</span>
+      {{- if .URL}}
+      <a class="commit-subject" href="{{.URL}}">{{.Subject}}</a>
+      {{- else}}
+      <span class="commit-subject">{{.Subject}}</span>
+      {{- end}}
+      <span class="spacer"></span>
+      {{- if .URL}}
+      <a class="meta commit-sha" href="{{.URL}}">{{.Short}}</a>
+      {{- else}}
+      <span class="meta commit-sha">{{.Short}}</span>
+      {{- end}}
+      <span class="meta">·</span>
+      <span class="meta" title="{{.Date}}">{{.Ago}}</span>
+    </div>
+    {{- end}}
     <div class="box">
       <div class="box-header">
         {{- with .Views}}

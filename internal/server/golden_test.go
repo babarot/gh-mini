@@ -11,7 +11,9 @@ import (
 
 // TestGoldenPages compares whole pages, one of each kind, with
 // testdata/pages. The static files' version, a hash of them, is replaced
-// so that a change to a script or a stylesheet does not change every page.
+// so that a change to a script or a stylesheet does not change every page,
+// and so are the commit's hash and date, which change with the time it was
+// made.
 func TestGoldenPages(t *testing.T) {
 	root, themes := newTestRepo(t)
 	srv, err := New(Options{
@@ -25,6 +27,7 @@ func TestGoldenPages(t *testing.T) {
 	}
 	t.Cleanup(func() { srv.Close() })
 	h := srv.Handler()
+	head := srv.lastCommit(".")
 
 	for name, target := range map[string]string{
 		"root":          "/",
@@ -46,6 +49,8 @@ func TestGoldenPages(t *testing.T) {
 				t.Fatalf("status %d", r.code)
 			}
 			body := strings.ReplaceAll(r.body, srv.static.prefix(), "/_mini/static/VERSION")
+			body = strings.ReplaceAll(body, head.Short, "SHA")
+			body = strings.ReplaceAll(body, head.Date, "DATE")
 			golden.Check(t, filepath.Join("testdata", "pages", name+".html"), []byte(body))
 		})
 	}
