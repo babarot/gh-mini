@@ -319,8 +319,12 @@ export function initTree() {
       e.preventDefault();
       fold(path, !open.has(path));
     } else {
-      // Its page opens it, as the way to the page
+      // Opened in the tree as much as by the chevron, and kept so: only
+      // the way to a page reached otherwise, by a link or the finder, is
+      // not
+      kept.add(path);
       open.add(path);
+      save("open", Array.from(kept));
     }
   });
   // The keys of a tree view: up and down move between the rows, right
