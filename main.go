@@ -171,6 +171,11 @@ func run(args []string, stdout, stderr io.Writer) error {
 
 	url := fmt.Sprintf("http://%s%s", browserAddr(ln.Addr()), open)
 	fmt.Fprintf(stdout, "gh-mini: serving %s at %s\n", root, url)
+	if ifaddrs, err := net.InterfaceAddrs(); err == nil {
+		for _, addr := range lanAddrs(ln.Addr(), ifaddrs) {
+			fmt.Fprintf(stdout, "gh-mini: also at http://%s%s\n", addr, open)
+		}
+	}
 	if pln != nil {
 		fmt.Fprintf(stdout, "gh-mini: HTML previews on port %d\n", opts.PreviewPort)
 	}
@@ -269,6 +274,25 @@ func browserAddr(a net.Addr) string {
 		return a.String()
 	}
 	return net.JoinHostPort("localhost", strconv.Itoa(tcp.Port))
+}
+
+// lanAddrs gives the addresses other machines can reach the server at, if
+// it listens on all of them: the IPv4 addresses of the machine's
+// interfaces, but not loopback or link-local ones.
+func lanAddrs(a net.Addr, ifaddrs []net.Addr) []string {
+	tcp, ok := a.(*net.TCPAddr)
+	if !ok || tcp.IP == nil || !tcp.IP.IsUnspecified() {
+		return nil
+	}
+	var out []string
+	for _, ia := range ifaddrs {
+		n, ok := ia.(*net.IPNet)
+		if !ok || n.IP.To4() == nil || n.IP.IsLoopback() || n.IP.IsLinkLocalUnicast() {
+			continue
+		}
+		out = append(out, net.JoinHostPort(n.IP.String(), strconv.Itoa(tcp.Port)))
+	}
+	return out
 }
 
 // tooWide tells a current directory too wide to serve for a file in it:

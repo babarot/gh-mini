@@ -294,6 +294,33 @@ func TestBrowserAddr(t *testing.T) {
 	}
 }
 
+func TestLanAddrs(t *testing.T) {
+	var ifaddrs []net.Addr
+	for _, cidr := range []string{"127.0.0.1/8", "192.168.1.5/24", "169.254.3.4/16", "::1/128", "fe80::1/64", "2001:db8::5/64", "10.0.0.7/8"} {
+		ip, n, err := net.ParseCIDR(cidr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		n.IP = ip
+		ifaddrs = append(ifaddrs, n)
+	}
+	for addr, want := range map[string]string{
+		"0.0.0.0:6419":   "192.168.1.5:6419 10.0.0.7:6419",
+		"[::]:6419":      "192.168.1.5:6419 10.0.0.7:6419",
+		"127.0.0.1:6419": "",
+		"[::1]:6419":     "",
+		"10.0.0.7:6419":  "",
+	} {
+		a, err := net.ResolveTCPAddr("tcp", addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Join(lanAddrs(a, ifaddrs), " "); got != want {
+			t.Errorf("lanAddrs(%s) = %q, want %q", addr, got, want)
+		}
+	}
+}
+
 // From the home directory, a file is served with its own directory, not
 // the whole home.
 func TestResolveFromHome(t *testing.T) {
