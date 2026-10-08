@@ -145,6 +145,8 @@ type app struct {
 	hs   *http.Server
 	// skip is what the server leaves out of the tree, as --skip does
 	skip []string
+	// phs serves the HTML previews, on a port of its own
+	phs *http.Server
 }
 
 // URL is the address of a page, such as "/a.md".
@@ -176,11 +178,29 @@ func newApp(t *testing.T, files map[string]string) *app {
 
 func (a *app) start(ln net.Listener) {
 	a.t.Helper()
-	srv, err := server.New(server.Options{Root: a.root, Name: "repo", Skip: a.skip, Reload: true, ThemesDir: filepath.Join(a.root, ".themes")})
+	pln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	srv, err := server.New(server.Options{
+		Root:        a.root,
+		Name:        "repo",
+		Skip:        a.skip,
+		Reload:      true,
+		ThemesDir:   filepath.Join(a.root, ".themes"),
+		PreviewPort: pln.Addr().(*net.TCPAddr).Port,
+	})
 	if err != nil {
 		a.t.Fatal(err)
 	}
 	a.srv = srv
+	phs := &http.Server{Handler: srv.PreviewHandler()}
+	a.phs = phs
+	go func() {
+		if err := phs.Serve(pln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			a.t.Error(err)
+		}
+	}()
 	hs := &http.Server{Handler: srv.Handler()}
 	a.hs = hs
 	// Not a.hs, which stop may have cleared before this runs
@@ -197,8 +217,9 @@ func (a *app) stop() {
 		return
 	}
 	a.hs.Close()
+	a.phs.Close()
 	a.srv.Close()
-	a.hs, a.srv = nil, nil
+	a.hs, a.phs, a.srv = nil, nil, nil
 }
 
 // restart stops the server, if it runs, and starts another on the same
