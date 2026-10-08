@@ -70,6 +70,11 @@ type Watcher struct {
 	ws        *Workspace
 	recursive bool
 	gitDir    string
+	// ignores are the directories outside the root holding what tells git
+	// what to ignore in it, each with the file names that do: the
+	// .gitignore of the directories between the repository's top and the
+	// root, and info/exclude
+	ignores   map[string]string
 	themesDir string
 	// themesOn is set while themesDir is watched; it may be created or
 	// removed while the server runs
@@ -167,6 +172,17 @@ func Watch(ws *Workspace, themesDir string, handlers ...func(Event)) (*Watcher, 
 			log.Printf("watch %s: %v", gitDir, err)
 		} else {
 			w.gitDir = gitDir
+		}
+	}
+	w.ignores = ignoreDirs(root)
+	for dir := range w.ignores {
+		// The git directory may be in a root watched whole
+		if w.recursive && strings.HasPrefix(dir, root+string(filepath.Separator)) {
+			continue
+		}
+		if err := fw.Add(dir, fswatcher.All); err != nil {
+			log.Printf("watch %s: %v", dir, err)
+			delete(w.ignores, dir)
 		}
 	}
 	if themesDir != "" {
@@ -275,6 +291,12 @@ func (w *Watcher) add(e fswatcher.Event) {
 	b := &w.burst
 	dir := filepath.Dir(e.Name)
 	switch {
+	case w.ignores[dir] != "":
+		// What git ignores in the root changes with these files
+		if filepath.Base(e.Name) != w.ignores[dir] {
+			return
+		}
+		b.gitignore = true
 	case w.gitDir != "" && (e.Name == w.gitDir || strings.HasPrefix(e.Name, w.gitDir+string(filepath.Separator))):
 		// Only HEAD matters; git writes its index and locks here all
 		// the time
@@ -584,4 +606,38 @@ func gitDirOf(dir string) string {
 		return ""
 	}
 	return p
+}
+
+// ignoreDirs finds the directories outside root whose files tell git what
+// to ignore in it, each with the name of that file: the directories from
+// the repository's top to root's parent, with their .gitignore, and that
+// of info/exclude. Paths have symlinks resolved, as events give them.
+func ignoreDirs(root string) map[string]string {
+	dirs := map[string]string{}
+	top := gitOutput(root, "rev-parse", "--show-toplevel")
+	if top == "" {
+		return dirs
+	}
+	if real, err := filepath.EvalSymlinks(top); err == nil {
+		top = real
+	}
+	if strings.HasPrefix(root, top+string(filepath.Separator)) {
+		for d := filepath.Dir(root); ; d = filepath.Dir(d) {
+			dirs[d] = ".gitignore"
+			if d == top {
+				break
+			}
+		}
+	}
+	// A worktree shares the exclude file of its repository's git directory
+	if exclude := gitOutput(root, "rev-parse", "--path-format=absolute", "--git-path", "info/exclude"); exclude != "" {
+		dir := filepath.Dir(exclude)
+		if real, err := filepath.EvalSymlinks(dir); err == nil {
+			dir = real
+		}
+		if _, err := os.Stat(dir); err == nil {
+			dirs[dir] = filepath.Base(exclude)
+		}
+	}
+	return dirs
 }

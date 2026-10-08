@@ -459,3 +459,29 @@ func TestWatchPerDirectory(t *testing.T) {
 		t.Run(name, test)
 	}
 }
+
+// What git ignores in a root that is a directory in a repository changes
+// with the .gitignore of the directories above it, and info/exclude.
+func TestWatchIgnoresOutsideRoot(t *testing.T) {
+	top := newRepo(t, "", "docs/README.md")
+	root := filepath.Join(top, "docs")
+	// Untracked, as git ignores only what it does not track
+	write(t, filepath.Join(root, "a.md"), "x\n")
+	write(t, filepath.Join(root, "out", "b.md"), "x\n")
+	ws, events := startWatch(t, root)
+	if ws.Snapshot().Ignored("out") {
+		t.Fatal("out ignored from the start")
+	}
+	write(t, filepath.Join(top, ".gitignore"), "out/\n")
+	next(t, events, func(e Event) bool { return e.Structure })
+	if !ws.Snapshot().Ignored("out") {
+		t.Error("out not ignored after the top's .gitignore")
+	}
+	write(t, filepath.Join(top, ".gitignore"), "\n")
+	next(t, events, func(e Event) bool { return e.Structure })
+	write(t, filepath.Join(top, ".git", "info", "exclude"), "a.md\n")
+	next(t, events, func(e Event) bool { return e.Structure })
+	if !ws.Snapshot().Ignored("a.md") {
+		t.Error("a.md not ignored after info/exclude")
+	}
+}
