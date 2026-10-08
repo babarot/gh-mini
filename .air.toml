@@ -1,0 +1,11 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -o ./tmp/gh-mini ."
+entrypoint = ["./tmp/gh-mini"]
+args_bin = ["--no-open"]
+include_ext = ["go", "html", "css", "js", "xml"]
+exclude_dir = ["tmp", "dist", ".git", "examples"]
+exclude_regex = ["_test\\.go$"]
+delay = 200
