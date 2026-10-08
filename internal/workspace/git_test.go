@@ -103,6 +103,20 @@ func TestGitBranch(t *testing.T) {
 	}
 }
 
+// A new repository is on a branch before its first commit.
+func TestGitBranchUnborn(t *testing.T) {
+	dir := newRepo(t, "")
+	unborn := t.TempDir()
+	git(t, unborn, "init", "-q", "-b", "trunk")
+	if b := gitBranch(unborn); b != "trunk" {
+		t.Errorf("no commits: %q, want trunk", b)
+	}
+	git(t, dir, "switch", "-q", "--orphan", "fresh")
+	if b := gitBranch(dir); b != "fresh" {
+		t.Errorf("orphan branch: %q, want fresh", b)
+	}
+}
+
 func TestGitBranchDetached(t *testing.T) {
 	dir := newRepo(t, "")
 	if b := gitBranch(dir); b != "main" {

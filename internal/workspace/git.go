@@ -27,11 +27,10 @@ func gitIgnored(dir string) map[string]bool {
 	return set
 }
 
-// gitBranch is the branch checked out; on a detached HEAD, the tag there,
-// or the commit.
+// gitBranch is the branch checked out, even one with no commits yet; on a
+// detached HEAD, the tag there, or the commit.
 func gitBranch(dir string) string {
-	branch := gitOutput(dir, "rev-parse", "--abbrev-ref", "HEAD")
-	if branch != "HEAD" {
+	if branch := gitOutput(dir, "symbolic-ref", "-q", "--short", "HEAD"); branch != "" {
 		return branch
 	}
 	if tag := gitOutput(dir, "describe", "--tags", "--exact-match"); tag != "" {
