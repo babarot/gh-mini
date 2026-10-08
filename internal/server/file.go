@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"net/url"
 	"path"
@@ -107,8 +109,11 @@ func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request, rel string, in
 		return
 	}
 	defer f.Close()
+	ctype := rawType(info.Name(), f)
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "no-cache")
-	if runsScripts(rel) {
+	if !passive(ctype) {
 		// Opened as a page, from here or from a link on any site, a file's
 		// scripts would run as gh-mini and could read every file through
 		// it. A sandbox gives the document an origin of its own and no
@@ -118,12 +123,38 @@ func (s *Server) serveRaw(w http.ResponseWriter, r *http.Request, rel string, in
 	http.ServeContent(w, r, info.Name(), info.ModTime(), f)
 }
 
-// runsScripts tells the files a browser runs scripts in when it opens them
-// as a page. Others, such as PDF, are left alone: a sandbox also stops the
-// browser's PDF viewer.
-func runsScripts(name string) bool {
-	switch strings.ToLower(path.Ext(name)) {
-	case ".html", ".htm", ".xhtml", ".svg", ".xml":
+// rawType is the Content-Type a file is served raw with: the one of its
+// extension, else text, as GitHub serves files raw. A file with no type
+// of its own is not sniffed into HTML, which would run its scripts.
+func rawType(name string, f io.ReadSeeker) string {
+	if t := mime.TypeByExtension(path.Ext(name)); t != "" {
+		return t
+	}
+	var b [512]byte
+	n, _ := io.ReadFull(f, b[:])
+	_, _ = f.Seek(0, io.SeekStart)
+	t := http.DetectContentType(b[:n])
+	if strings.HasPrefix(t, "text/") || strings.Contains(t, "xml") {
+		return "text/plain; charset=utf-8"
+	}
+	return t
+}
+
+// passive tells the types a browser runs no scripts in when it opens them
+// as a page, and which are left out of the sandbox: it would also stop the
+// browser's own viewers, such as that of PDF. Every other type, text
+// included, is sandboxed, as types the browser runs scripts in are many:
+// HTML, SVG, XHTML, XML with a stylesheet and others by the system's MIME
+// types.
+func passive(ctype string) bool {
+	t, _, _ := strings.Cut(ctype, ";")
+	t = strings.TrimSpace(strings.ToLower(t))
+	switch {
+	case t == "application/pdf":
+		return true
+	case strings.HasPrefix(t, "image/"):
+		return t != "image/svg+xml"
+	case strings.HasPrefix(t, "video/"), strings.HasPrefix(t, "audio/"), strings.HasPrefix(t, "font/"):
 		return true
 	}
 	return false

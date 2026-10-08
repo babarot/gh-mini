@@ -721,6 +721,8 @@ func TestHandlerRawSandbox(t *testing.T) {
 	root, _ := newTestRepo(t)
 	for name, body := range map[string]string{
 		"page.html": "<script>1</script>", "pic.svg": "<svg/>", "doc.pdf": "%PDF-1.4", "notes.md": "# x",
+		"page.shtml": "<script>1</script>", "page.xht": "<script>1</script>", "feed.rss": "<rss/>",
+		"noext": "<html><script>1</script>", "noext.zzq": "<?xml version=\"1.0\"?><x/>",
 	} {
 		writeFile(t, filepath.Join(root, name), []byte(body))
 	}
@@ -730,10 +732,22 @@ func TestHandlerRawSandbox(t *testing.T) {
 	}
 	defer srv.Close()
 	h := srv.Handler()
-	for name, want := range map[string]bool{"page.html": true, "pic.svg": true, "doc.pdf": false, "notes.md": false, "img.png": false} {
+	for name, want := range map[string]bool{
+		"page.html": true, "pic.svg": true, "doc.pdf": false, "notes.md": true, "img.png": false,
+		"page.shtml": true, "page.xht": true, "feed.rss": true, "noext": true, "noext.zzq": true,
+	} {
 		r := get(t, h, "/"+name+"?raw")
 		if got := r.header.Get("Content-Security-Policy") == "sandbox"; got != want || r.code != http.StatusOK {
 			t.Errorf("%s: status %d, sandboxed %v, want %v", name, r.code, got, want)
+		}
+		if got := r.header.Get("X-Content-Type-Options"); got != "nosniff" {
+			t.Errorf("%s: X-Content-Type-Options %q", name, got)
+		}
+	}
+	// A file with no type of its own is text, not sniffed into HTML
+	for _, name := range []string{"noext", "noext.zzq"} {
+		if got := get(t, h, "/"+name+"?raw").header.Get("Content-Type"); got != "text/plain; charset=utf-8" {
+			t.Errorf("%s: Content-Type %q", name, got)
 		}
 	}
 	// Loaded as an image, an SVG is the same bytes

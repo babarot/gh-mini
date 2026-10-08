@@ -17,4 +17,4 @@ What a previewed file's scripts can still do, as with `python -m http.server`:
 
 So preview only files you trust.
 
-Opening an HTML or SVG file raw does not run its scripts.
+Opening a file raw does not run its scripts, whatever its type.
