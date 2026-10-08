@@ -523,6 +523,36 @@ func TestHandlerEvents(t *testing.T) {
 	waitFor(t, ch, func(c change) bool { return c.Theme && slices.Contains(c.Paths, "docs/guide.md") })
 }
 
+// The stream names the server's boot ID first, the one its pages carry,
+// so that a page from an earlier run can tell the server was restarted.
+func TestHandlerEventsBoot(t *testing.T) {
+	_, _, url := newReloadServer(t)
+	res, err := http.Get(url + "/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	m := regexp.MustCompile(`data-boot="([0-9a-f]+)"`).FindSubmatch(b)
+	if m == nil {
+		t.Fatal("the page has no boot ID")
+	}
+	res, err = http.Get(url + "/_mini/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	sc := bufio.NewScanner(res.Body)
+	var lines []string
+	for len(lines) < 4 && sc.Scan() {
+		lines = append(lines, sc.Text())
+	}
+	want := []string{": connected", "", "event: boot", "data: " + string(m[1])}
+	if !slices.Equal(lines, want) {
+		t.Errorf("stream starts %q, want %q", lines, want)
+	}
+}
+
 // A directory git ignores is watched once its page is looked at.
 func TestHandlerEventsInIgnoredDir(t *testing.T) {
 	root, _, url := newReloadServer(t)

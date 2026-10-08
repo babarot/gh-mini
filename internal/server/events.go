@@ -111,6 +111,9 @@ func (s *Server) serveEvents(w http.ResponseWriter, r *http.Request) {
 	sub := s.hub.subscribe()
 	defer s.hub.unsubscribe(sub)
 	fmt.Fprint(w, ": connected\n\n")
+	// Sent on every connection, so that a browser that lost the stream
+	// learns whether the server it reached is the one it had
+	fmt.Fprintf(w, "event: boot\ndata: %s\n\n", s.boot)
 	flusher.Flush()
 	tick := time.NewTicker(30 * time.Second)
 	defer tick.Stop()

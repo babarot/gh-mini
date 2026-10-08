@@ -58,6 +58,11 @@ export function initReload({ onTheme, onStructure, onFiles }) {
   restore();
   if (!page.reload) return;
   subscribe((c) => {
+    // The server was restarted, perhaps with other code: read it all again
+    if (c.boot) {
+      if (c.boot !== page.boot) reload();
+      return;
+    }
     if (c.theme) onTheme();
     if (c.structure || c.resync) onStructure();
     else onFiles(c.paths, c.dirs);
@@ -91,6 +96,7 @@ function subscribe(onChange) {
   if (!window.SharedWorker) {
     const es = new EventSource("/_mini/events");
     es.onmessage = (e) => onChange(JSON.parse(e.data));
+    es.addEventListener("boot", (e) => onChange({ boot: e.data }));
     return;
   }
   const worker = new SharedWorker(new URL("./events-worker.js", import.meta.url), { name: "gh-mini-events" });

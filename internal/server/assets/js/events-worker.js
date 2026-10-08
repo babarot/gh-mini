@@ -9,6 +9,14 @@ events.onmessage = (e) => {
   for (const port of ports) port.postMessage(e.data);
 };
 
+// Not kept for tabs that come later: while the stream is down, the last
+// one may be from a server that is gone, and a tab from the new one would
+// reload until the stream is back
+events.addEventListener("boot", (e) => {
+  const msg = JSON.stringify({ boot: e.data });
+  for (const port of ports) port.postMessage(msg);
+});
+
 // A tab says "close" when it is left, and "open" when it comes back from
 // the back/forward cache
 onconnect = (e) => {

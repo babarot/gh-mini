@@ -65,6 +65,9 @@ type Server struct {
 	translationChoices []choice
 	// serving is the root as the About dialog shows it
 	serving string
+	// boot tells this process from the one before it: a page from an
+	// earlier run reloads when the event stream gives another one
+	boot string
 }
 
 // New opens the root and, when reloading is on, starts watching it.
@@ -104,6 +107,7 @@ func New(opts Options) (*Server, error) {
 
 		translations:       translations,
 		translationChoices: choices,
+		boot:               newPreviewToken(),
 	}
 	if opts.PreviewPort != 0 {
 		s.previewToken = newPreviewToken()
