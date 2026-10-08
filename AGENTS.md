@@ -23,6 +23,8 @@ Mermaid and MathJax are vendored from npm, at the versions in [hack/vendorjs](ha
 go run ./hack/vendorjs internal/server/assets/vendor
 ```
 
-The tests in [e2e](e2e) drive the pages in a headless Chrome, for what the browser does with them: live reload, the tree, the keyboard. They run with `go test ./...` when Chrome is found and are skipped otherwise, or with `-short`. Wait for what a test expects, with `waitFor`, rather than for a time: changes to files reach a page a second or so later.
+The tests in [e2e](e2e) drive the pages in a headless Chrome, for what the browser does with them: live reload, the tree, the keyboard. They run with `go test ./...` when Chrome is found and are skipped otherwise, or with `-short`. Wait for what a test expects, with `waitFor`, rather than for a time: changes to files reach a page a second or so later. For the same reason, make the files a test starts from before the server starts, as `newApp` and `newRepoApp` do: a change made after reaches a page opened meanwhile late, and reloads it under what the test does to it, though what the test waits for may already show.
+
+A browser test that fails now and then is fixed, not run again until it passes: Test runs it once for a pull request, and passing it once does not tell it passes on main. Flaky runs the browser tests a few times over, each night and for a pull request that changes them or the page's assets.
 
 Settings are listed in [settings.go](internal/server/settings.go); adding one there adds it to the dialog, and the comment at the top of the file tells how its value reaches the page. A new setting goes in the table in [Settings](docs/guides/settings.md) too.
