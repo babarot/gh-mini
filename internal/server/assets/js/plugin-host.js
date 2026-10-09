@@ -22,10 +22,13 @@
     // Reads the plugin asked for, by ID, waiting for the page's answer
     const reads = new Map();
     let readID = 0;
-    // ctx is what a hook is handed for one request: the file shown, and
-    // reading the files next to it
+    // ctx is what a hook is handed for one request: the file shown, where
+    // a component is, its child components, and reading the files next to
+    // it
     const ctx = (m) => ({
       path: m.path,
+      block: m.block,
+      children: m.children,
       read(rel) {
         return new Promise((resolve, reject) => {
           const id = ++readID;

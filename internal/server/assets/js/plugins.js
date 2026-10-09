@@ -1,7 +1,7 @@
 // Plugins show what a Markdown file leaves to them: its front matter, which
 // the server also shows as a table, and components such as
-// <Partial name="figure" />, which the server keeps as empty
-// <mini-element>s. Each plugin runs in a sandbox of its own (see
+// <Partial name="figure" />, which the server keeps as <mini-element>s,
+// empty or holding their children. Each plugin runs in a sandbox of its own (see
 // plugins.go), handed what it shows and the files it reads; what it gives
 // back is sanitized by the server and shown in a shadow root, where the
 // page's styles and the plugin's keep apart.
@@ -30,7 +30,10 @@ export function initPlugins() {
     }
     for (const el of article.querySelectorAll("mini-element[data-tag]")) {
       const p = plugins.find((p) => p.elements.includes(el.dataset.tag));
-      if (p) jobs.push({ p, el, file, msg: { hook: "element", tag: el.dataset.tag, attrs: JSON.parse(el.dataset.attrs || "{}") } });
+      if (!p) continue;
+      const msg = { hook: "element", tag: el.dataset.tag, attrs: JSON.parse(el.dataset.attrs || "{}"), block: el.hasAttribute("data-block") };
+      if (el.dataset.children !== undefined) msg.children = JSON.parse(el.dataset.children);
+      jobs.push({ p, el, file, msg });
     }
   }
   const sandboxes = new Map();
@@ -51,17 +54,22 @@ async function run(sandbox, { p, el, file, msg }) {
     const err = document.createElement("span");
     err.className = "mini-plugin-error";
     err.textContent = `plugin ${p.name}: ${e.message || e}`;
-    el.replaceChildren(err);
+    // A component's children stay
+    if (msg.children) el.prepend(err);
+    else el.replaceChildren(err);
   }
 }
 
 // show puts what a plugin gave back in the place of el, in a shadow root
 // on a box inside it: the box, kept in by el's paint containment, holds
-// even a fixed position the plugin's styles give it.
+// even a fixed position the plugin's styles give it. A component's
+// children move into the box, where the plugin's <slot> shows them: still
+// the page's, its styles theirs.
 async function show(el, p, { html, css }) {
   const r = await fetch("/_mini/api/sanitize", { method: "POST", headers: { "Content-Type": "text/plain" }, body: html });
   if (!r.ok) throw new Error("could not sanitize: " + r.status);
   const box = document.createElement("div");
+  box.append(...el.childNodes);
   const root = box.attachShadow({ mode: "open" });
   root.innerHTML = await r.text();
   if (css) {
