@@ -139,13 +139,48 @@ func TestComponents(t *testing.T) {
 	}
 }
 
-// A plugin's HTML keeps classes, and nothing else that a file's HTML would
-// not keep.
+// A plugin's HTML keeps classes, styles, ids as written and SVG to draw
+// with, and nothing that runs or loads from elsewhere.
 func TestSanitizePlugin(t *testing.T) {
-	got := string(SanitizePlugin([]byte(`<div class="box a"><script>alert(1)</script><span id="x" onclick="alert(1)" style="color:red">t</span><svg onload="alert(1)"></svg><style>p{}</style></div>`)))
-	want := `<div class="box a"><span id="user-content-x">t</span></div>`
+	got := string(SanitizePlugin([]byte(`<div class="box a"><script>alert(1)</script><span id="x" onclick="alert(1)" style="color:red">t</span><style>p{}</style></div>`)))
+	want := `<div class="box a"><span id="x" style="color:red">t</span></div>`
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
+	}
+	svg := `<svg viewBox="0 0 10 10" role="img" aria-label="A diagram"><title>Graph</title><defs>` +
+		`<marker id="m" refX="1" orient="auto"><path d="M0 0L1 1z"/></marker>` +
+		`<linearGradient id="g"><stop offset="0" stop-color="rgb(1, 2, 3)"/></linearGradient></defs>` +
+		`<g transform="translate(1 2) rotate(3)"><path d="M0 0" marker-end="url(#m)" fill="url(#g)" style="stroke: hsl(1, 2%, 3%); stroke-width: 2"/>` +
+		`<text x="1" font-family="'Helvetica', sans-serif">A &amp; B</text></g></svg>`
+	if got := string(SanitizePlugin([]byte(svg))); !strings.Contains(got, `<title>Graph</title>`) ||
+		!strings.Contains(got, `marker-end="url(#m)"`) || !strings.Contains(got, `fill="url(#g)"`) ||
+		!strings.Contains(got, `transform="translate(1 2) rotate(3)"`) || !strings.Contains(got, `style="stroke: hsl(1, 2%, 3%); stroke-width: 2"`) ||
+		!strings.Contains(got, `aria-label="A diagram"`) || !strings.Contains(got, "<defs>") || !strings.Contains(got, `<marker id="m"`) {
+		t.Errorf("SVG: %s", got)
+	}
+	// What would run or load goes, with the attribute it is in
+	for _, bad := range []string{
+		`<svg onload="x()"><rect/></svg>`,
+		`<svg><script>x()</script></svg>`,
+		`<svg><foreignObject><img src=x onerror=x()></foreignObject></svg>`,
+		`<svg><rect><set attributeName="fill" to="red"/><animate attributeName="x"/></rect></svg>`,
+		`<svg><use href="https://example.com/a.svg#x"/><image href="https://example.com/a.png"/></svg>`,
+		`<svg><a xlink:href="javascript:x()"><rect/></a></svg>`,
+		`<svg><rect fill="url(https://example.com/x)"/></svg>`,
+		`<svg><rect filter="url(/_mini/api/tree)"/></svg>`,
+		`<svg><rect style="fill: red; background: url(https://example.com/x)"/></svg>`,
+		`<p style="background: image-set('https://example.com/x' 1x)">t</p>`,
+		`<p style="width: expression(x())">t</p>`,
+		`<p style="background: u\72l(https://example.com/x)">t</p>`,
+		`<svg><rect fill="rgb(url(https://example.com/x))"/></svg>`,
+		`<svg><rect fill="URL(https://example.com/x)"/></svg>`,
+	} {
+		got := strings.ToLower(string(SanitizePlugin([]byte(bad))))
+		for _, s := range []string{"onload", "script", "foreignobject", "onerror", "<set", "<animate", "<use", "<image", "javascript:", "example.com", "/_mini/", "expression", "\\72"} {
+			if strings.Contains(got, s) {
+				t.Errorf("%s: kept %q: %s", bad, s, got)
+			}
+		}
 	}
 	// A slot places a component's children, and is named nothing
 	if got, want := string(SanitizePlugin([]byte(`<div><slot></slot><slot name="x"></slot></div>`))), `<div><slot></slot><slot></slot></div>`; got != want {

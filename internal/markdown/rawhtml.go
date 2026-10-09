@@ -193,22 +193,62 @@ func placeholder(b []byte, block bool) ([]byte, bool) {
 }
 
 // pluginHTMLPolicy is what a plugin's HTML keeps: what a file's HTML
-// keeps, <slot> and classes, as a plugin's HTML comes with styles of its own. It
-// is shown apart from the page, in a shadow root, where the page's classes
-// do not reach, so a class takes the place of nothing of the page's.
+// keeps, and <slot>, classes, styles, roles, and SVG to draw with. It is
+// shown apart from the page, in a shadow root, where the page's classes
+// and ids do not reach, so a class or an id takes the place of nothing of
+// the page's. What a plugin gives back may be a file's text it was given,
+// so what would run, or load from elsewhere, still goes.
 var pluginHTMLPolicy = func() *bluemonday.Policy {
 	p := newRawHTMLPolicy()
 	p.AllowAttrs("class").Matching(anyText).Globally()
+	p.AllowAttrs("style").Matching(safeValue).Globally()
+	p.AllowAttrs("role", "aria-label", "aria-hidden", "aria-labelledby", "aria-describedby").Matching(anyText).Globally()
 	// Where a component's children go
 	p.AllowNoAttrs().OnElements("slot")
+	p.AllowNoAttrs().OnElements(svgElements...)
+	p.AllowAttrs(svgAttrs...).Matching(safeValue).OnElements(svgElements...)
+	p.AllowAttrs("type").Matching(safeValue).OnElements("feColorMatrix")
 	return p
 }()
 
+// svgElements are the SVG elements a plugin's HTML keeps, those that draw.
+// Out are those that run or load: script, foreignObject, which holds HTML
+// apart from what the policy reads, the animations, which set attributes,
+// use and image, which load other documents, and feImage.
+var svgElements = []string{
+	"svg", "g", "defs", "symbol", "title", "desc",
+	"path", "rect", "circle", "ellipse", "line", "polyline", "polygon",
+	"text", "tspan", "textPath", "marker",
+	"linearGradient", "radialGradient", "stop", "pattern", "clipPath", "mask",
+	"filter", "feGaussianBlur", "feOffset", "feBlend", "feFlood", "feComposite",
+	"feMerge", "feMergeNode", "feColorMatrix", "feDropShadow",
+}
+
+// svgAttrs are the attributes those keep, of geometry and painting.
+var svgAttrs = strings.Fields(`
+	viewBox preserveAspectRatio x y x1 y1 x2 y2 cx cy r rx ry width height d points
+	transform pathLength fill fill-opacity fill-rule stroke stroke-width stroke-opacity
+	stroke-dasharray stroke-dashoffset stroke-linecap stroke-linejoin stroke-miterlimit
+	opacity color visibility display font-family font-size font-weight font-style
+	text-anchor dominant-baseline alignment-baseline letter-spacing dx dy rotate
+	textLength lengthAdjust offset stop-color stop-opacity gradientUnits gradientTransform
+	spreadMethod fx fy patternUnits patternContentUnits patternTransform clipPathUnits
+	clip-path clip-rule mask maskUnits maskContentUnits filter filterUnits primitiveUnits
+	in in2 result stdDeviation mode operator k1 k2 k3 k4 values flood-color flood-opacity
+	markerWidth markerHeight markerUnits refX refY orient marker-start marker-mid marker-end
+	vector-effect xmlns version`)
+
+// safeValue is a value, of an SVG attribute or a style, that loads
+// nothing: a paren only after a function that computes, without others in
+// it, or url() of a fragment, an element of the same SVG; no backslash,
+// which CSS would read as an escape.
+var safeValue = regexp.MustCompile(`^(?:[^()\\]|(?i:rgba?|hsla?|var|calc|translate|rotate|scale|matrix|skew[xy])\([^()\\]*\)|url\(\s*['"]?#[\w.:-]+['"]?\s*\))*$`)
+
 // SanitizePlugin drops from a plugin's HTML what the page must not run, as
-// sanitize does for a file's.
+// sanitize does for a file's. Its ids stay as written: in the plugin's
+// shadow root they are its own, and its SVG names them in url(#id).
 func SanitizePlugin(b []byte) []byte {
-	b = tagFilter.ReplaceAll(b, []byte("&lt;$1"))
-	return idAttr.ReplaceAll(pluginHTMLPolicy.SanitizeBytes(b), []byte("${1}"+userContent))
+	return pluginHTMLPolicy.SanitizeBytes(b)
 }
 
 // componentName is a component's name: letters, digits and hyphens, as

@@ -8,6 +8,7 @@
 // page's styles and the plugin's keep apart.
 
 import { page, href, dirname } from "./util.js";
+import { settings } from "./settings.js";
 
 // TIMEOUT is how long a plugin has to start, and to show one thing.
 const TIMEOUT = 10000;
@@ -54,20 +55,34 @@ export function initPlugins() {
   const sandboxes = new Map();
   for (const job of jobs) {
     if (!sandboxes.has(job.p.name)) sandboxes.set(job.p.name, new Sandbox(job.p));
-    run(sandboxes.get(job.p.name), job);
+    job.sandbox = sandboxes.get(job.p.name);
   }
+  let drawing = Promise.all(jobs.map((job) => run(job)));
+  // Drawn in the mode and the theme, what plugins show is drawn again when
+  // either changes, a change after the one before, as Mermaid's diagrams
+  const again = () => {
+    drawing = drawing.then(() => Promise.all(jobs.map((job) => run(job, true))));
+  };
+  new MutationObserver(again).observe(document.documentElement, { attributes: true, attributeFilter: ["data-mode"] });
+  // A theme picked, or saved, loads its stylesheet again
+  document.getElementById("mini.theme")?.addEventListener("load", again);
 }
 
-async function run(sandbox, { p, el, file, msg }) {
+// run asks a plugin to show a job, and shows what it gives back. Asked
+// again, what it showed stays when it fails, or gives back nothing.
+async function run(job, again = false) {
+  const { p, el, file, msg } = job;
   // What el holds, a component's children or a code block, stays
   const holds = msg.children !== undefined || msg.hook === "codeBlock";
   try {
-    const result = await sandbox.ask({ ...msg, ...look(), path: file }, file);
-    if (result) await show(el, p, result, holds);
+    const result = await job.sandbox.ask({ ...msg, ...look(), path: file }, file);
+    if (!result) return;
+    if (job.root) await fill(job.root, result);
+    else job.root = await show(el, p, result, holds);
   } catch (e) {
     console.error(`gh-mini: plugin ${p.name}:`, e);
     // The front matter keeps its table
-    if (msg.hook === "frontMatter") return;
+    if (again || msg.hook === "frontMatter") return;
     const err = document.createElement("span");
     err.className = "mini-plugin-error";
     err.textContent = `plugin ${p.name}: ${e.message || e}`;
@@ -81,20 +96,37 @@ async function run(sandbox, { p, el, file, msg }) {
 // even a fixed position the plugin's styles give it. A component's
 // children move into the box, where the plugin's <slot> shows them: still
 // the page's, its styles theirs; so does a code block.
-async function show(el, p, { html, css }, holds) {
-  const r = await fetch("/_mini/api/sanitize", { method: "POST", headers: { "Content-Type": "text/plain" }, body: html });
-  if (!r.ok) throw new Error("could not sanitize: " + r.status);
+async function show(el, p, result, holds) {
+  const html = await sanitize(result.html);
   const box = document.createElement("div");
+  // An error told before goes, as what it was about shows now
+  el.querySelector(":scope > .mini-plugin-error")?.remove();
   if (holds) box.append(...el.childNodes);
   const root = box.attachShadow({ mode: "open" });
-  root.innerHTML = await r.text();
+  put(root, html, result.css);
+  el.dataset.plugin = p.name;
+  el.replaceChildren(box);
+  return root;
+}
+
+// fill puts what a plugin gave back again in the shadow root it showed in.
+async function fill(root, result) {
+  put(root, await sanitize(result.html), result.css);
+}
+
+function put(root, html, css) {
+  root.innerHTML = html;
   if (css) {
     const style = document.createElement("style");
     style.textContent = css;
     root.prepend(style);
   }
-  el.dataset.plugin = p.name;
-  el.replaceChildren(box);
+}
+
+async function sanitize(html) {
+  const r = await fetch("/_mini/api/sanitize", { method: "POST", headers: { "Content-Type": "text/plain" }, body: html });
+  if (!r.ok) throw new Error("could not sanitize: " + r.status);
+  return r.text();
 }
 
 // look is how the page shows, which a plugin may draw in: the mode, light
@@ -102,9 +134,7 @@ async function show(el, p, { html, css }, holds) {
 function look() {
   const root = document.documentElement;
   const dark = root.dataset.mode ? root.dataset.mode === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  const link = document.getElementById("mini.theme");
-  const theme = link ? decodeURIComponent(link.href.split("?")[0].split("/").pop().replace(/\.css$/, "")) : "github";
-  return { mode: dark ? "dark" : "light", theme };
+  return { mode: dark ? "dark" : "light", theme: settings.theme || "github" };
 }
 
 // Sandbox is a plugin's iframe, and the channel to it.

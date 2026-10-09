@@ -1,6 +1,8 @@
 // Mermaid diagrams, drawn in the colors of the mode and the theme and drawn
 // again when either changes, with buttons to zoom and pan as GitHub has.
 
+import { settings } from "./settings.js";
+
 const root = document.documentElement;
 
 const icon = (d) => '<svg class="octicon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="' + d + '"></path></svg>';
@@ -56,8 +58,7 @@ async function drawAll(diagrams, sources) {
 // its colors, read from the page.
 function themeConfig() {
   const dark = root.dataset.mode === "dark";
-  const link = document.getElementById("mini.theme");
-  const name = link ? decodeURIComponent(link.href.split("?")[0].split("/").pop().replace(/\.css$/, "")) : "github";
+  const name = settings.theme || "github";
   if (name === "github") return { theme: dark ? "dark" : "default" };
   const bg = color("--bgColor-default");
   const muted = color("--bgColor-muted");
