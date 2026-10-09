@@ -20,6 +20,8 @@ type change struct {
 	Dirs      []string `json:"dirs,omitempty"`
 	Structure bool     `json:"structure"`
 	Theme     bool     `json:"theme"`
+	// Plugin tells that a file of the viewer's plugins changed
+	Plugin bool `json:"plugin,omitempty"`
 	// Status tells that what changed since the last commit changed
 	Status bool `json:"status,omitempty"`
 	// Head tells that HEAD or a branch of origin moved, which changes
@@ -137,6 +139,7 @@ func (sub *subscriber) add(c change) {
 	}
 	sub.pending.Structure = sub.pending.Structure || c.Structure
 	sub.pending.Theme = sub.pending.Theme || c.Theme
+	sub.pending.Plugin = sub.pending.Plugin || c.Plugin
 	sub.pending.Status = sub.pending.Status || c.Status
 	sub.pending.Head = sub.pending.Head || c.Head
 	sub.pending.Resync = sub.pending.Resync || c.Resync
@@ -234,8 +237,8 @@ func seqOf(r *http.Request) uint64 {
 // moving changes where the branch stands, which Head tells; when it
 // changes what is uncommitted, Status tells that too.
 func (s *Server) notify(e workspace.Event) {
-	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.Theme && !e.Resync && !e.Status && !e.GitHead {
+	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.Theme && !e.Plugin && !e.Resync && !e.Status && !e.GitHead {
 		return
 	}
-	s.hub.publish(change{Paths: e.Paths, Dirs: e.Dirs, Structure: e.Structure, Theme: e.Theme, Resync: e.Resync, Status: e.Status, Head: e.GitHead})
+	s.hub.publish(change{Paths: e.Paths, Dirs: e.Dirs, Structure: e.Structure, Theme: e.Theme, Plugin: e.Plugin, Resync: e.Resync, Status: e.Status, Head: e.GitHead})
 }

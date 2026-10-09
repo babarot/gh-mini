@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"os"
 	"path"
@@ -49,8 +50,9 @@ type plugin struct {
 	Builtin bool `json:"-"`
 	// Err tells why the plugin cannot run, "" when it can
 	Err string `json:"-"`
-	// fsys holds its files
+	// fsys holds its files, and dir is where, for a viewer's plugin
 	fsys fs.FS
+	dir  string
 }
 
 var (
@@ -69,7 +71,10 @@ func (s *Server) plugins() []plugin {
 		entries, _ := os.ReadDir(s.opts.PluginsDir)
 		for _, e := range entries {
 			if pluginName.MatchString(e.Name()) && isDir(s.opts.PluginsDir, e) {
-				out = append(out, loadPlugin(e.Name(), os.DirFS(filepath.Join(s.opts.PluginsDir, e.Name())), false))
+				dir := filepath.Join(s.opts.PluginsDir, e.Name())
+				p := loadPlugin(e.Name(), os.DirFS(dir), false)
+				p.dir = dir
+				out = append(out, p)
 			}
 		}
 	}
@@ -188,7 +193,7 @@ func (s *Server) enabledPlugins(plugins []plugin, settings map[string]string) []
 			Elements:    cmpOrEmpty(p.Elements),
 			CodeBlocks:  cmpOrEmpty(p.CodeBlocks),
 			Read:        cmpOrEmpty(p.Read),
-			Host:        "/_mini/plugin-host/" + s.boot + "/" + p.Name,
+			Host:        "/_mini/plugins/" + s.boot + "/" + p.Name + "/",
 		})
 	}
 	return out
@@ -238,53 +243,24 @@ func (s *Server) findPlugin(name string) (plugin, bool) {
 }
 
 // pluginPath splits /<prefix><boot>/<name>[/<rest>], for the boot ID of
-// this run only.
-func (s *Server) pluginPath(r *http.Request, prefix string) (name, rest string, ok bool) {
+// this run only. dir is set when the path goes on past the name.
+func (s *Server) pluginPath(r *http.Request, prefix string) (name, rest string, dir, ok bool) {
 	p := strings.TrimPrefix(r.URL.Path, prefix)
 	boot, p, _ := strings.Cut(p, "/")
 	if boot != s.boot {
-		return "", "", false
+		return "", "", false, false
 	}
-	name, rest, _ = strings.Cut(p, "/")
-	return name, rest, pluginName.MatchString(name)
+	name, rest, dir = strings.Cut(p, "/")
+	return name, rest, dir, pluginName.MatchString(name)
 }
 
-// servePluginHost serves the document a plugin runs in: plugin-host.js,
-// which imports the plugin's main.js once the page has handed it a channel
-// to talk on. Its policy sandboxes it, even opened on its own, to an origin
-// of its own, where it loads those two scripts and nothing else.
-func (s *Server) servePluginHost(w http.ResponseWriter, r *http.Request) {
-	name, rest, ok := s.pluginPath(r, "/_mini/plugin-host/")
-	if !ok || rest != "" {
-		http.NotFound(w, r)
-		return
-	}
-	if _, ok := s.findPlugin(name); !ok {
-		http.NotFound(w, r)
-		return
-	}
-	// 'self' would be the sandbox's own origin, which matches nothing
-	origin := "http://" + r.Host
-	host := s.static.prefix() + "/assets/js/plugin-host.js"
-	code := "/_mini/plugins/" + s.boot + "/" + name + "/"
-	w.Header().Set("Content-Security-Policy", strings.Join([]string{
-		"sandbox allow-scripts",
-		"default-src 'none'",
-		"script-src " + origin + host + " " + origin + code,
-	}, "; "))
-	w.Header().Set("Referrer-Policy", "no-referrer")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, "<!doctype html>\n<meta charset=\"utf-8\">\n<script src=\"%s\" data-plugin=\"%s\"></script>\n",
-		template.HTMLEscapeString(host), template.HTMLEscapeString(code+"main.js"))
-}
-
-// servePluginCode serves a plugin's main.js. It is imported as a module
-// from the plugin's sandbox, whose origin is "null", so it allows that
-// origin, and none other, to read it.
-func (s *Server) servePluginCode(w http.ResponseWriter, r *http.Request) {
-	name, rest, ok := s.pluginPath(r, "/_mini/plugins/")
-	if !ok || rest != "main.js" {
+// servePlugin serves a plugin: at its directory, the document it runs
+// in, and under it, its files. The document is at the directory so that
+// what the plugin names relative to it, as fetch("./data.json") does,
+// resolves among its files, as its imports do.
+func (s *Server) servePlugin(w http.ResponseWriter, r *http.Request) {
+	name, rest, dir, ok := s.pluginPath(r, "/_mini/plugins/")
+	if !ok || !dir {
 		http.NotFound(w, r)
 		return
 	}
@@ -293,7 +269,61 @@ func (s *Server) servePluginCode(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	b, err := fs.ReadFile(p.fsys, "main.js")
+	if rest == "" {
+		s.servePluginHost(w, r, name)
+		return
+	}
+	s.servePluginFile(w, r, p, rest)
+}
+
+// servePluginHost serves the document a plugin runs in: plugin-host.js,
+// which imports the plugin's main.js once the page has handed it a channel
+// to talk on. Its policy sandboxes it, even opened on its own, to an origin
+// of its own, where it loads those two scripts and the plugin's modules,
+// compiles WebAssembly, and fetches the plugin's files, and nothing else.
+func (s *Server) servePluginHost(w http.ResponseWriter, r *http.Request, name string) {
+	// 'self' would be the sandbox's own origin, which matches nothing
+	origin := "http://" + r.Host
+	host := s.static.prefix() + "/assets/js/plugin-host.js"
+	code := "/_mini/plugins/" + s.boot + "/" + name + "/"
+	w.Header().Set("Content-Security-Policy", strings.Join([]string{
+		"sandbox allow-scripts",
+		"default-src 'none'",
+		"script-src " + origin + host + " " + origin + code + " 'wasm-unsafe-eval'",
+		"connect-src " + origin + code,
+	}, "; "))
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, "<!doctype html>\n<meta charset=\"utf-8\">\n<script src=\"%s\" data-plugin=\"%s\"></script>\n",
+		template.HTMLEscapeString(host), template.HTMLEscapeString(code+"main.js"))
+}
+
+// servePluginFile serves a file of a plugin's: its modules, WebAssembly
+// and data, which its sandbox, whose origin is "null", imports and fetches;
+// so it allows that origin, and none other, to read them. Hidden files are
+// not served, nor, for a viewer's plugin, what a symlink in its directory
+// points to out of it.
+func (s *Server) servePluginFile(w http.ResponseWriter, r *http.Request, p plugin, rel string) {
+	if !fs.ValidPath(rel) || slices.ContainsFunc(strings.Split(rel, "/"), func(part string) bool { return strings.HasPrefix(part, ".") }) {
+		http.NotFound(w, r)
+		return
+	}
+	fsys := p.fsys
+	if p.dir != "" {
+		root, err := os.OpenRoot(p.dir)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer root.Close()
+		fsys = root.FS()
+	}
+	if info, err := fs.Stat(fsys, rel); err != nil || info.IsDir() {
+		http.NotFound(w, r)
+		return
+	}
+	b, err := fs.ReadFile(fsys, rel)
 	if err != nil {
 		http.NotFound(w, r)
 		return
@@ -302,10 +332,35 @@ func (s *Server) servePluginCode(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Origin") == "null" {
 		w.Header().Set("Access-Control-Allow-Origin", "null")
 	}
-	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	ctype := pluginFileType(rel)
+	w.Header().Set("Content-Type", ctype)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if !passive(ctype) {
+		// Opened as a page, a plugin's HTML would run as gh-mini, as a
+		// file served raw would; a sandbox does nothing to a module
+		// imported or a file fetched
+		w.Header().Set("Content-Security-Policy", "sandbox")
+	}
 	w.Header().Set("Cache-Control", "no-store")
 	w.Write(b)
+}
+
+// pluginFileType is the type a plugin's file is served as.
+func pluginFileType(name string) string {
+	switch path.Ext(name) {
+	case ".js", ".mjs":
+		return "text/javascript; charset=utf-8"
+	case ".wasm":
+		return "application/wasm"
+	case ".json":
+		return "application/json"
+	case ".css":
+		return "text/css; charset=utf-8"
+	}
+	if t := mime.TypeByExtension(path.Ext(name)); t != "" {
+		return t
+	}
+	return "application/octet-stream"
 }
 
 // maxPluginHTML is the most HTML a plugin may give back at once.

@@ -39,6 +39,9 @@ type Event struct {
 	Status bool
 	// Theme is set when a file in the themes directory changed.
 	Theme bool
+	// Plugin is set when a file of the viewer's plugins changed, or one
+	// was added or removed.
+	Plugin bool
 	// Resync is set when changes may have been missed, so that pages and
 	// the tree are read again.
 	Resync bool
@@ -90,9 +93,13 @@ type Watcher struct {
 	// themesOn is set while themesDir is watched; it may be created or
 	// removed while the server runs
 	themesOn atomic.Bool
-	handlers []func(Event)
-	stop     chan struct{}
-	wg       sync.WaitGroup
+	// pmu guards pluginDirs, the directories of the viewer's plugins
+	// watched, as events name them
+	pmu        sync.Mutex
+	pluginDirs map[string]bool
+	handlers   []func(Event)
+	stop       chan struct{}
+	wg         sync.WaitGroup
 	// head is HEAD's commit as last told, so that a commit, which moves
 	// HEAD without writing HEAD itself, is told as HEAD moving; only the
 	// flushing goroutine uses it
@@ -133,6 +140,7 @@ type burst struct {
 	// writes it, and some writes that move nothing
 	headLog   bool
 	theme     bool
+	plugin    bool
 	gitignore bool
 	resync    bool
 }
@@ -166,6 +174,8 @@ func Watch(ws *Workspace, themesDir string, handlers ...func(Event)) (*Watcher, 
 		viewedAt:  map[string]*list.Element{},
 		maxCost:   maxViewedCost,
 		tooBig:    map[string]bool{},
+
+		pluginDirs: map[string]bool{},
 	}
 	root := ws.opts.Root
 	// Mark the workspace watched first, so that the snapshot built here
@@ -255,6 +265,72 @@ func (w *Watcher) WatchThemes() {
 	if err := w.fw.Add(w.themesDir, fswatcher.All); err == nil {
 		w.themesOn.Store(true)
 	}
+}
+
+// WatchPlugins watches the directories of the viewer's plugins, those
+// given and the ones in them, those not watched yet. The server calls it on
+// every page with the plugins directory and each plugin's, so one added is
+// followed from the next page on. A plugin linked from elsewhere is
+// watched where it is; hidden directories and node_modules are not.
+func (w *Watcher) WatchPlugins(dirs []string) {
+	for _, top := range dirs {
+		top = resolve(top)
+		_ = filepath.WalkDir(top, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || !d.IsDir() {
+				return nil
+			}
+			if p != top && (strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules") {
+				return fs.SkipDir
+			}
+			w.watchPluginDir(p)
+			return nil
+		})
+	}
+}
+
+func (w *Watcher) watchPluginDir(dir string) {
+	w.pmu.Lock()
+	known := w.pluginDirs[dir]
+	w.pmu.Unlock()
+	if known {
+		return
+	}
+	root := w.ws.opts.Root
+	// A directory in a root watched whole is watched already, and one the
+	// root's watch holds for good too
+	covered := w.recursive && (dir == root || strings.HasPrefix(dir, root+string(filepath.Separator)))
+	w.mu.Lock()
+	if w.closed {
+		w.mu.Unlock()
+		return
+	}
+	if !covered && !w.fixed[dir] {
+		// A directory removed and made again is a new one to the watcher
+		_ = w.fw.Remove(dir)
+		if err := w.fw.Add(dir, fswatcher.All); err != nil && !errors.Is(err, fswatcher.ErrAlreadyAdded) {
+			w.mu.Unlock()
+			return
+		}
+	}
+	w.mu.Unlock()
+	w.pmu.Lock()
+	w.pluginDirs[dir] = true
+	w.pmu.Unlock()
+}
+
+// pluginChanged tells whether an event is of a plugin's file or
+// directory. A directory gone is forgotten, to be watched again if made
+// again.
+func (w *Watcher) pluginChanged(name, dir string) bool {
+	w.pmu.Lock()
+	defer w.pmu.Unlock()
+	if w.pluginDirs[name] {
+		if _, err := os.Stat(name); err != nil {
+			delete(w.pluginDirs, name)
+		}
+		return true
+	}
+	return w.pluginDirs[dir]
 }
 
 // watchRefs follows the refs a fetch or a push moves, origin's branches,
@@ -358,6 +434,12 @@ func (w *Watcher) add(e fswatcher.Event) {
 	defer w.bmu.Unlock()
 	b := &w.burst
 	dir := filepath.Dir(e.Name)
+	// The plugins directory may be in the root, where what changed in it
+	// is a change of the root's too
+	if w.pluginChanged(e.Name, dir) {
+		b.plugin = true
+		b.touch(time.Now())
+	}
 	switch {
 	case w.ignores[dir] != "":
 		// What git ignores in the root changes with these files
@@ -461,7 +543,7 @@ func (w *Watcher) flush(b burst) {
 		// ignores now
 		w.addTree(w.ws.opts.Root, w.ws.Snapshot())
 	}
-	e := Event{Structure: structure, GitHead: b.gitHead, Theme: b.theme, Resync: b.resync}
+	e := Event{Structure: structure, GitHead: b.gitHead, Theme: b.theme, Plugin: b.plugin, Resync: b.resync}
 	// git writes its index for other reasons too, such as a status run
 	// by an editor: only a change of status is told
 	if status {
@@ -471,7 +553,7 @@ func (w *Watcher) flush(b burst) {
 		e.Status = now.StatusETag != snap.StatusETag || now.BaseStatusETag != snap.BaseStatusETag
 	}
 	e.Paths, e.Dirs = limitPaths(snap, b.paths)
-	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.GitHead && !e.Status && !e.Theme && !e.Resync {
+	if len(e.Paths) == 0 && len(e.Dirs) == 0 && !e.Structure && !e.GitHead && !e.Status && !e.Theme && !e.Plugin && !e.Resync {
 		return
 	}
 	for _, h := range w.handlers {

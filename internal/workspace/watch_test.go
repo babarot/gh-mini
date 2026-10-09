@@ -461,6 +461,8 @@ func TestWatchPerDirectory(t *testing.T) {
 		"symlink":              TestWatchSymlink,
 		"past dangling":        TestWatchPastDanglingSymlink,
 		"themes created later": TestWatchThemesCreatedLater,
+		"plugins":              TestWatchPlugins,
+		"plugins in root":      TestWatchPluginsInRoot,
 		"refs":                 TestWatchRefs,
 		"refs of worktree":     TestWatchRefsOfWorktree,
 		"commit moves head":    TestWatchCommitMovesHead,
@@ -493,4 +495,87 @@ func TestWatchIgnoresOutsideRoot(t *testing.T) {
 	if !ws.Snapshot().Ignored("a.md") {
 		t.Error("a.md not ignored after info/exclude")
 	}
+}
+
+// A change of a plugin's file is told, in a directory of it, in a plugin
+// linked from elsewhere, and a plugin added; not in its node_modules.
+func TestWatchPlugins(t *testing.T) {
+	dir := newRepo(t, "")
+	plugins := filepath.Join(t.TempDir(), "plugins")
+	write(t, filepath.Join(plugins, "a", "main.js"), "1\n")
+	write(t, filepath.Join(plugins, "a", "lib", "x.js"), "1\n")
+	write(t, filepath.Join(plugins, "a", "node_modules", "y.js"), "1\n")
+	linked := filepath.Join(t.TempDir(), "b")
+	write(t, filepath.Join(linked, "main.js"), "1\n")
+	if err := os.Symlink(linked, filepath.Join(plugins, "b")); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := Open(Options{Root: dir, Name: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws.Close()
+	events := make(chan Event, 16)
+	w, err := Watch(ws, "", func(e Event) { events <- e })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	w.WatchPlugins([]string{plugins, filepath.Join(plugins, "a"), filepath.Join(plugins, "b")})
+
+	plugin := func(e Event) bool { return e.Plugin }
+	write(t, filepath.Join(plugins, "a", "lib", "x.js"), "2\n")
+	next(t, events, plugin)
+	write(t, filepath.Join(linked, "main.js"), "2\n")
+	next(t, events, plugin)
+	write(t, filepath.Join(plugins, "c", "main.js"), "1\n")
+	next(t, events, plugin)
+
+	time.Sleep(300 * time.Millisecond)
+	for len(events) > 0 {
+		<-events
+	}
+	write(t, filepath.Join(plugins, "a", "node_modules", "y.js"), "2\n")
+	time.Sleep(500 * time.Millisecond)
+	for len(events) > 0 {
+		if e := <-events; e.Plugin {
+			t.Error("a change in node_modules is told")
+		}
+	}
+
+	// Removed and made again, as a plugin is updated, it is watched again
+	if err := os.RemoveAll(filepath.Join(plugins, "a")); err != nil {
+		t.Fatal(err)
+	}
+	next(t, events, plugin)
+	write(t, filepath.Join(plugins, "a", "main.js"), "1\n")
+	time.Sleep(300 * time.Millisecond)
+	w.WatchPlugins([]string{plugins})
+	for len(events) > 0 {
+		<-events
+	}
+	write(t, filepath.Join(plugins, "a", "main.js"), "2\n")
+	next(t, events, plugin)
+}
+
+// Plugins in the root are watched with it, and a change of theirs is a
+// change of the root's too.
+func TestWatchPluginsInRoot(t *testing.T) {
+	dir := newRepo(t, "")
+	plugins := filepath.Join(dir, ".plugins")
+	write(t, filepath.Join(plugins, "a", "main.js"), "1\n")
+	ws, err := Open(Options{Root: dir, Name: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws.Close()
+	events := make(chan Event, 16)
+	w, err := Watch(ws, "", func(e Event) { events <- e })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	w.WatchPlugins([]string{plugins, filepath.Join(plugins, "a")})
+	write(t, filepath.Join(plugins, "a", "main.js"), "2\n")
+	next(t, events, func(e Event) bool { return e.Plugin })
 }

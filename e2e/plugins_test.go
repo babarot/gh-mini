@@ -287,3 +287,34 @@ func TestPluginCodeBlocks(t *testing.T) {
 		t.Error("a language no plugin shows is boxed")
 	}
 }
+
+// A plugin imports its own modules, fetches its own files, relative to
+// itself, and compiles WebAssembly; editing one shows again on the page.
+func TestPluginFiles(t *testing.T) {
+	a := newApp(t, map[string]string{
+		".plugins/files/plugin.json":  `{"elements": ["Files"]}`,
+		".plugins/files/lib/label.js": `export const label = "one";` + "\n",
+		".plugins/files/data.json":    `{"n": 2}`,
+		// The smallest WebAssembly module
+		".plugins/files/m.wasm": "\x00asm\x01\x00\x00\x00",
+		".plugins/files/main.js": `import { label } from "./lib/label.js";
+export default {
+  elements: {
+    async Files() {
+      const data = await (await fetch("./data.json")).json();
+      const { instance } = await WebAssembly.instantiateStreaming(fetch("./m.wasm"));
+      return "<p>" + label + " " + data.n + (instance ? " wasm" : "") + "</p>";
+    },
+  },
+};
+`,
+		"post.md": "<Files />\n",
+	})
+	ctx := tab(t)
+	open(t, ctx, a.URL("/post.md"))
+	subscribed(t, ctx)
+	text := `document.querySelector('mini-element[data-plugin="files"] > div')?.shadowRoot?.textContent`
+	waitFor(t, ctx, text+` === "one 2 wasm"`)
+	a.write(".plugins/files/lib/label.js", `export const label = "two";`+"\n")
+	waitFor(t, ctx, text+` === "two 2 wasm"`)
+}

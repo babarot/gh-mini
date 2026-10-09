@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -112,7 +113,7 @@ func TestPagePlugins(t *testing.T) {
 		"broken":  {"plugin.json": `{}`, "main.js": ""},
 	})
 	h := srv.Handler()
-	host := `"host":"/_mini/plugin-host/` + srv.boot + `/partial"`
+	host := `"host":"/_mini/plugins/` + srv.boot + `/partial/"`
 	r := get(t, h, "/")
 	r.expect(t, http.StatusOK,
 		`<script type="application/json" id="mini.plugins">[{"name":"partial","frontMatter":false,"elements":["Partial"],"codeBlocks":[],"read":["figures/*.part.html","/styles/*.css"],`+host+`}]</script>`,
@@ -125,14 +126,16 @@ func TestPagePlugins(t *testing.T) {
 	r.reject(t, `"name":"partial"`)
 }
 
-// A plugin's document is sandboxed, loads its two scripts and nothing
-// else, and is there for this run only.
+// A plugin's document, at its directory, is sandboxed, loads its scripts,
+// compiles WebAssembly and fetches its files, and nothing else, and is
+// there for this run only.
 func TestPluginHost(t *testing.T) {
 	srv := newPluginServer(t, map[string]map[string]string{"partial": partialPlugin})
 	h := srv.Handler()
-	r := get(t, h, "/_mini/plugin-host/"+srv.boot+"/partial")
-	r.expect(t, http.StatusOK, `data-plugin="/_mini/plugins/`+srv.boot+`/partial/main.js"`)
-	want := "sandbox allow-scripts; default-src 'none'; script-src http://localhost" + srv.static.prefix() + "/assets/js/plugin-host.js http://localhost/_mini/plugins/" + srv.boot + "/partial/"
+	dir := "/_mini/plugins/" + srv.boot + "/partial/"
+	r := get(t, h, dir)
+	r.expect(t, http.StatusOK, `data-plugin="`+dir+`main.js"`)
+	want := "sandbox allow-scripts; default-src 'none'; script-src http://localhost" + srv.static.prefix() + "/assets/js/plugin-host.js http://localhost" + dir + " 'wasm-unsafe-eval'; connect-src http://localhost" + dir
 	if got := r.header.Get("Content-Security-Policy"); got != want {
 		t.Errorf("CSP %q, want %q", got, want)
 	}
@@ -140,9 +143,9 @@ func TestPluginHost(t *testing.T) {
 		t.Errorf("Referrer-Policy %q", got)
 	}
 	for _, target := range []string{
-		"/_mini/plugin-host/nope/partial",
-		"/_mini/plugin-host/" + srv.boot + "/none",
-		"/_mini/plugin-host/" + srv.boot + "/partial/x",
+		"/_mini/plugins/nope/partial/",
+		"/_mini/plugins/" + srv.boot + "/none/",
+		"/_mini/plugins/" + srv.boot + "/partial",
 	} {
 		if r := get(t, h, target); r.code != http.StatusNotFound {
 			t.Errorf("%s: %d", target, r.code)
@@ -150,36 +153,88 @@ func TestPluginHost(t *testing.T) {
 	}
 }
 
-// A plugin's code is read by its sandbox, whose origin is "null", and by
-// no other origin.
-func TestPluginCode(t *testing.T) {
-	srv := newPluginServer(t, map[string]map[string]string{"partial": partialPlugin})
+// A plugin's files are read by its sandbox, whose origin is "null", and by
+// no other origin: its modules, WebAssembly and data, but not its hidden
+// files, nor what a symlink points to out of its directory.
+func TestPluginFiles(t *testing.T) {
+	srv := newPluginServer(t, map[string]map[string]string{"partial": withPluginFiles(partialPlugin, map[string]string{
+		"lib/draw.js":    "export const x = 1;\n",
+		"lib/draw.wasm":  "\x00asm",
+		"data.json":      "{}",
+		"page.html":      "<script>x()</script>",
+		"logo.png":       "\x89PNG",
+		".env":           "SECRET=1",
+		".git/config":    "x",
+		"lib/.hidden.js": "x",
+	})})
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	writeFile(t, outside, []byte("secret"))
+	if err := os.Symlink(outside, filepath.Join(srv.opts.PluginsDir, "partial", "link.txt")); err != nil {
+		t.Fatal(err)
+	}
 	h := srv.Handler()
-	code := "/_mini/plugins/" + srv.boot + "/partial/main.js"
-	r := get(t, h, code, withHeader("Origin", "null"))
-	r.expect(t, http.StatusOK, "export default")
-	if got := r.header.Get("Access-Control-Allow-Origin"); got != "null" {
-		t.Errorf("Access-Control-Allow-Origin %q", got)
+	dir := "/_mini/plugins/" + srv.boot + "/partial/"
+	for file, typ := range map[string]string{
+		"main.js":       "text/javascript; charset=utf-8",
+		"lib/draw.js":   "text/javascript; charset=utf-8",
+		"lib/draw.wasm": "application/wasm",
+		"data.json":     "application/json",
+		"plugin.json":   "application/json",
+	} {
+		r := get(t, h, dir+file, withHeader("Origin", "null"))
+		if r.code != http.StatusOK || r.header.Get("Content-Type") != typ || r.header.Get("Access-Control-Allow-Origin") != "null" {
+			t.Errorf("%s: %d %q %q", file, r.code, r.header.Get("Content-Type"), r.header.Get("Access-Control-Allow-Origin"))
+		}
 	}
-	if got := r.header.Get("Content-Type"); got != "text/javascript; charset=utf-8" {
-		t.Errorf("Content-Type %q", got)
-	}
-	if r := get(t, h, code, withHeader("Origin", "https://example.com")); r.header.Get("Access-Control-Allow-Origin") != "" {
+	if r := get(t, h, dir+"main.js", withHeader("Origin", "https://example.com")); r.header.Get("Access-Control-Allow-Origin") != "" {
 		t.Error("another origin may read it")
+	}
+	// Opened as a page, what would run runs in a sandbox
+	for _, file := range []string{"main.js", "page.html"} {
+		if r := get(t, h, dir+file); r.header.Get("Content-Security-Policy") != "sandbox" {
+			t.Errorf("%s: CSP %q", file, r.header.Get("Content-Security-Policy"))
+		}
+	}
+	if r := get(t, h, dir+"logo.png"); r.code != http.StatusOK || r.header.Get("Content-Security-Policy") != "" {
+		t.Errorf("an image: %d %q", r.code, r.header.Get("Content-Security-Policy"))
 	}
 	for _, target := range []string{
 		"/_mini/plugins/nope/partial/main.js",
-		"/_mini/plugins/" + srv.boot + "/partial/plugin.json",
 		"/_mini/plugins/" + srv.boot + "/none/main.js",
+		dir + ".env",
+		dir + ".git/config",
+		dir + "lib/.hidden.js",
+		dir + "lib",
+		dir + "lib/",
+		dir + "link.txt",
 	} {
 		if r := get(t, h, target); r.code != http.StatusNotFound {
 			t.Errorf("%s: %d", target, r.code)
 		}
 	}
 	// A path with .. in it is cleaned, by a redirect, before it gets here
-	if r := get(t, h, "/_mini/plugins/"+srv.boot+"/partial/../partial/main.js"); r.code != http.StatusTemporaryRedirect {
+	if r := get(t, h, dir+"../partial/main.js"); r.code != http.StatusTemporaryRedirect {
 		t.Errorf("with ..: %d", r.code)
 	}
+	// One that comes with gh-mini
+	if r := get(t, newServerFor(t, Options{}).Handler(), "/_mini/plugins/"); r.code != http.StatusNotFound {
+		t.Errorf("no boot: %d", r.code)
+	}
+	builtin := newServerFor(t, Options{})
+	if r := get(t, builtin.Handler(), "/_mini/plugins/"+builtin.boot+"/front-matter-card/plugin.json"); r.code != http.StatusOK {
+		t.Errorf("built-in plugin.json: %d", r.code)
+	}
+}
+
+func withPluginFiles(base, more map[string]string) map[string]string {
+	out := map[string]string{}
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, v := range more {
+		out[k] = v
+	}
+	return out
 }
 
 // A plugin's HTML comes back without what would run, its classes kept.
