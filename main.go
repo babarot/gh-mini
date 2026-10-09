@@ -33,7 +33,7 @@ Usage:
 With a FILE, the current directory is served when it holds the file,
 unless it is your home directory or /, and the file is opened.
 
-Themes are CSS files in %s.
+Themes are CSS files in %s, and plugins directories in %s.
 
 Flags:
 `
@@ -64,6 +64,7 @@ type config struct {
 	translations string
 	skip         []string
 	themesDir    string
+	pluginsDir   string
 	version      bool
 	// target is the directory or file to serve, "" for the current
 	// directory.
@@ -77,7 +78,7 @@ type usageError struct{ error }
 // and what is wrong with the flags are written to stderr. With -h, it
 // returns flag.ErrHelp.
 func parseArgs(args []string, stderr io.Writer) (config, error) {
-	c := config{themesDir: defaultThemesDir(), translations: os.Getenv("GH_MINI_TRANSLATIONS")}
+	c := config{themesDir: configDir("themes"), pluginsDir: configDir("plugins"), translations: os.Getenv("GH_MINI_TRANSLATIONS")}
 	var skip string
 	fs := flag.NewFlagSet("gh-mini", flag.ContinueOnError)
 	fs.SetOutput(stderr)
@@ -95,9 +96,10 @@ func parseArgs(args []string, stderr io.Writer) (config, error) {
 	})
 	fs.StringVar(&skip, "skip", ".git,node_modules,.DS_Store", "comma-separated names left out of the tree")
 	fs.StringVar(&c.themesDir, "theme-dir", c.themesDir, "directory of themes")
+	fs.StringVar(&c.pluginsDir, "plugin-dir", c.pluginsDir, "directory of plugins")
 	fs.BoolVar(&c.version, "version", false, "print the version")
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, usage, c.themesDir)
+		fmt.Fprintf(stderr, usage, c.themesDir, c.pluginsDir)
 		fs.VisitAll(func(f *flag.Flag) {
 			if f.Usage == "" {
 				return
@@ -163,11 +165,12 @@ func run(args []string, stdout, stderr io.Writer) error {
 	}
 
 	opts := server.Options{
-		Root:      root,
-		Name:      filepath.Base(root),
-		Skip:      c.skip,
-		Theme:     c.theme,
-		ThemesDir: c.themesDir,
+		Root:       root,
+		Name:       filepath.Base(root),
+		Skip:       c.skip,
+		Theme:      c.theme,
+		ThemesDir:  c.themesDir,
+		PluginsDir: c.pluginsDir,
 
 		Translations: c.translations,
 		Reload:       !c.noReload,
@@ -296,7 +299,8 @@ func openBrowser(url string) {
 	_ = exec.Command(cmd, url).Start()
 }
 
-func defaultThemesDir() string {
+// configDir is a directory of gh-mini's under the user's configuration.
+func configDir(name string) string {
 	dir := os.Getenv("XDG_CONFIG_HOME")
 	if dir == "" {
 		home, err := os.UserHomeDir()
@@ -305,7 +309,7 @@ func defaultThemesDir() string {
 		}
 		dir = filepath.Join(home, ".config")
 	}
-	return filepath.Join(dir, "gh-mini", "themes")
+	return filepath.Join(dir, "gh-mini", name)
 }
 
 func splitList(s string) []string {

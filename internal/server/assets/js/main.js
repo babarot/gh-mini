@@ -10,6 +10,7 @@ import { initCopy } from "./copy.js";
 import { initMermaid } from "./mermaid.js";
 import { initPictures } from "./pictures.js";
 import { initLines } from "./lines.js";
+import { initPlugins } from "./plugins.js";
 
 // Each part starts on its own, so that one failing leaves the rest working
 for (const init of [
@@ -23,6 +24,7 @@ for (const init of [
   initMermaid,
   initPictures,
   initLines,
+  initPlugins,
   () => initReload({ onTheme: refreshTheme, onStructure: fetchTree, onFiles: refresh, onStatus: fetchStatus, onHead: () => { refreshBranch(); refreshPR(); } }),
   () => fetchStatus().then(({ etag }) => checkStatus(etag)),
 ]) {

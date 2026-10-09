@@ -72,3 +72,84 @@ func TestRawHTMLKept(t *testing.T) {
 		}
 	}
 }
+
+// A component, a self-closing tag whose name starts with a capital as MDX
+// writes one, is kept as an empty <mini-element> for a plugin to show.
+func TestComponents(t *testing.T) {
+	r := New()
+	for name, tt := range map[string]struct{ src, want string }{
+		"block": {
+			"a\n\n<Partial name=\"elm\" />\n\nb\n",
+			"<p>a</p>\n<mini-element data-tag=\"Partial\" data-attrs=\"{&#34;name&#34;:&#34;elm&#34;}\" data-block></mini-element>\n<p>b</p>",
+		},
+		// An HTML block goes on up to a blank line
+		"block with a line after": {
+			"<Partial name=\"elm\" />\nnext\n",
+			"<mini-element data-tag=\"Partial\" data-attrs=\"{&#34;name&#34;:&#34;elm&#34;}\" data-block></mini-element>\nnext",
+		},
+		"inline": {
+			"a <Badge text='new' on /> b\n",
+			"<p>a <mini-element data-tag=\"Badge\" data-attrs=\"{&#34;on&#34;:true,&#34;text&#34;:&#34;new&#34;}\"></mini-element> b</p>",
+		},
+		"over lines": {
+			"<Partial\n  name=\"elm\" />\n",
+			"<mini-element data-tag=\"Partial\" data-attrs=\"{&#34;name&#34;:&#34;elm&#34;}\"></mini-element>",
+		},
+		// A name of HTML's, but not in capitals alone, is a component
+		"name of HTML's": {
+			"<Image src=\"a.png\" />\n",
+			"<mini-element data-tag=\"Image\" data-attrs=\"{&#34;src&#34;:&#34;a.png&#34;}\" data-block></mini-element>",
+		},
+		"attribute case and entities": {
+			"<Chart altText=\"a &amp; &quot;b&quot;\" />\n",
+			"data-attrs=\"{&#34;altText&#34;:&#34;a \\u0026 \\&#34;b\\&#34;&#34;}\"",
+		},
+	} {
+		out, _, err := r.Render([]byte(tt.src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(out), tt.want) {
+			t.Errorf("%s: missing %q in %s", name, tt.want, out)
+		}
+	}
+	// HTML in capitals is HTML still
+	for src, want := range map[string]string{
+		"line one<BR/>line two\n":                 "line one<br/>line two",
+		"<IMG SRC=\"logo.png\" WIDTH=\"100\"/>\n": `<img src="logo.png" width="100"/>`,
+		"<P align=\"center\"/>\n":                 `<p align="center"/>`,
+	} {
+		out, _, err := r.Render([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(out), "mini-element") || !strings.Contains(string(out), want) {
+			t.Errorf("%q: %s", src, out)
+		}
+	}
+	// A tag in lower case, or one with children, is dropped as before
+	for _, src := range []string{"<partial name=\"x\" />\n", "<Callout>hi</Callout>\n"} {
+		out, _, err := r.Render([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(out), "mini-element") || strings.Contains(strings.ToLower(string(out)), "callout") {
+			t.Errorf("%q: %s", src, out)
+		}
+	}
+}
+
+// A plugin's HTML keeps classes, and nothing else that a file's HTML would
+// not keep.
+func TestSanitizePlugin(t *testing.T) {
+	got := string(SanitizePlugin([]byte(`<div class="box a"><script>alert(1)</script><span id="x" onclick="alert(1)" style="color:red">t</span><svg onload="alert(1)"></svg><style>p{}</style></div>`)))
+	want := `<div class="box a"><span id="user-content-x">t</span></div>`
+	if got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+	// A file's HTML still drops classes
+	out, _, _ := New().Render([]byte(`<div class="box">x</div>` + "\n"))
+	if strings.Contains(string(out), "class=") {
+		t.Errorf("class kept in a file: %s", out)
+	}
+}

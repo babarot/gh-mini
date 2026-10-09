@@ -84,7 +84,7 @@ func TestSettingsDialog(t *testing.T) {
 		`<option value="sepia" selected>sepia</option>`,
 		`data-setting="mode" data-value="dark" aria-checked="true" tabindex="0" class="selected">Dark</button>`,
 		`data-setting="mode" data-value="" aria-checked="false" tabindex="-1">Auto</button>`,
-		`<script type="application/json" id="mini.settings-data">{"avatars":"true","changedWords":"true","changes":"true","hideIgnoredDirs":"false","htmlPreview":"false","ignoreWhitespace":"false","languageSwitch":"true","mode":"dark","openChanged":"file","theme":"sepia","treeMarks":"letter","untracked":"true","wide":"false","wrap":"false"}</script>`,
+		`<script type="application/json" id="mini.settings-data">{"avatars":"true","changedWords":"true","changes":"true","hideIgnoredDirs":"false","htmlPreview":"false","ignoreWhitespace":"false","languageSwitch":"true","mode":"dark","openChanged":"file","plugin.front-matter-card":"false","theme":"sepia","treeMarks":"letter","untracked":"true","wide":"false","wrap":"false"}</script>`,
 	)
 	r.reject(t, `id="theme-select"`, `id="mode-select"`)
 }
@@ -119,7 +119,8 @@ func TestSettingSections(t *testing.T) {
 		}
 		got = append(got, sec.Name+"|"+sec.ID+"|"+keys)
 	}
-	want := []string{"Look and Feel|look-and-feel|ac", "General|general|b"}
+	// The plugins, here the one that comes with gh-mini, come last
+	want := []string{"Look and Feel|look-and-feel|ac", "General|general|b", "Plugins|plugins|plugin.front-matter-card"}
 	if !slices.Equal(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}

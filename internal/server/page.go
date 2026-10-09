@@ -41,6 +41,9 @@ type page struct {
 	ChangeList *changeList
 	// Features loads the scripts the page's Markdown needs.
 	Features markdown.Features
+	// Plugins are the plugins on for the viewer, which the page runs on
+	// what its Markdown leaves to them.
+	Plugins []pluginView
 	// csp is the page's Content-Security-Policy
 	csp string
 	// status is what changed since the last commit as the viewer's
@@ -118,6 +121,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 	p.SettingAttrs = settingAttrs(p.Settings)
 	p.SidebarHidden = cookie(r, sidebarCookie) == "hidden"
 	p.SettingSections = s.settingSections(p.Settings)
+	p.Plugins = s.enabledPlugins(s.plugins(), p.Settings)
 	if rel != "." {
 		p.Title = rel + " · " + full
 		parts := strings.Split(rel, "/")

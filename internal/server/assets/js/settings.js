@@ -125,7 +125,10 @@ function set(key, value) {
   const v = typeof value === "boolean" ? String(value) : value;
   settings[key] = v;
   if (appliers[key]) appliers[key](v);
-  else root.setAttribute("data-" + key, v);
+  // A plugin shows parts of Markdown, on a file's page or a README
+  else if (key.startsWith("plugin.")) {
+    if (page.kind === "dir" || page.kind === "markdown") reload();
+  } else root.setAttribute("data-" + key, v);
 }
 
 // initSections switches the page of the dialog, one per section, from the

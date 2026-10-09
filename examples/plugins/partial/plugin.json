@@ -1,0 +1,5 @@
+{
+  "description": "Show <Partial name=\"x\" /> as figures/x.part.html next to the file, with the styles in it",
+  "elements": ["Partial"],
+  "read": ["figures/*.part.html"]
+}

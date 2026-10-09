@@ -127,6 +127,7 @@
       <button type="button" role="tab" id="mini.settings-tab-files" data-section="files" aria-controls="mini.settings-files" aria-selected="false" tabindex="-1">Files</button>
       <button type="button" role="tab" id="mini.settings-tab-changes" data-section="changes" aria-controls="mini.settings-changes" aria-selected="false" tabindex="-1">Changes</button>
       <button type="button" role="tab" id="mini.settings-tab-privacy" data-section="privacy" aria-controls="mini.settings-privacy" aria-selected="false" tabindex="-1">Privacy</button>
+      <button type="button" role="tab" id="mini.settings-tab-plugins" data-section="plugins" aria-controls="mini.settings-plugins" aria-selected="false" tabindex="-1">Plugins</button>
     </div>
     <section class="settings-pane" role="tabpanel" id="mini.settings-appearance" aria-labelledby="mini.settings-tab-appearance">
       <div class="setting">
@@ -251,9 +252,19 @@
         <input type="checkbox" role="switch" data-setting="avatars" aria-labelledby="mini.setting-avatars" checked>
       </div>
     </section>
+    <section class="settings-pane" role="tabpanel" id="mini.settings-plugins" aria-labelledby="mini.settings-tab-plugins" hidden>
+      <div class="setting">
+        <div class="setting-text">
+          <div class="setting-label" id="mini.setting-plugin.front-matter-card">front-matter-card</div>
+          <div class="setting-description">Show front matter as a card: its title, date, description and tags, and the other keys below (comes with gh-mini)</div>
+        </div>
+        <input type="checkbox" role="switch" data-setting="plugin.front-matter-card" aria-labelledby="mini.setting-plugin.front-matter-card">
+      </div>
+    </section>
   </div>
 </dialog>
-<script type="application/json" id="mini.settings-data">{"avatars":"true","changedWords":"true","changes":"true","hideIgnoredDirs":"false","htmlPreview":"false","ignoreWhitespace":"false","languageSwitch":"true","mode":"","openChanged":"file","theme":"github","treeMarks":"letter","untracked":"true","wide":"false","wrap":"false"}</script>
+<script type="application/json" id="mini.settings-data">{"avatars":"true","changedWords":"true","changes":"true","hideIgnoredDirs":"false","htmlPreview":"false","ignoreWhitespace":"false","languageSwitch":"true","mode":"","openChanged":"file","plugin.front-matter-card":"false","theme":"github","treeMarks":"letter","untracked":"true","wide":"false","wrap":"false"}</script>
+<script type="application/json" id="mini.plugins">[]</script>
 
 <div class="layout">
   <aside class="sidebar" id="mini.sidebar">

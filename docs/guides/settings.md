@@ -20,6 +20,7 @@ The gear button opens a menu with the keyboard shortcuts (or press `?`), an Abou
 | Ignore whitespace | off | Leave out changes of whitespace alone from diffs, as `git diff -w` does |
 | Open a changed file at | The file | What the page of a changed file shows first: the file, or its diff |
 | Avatars | on | Show the author of a file's last commit with their picture on GitHub, which asks GitHub for it by their email |
+| A plugin, by its name | on for yours, off for those that come with gh-mini | Show what the plugin shows (see [Plugins](plugins.md)) |
 
 The settings are kept per browser, and hold for every gh-mini on `localhost`.
 

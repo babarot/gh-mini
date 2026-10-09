@@ -23,6 +23,7 @@ It opens `http://localhost:6419/` with:
 - HTML files previewed as a browser shows them, scripts included
 - translations side by side, such as `guide.md` and `guide.ja.md`
 - themes, built in or written as CSS, each in light and dark
+- plugins of your own, to show front matter or MDX components your way
 - what changed since the last commit, in the tree and as diffs, and on a branch, since it left the default branch
 - live reload when files change
 
@@ -56,6 +57,7 @@ go install github.com/babarot/gh-mini@latest
 | `--no-changes` | | Do not read what changed since the last commit |
 | `--theme` | `$GH_MINI_THEME` | Theme until one is picked in the settings |
 | `--theme-dir` | `~/.config/gh-mini/themes` | Directory of themes |
+| `--plugin-dir` | `~/.config/gh-mini/plugins` | Directory of plugins |
 | `--preview-port` | a free one | Port HTML previews are served on, printed at start |
 | `--skip` | `.git,node_modules,.DS_Store` | Names left out of the tree |
 | `--translations` | `$GH_MINI_TRANSLATIONS`, else `suffix` | How translations are named |
@@ -76,6 +78,7 @@ An HTML file's preview runs its scripts. They run in an origin of their own and 
 - [HTML previews](docs/guides/html-previews.md): how previews are served, and what their scripts can do
 - [Translations](docs/guides/translations.md): how translations are named, and how to name yours otherwise
 - [Themes](docs/guides/themes.md): writing a theme of your own
+- [Plugins](docs/guides/plugins.md): showing front matter and components your way, and writing a plugin
 
 ## License
 

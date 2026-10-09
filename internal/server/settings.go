@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -215,6 +216,12 @@ var settingDefs = []setting{
 	},
 }
 
+// settingDefs are the settings: those of settingDefs, and one for each
+// plugin, which come and go with the plugins.
+func (s *Server) settingDefs() []setting {
+	return append(slices.Clip(settingDefs), pluginSettings(s.plugins())...)
+}
+
 // legacyCookies are where settings were kept before settingsCookie.
 // Remove them, and migrate in settings.js, once they are gone.
 var legacyCookies = map[string]string{
@@ -238,8 +245,9 @@ func (d setting) valid(s *Server, v string) bool {
 // the cookie when it is valid, else the default.
 func (s *Server) settings(r *http.Request) map[string]string {
 	stored := storedSettings(r)
-	out := make(map[string]string, len(settingDefs))
-	for _, d := range settingDefs {
+	defs := s.settingDefs()
+	out := make(map[string]string, len(defs))
+	for _, d := range defs {
 		v, ok := stored[d.Key]
 		if !ok {
 			if name, legacy := legacyCookies[d.Key]; legacy {
@@ -350,7 +358,7 @@ func (s *Server) settingSections(values map[string]string) []settingSection {
 	index := map[string]int{}
 	// off are the toggles that do nothing, for the settings under them
 	off := map[string]bool{}
-	for _, d := range settingDefs {
+	for _, d := range s.settingDefs() {
 		v := settingView{setting: d, Value: values[d.Key]}
 		if d.Choices != nil {
 			v.Options = d.Choices(s)

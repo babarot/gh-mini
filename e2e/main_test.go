@@ -215,6 +215,7 @@ func (a *app) start(ln net.Listener) {
 		Skip:        a.skip,
 		Reload:      true,
 		ThemesDir:   filepath.Join(a.root, ".themes"),
+		PluginsDir:  filepath.Join(a.root, ".plugins"),
 		PreviewPort: pln.Addr().(*net.TCPAddr).Port,
 	})
 	if err != nil {

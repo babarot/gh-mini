@@ -137,11 +137,13 @@ func TestRender(t *testing.T) {
 			name: "front matter",
 			src:  "---\ntitle: A <b>\ntags: [x, y]\nmeta: {k: v}\n---\n# Body\n",
 			want: []string{
+				// The front matter as JSON, for a plugin to show
+				`<div class="mini-frontmatter" data-front-matter="{&#34;meta&#34;:{&#34;k&#34;:&#34;v&#34;},&#34;tags&#34;:[&#34;x&#34;,&#34;y&#34;],&#34;title&#34;:&#34;A \u003cb\u003e&#34;}">`,
 				"<table>\n<thead><tr><th>title</th><th>tags</th><th>meta</th></tr></thead><tbody><tr>" +
 					"<td>A &lt;b&gt;</td>" +
 					"<td><table><tbody><tr><td>x</td><td>y</td></tr></tbody></table></td>" +
 					"<td><table><thead><tr><th>k</th></tr></thead><tbody><tr><td>v</td></tr></tbody></table></td>" +
-					"</tr></tbody></table>\n<h1",
+					"</tr></tbody></table>\n</div>\n<h1",
 			},
 		},
 		{
@@ -150,7 +152,7 @@ func TestRender(t *testing.T) {
 			name:   "broken front matter shows its error",
 			src:    "---\nnot: [yaml\n---\n",
 			want:   []string{"Error in user YAML", "<pre><code>not: [yaml\n</code></pre>"},
-			reject: []string{"<hr>", "<table>"},
+			reject: []string{"<hr>", "<table>", "data-front-matter"},
 		},
 		{
 			name:   "a rule around a line that is no mapping is not front matter",
@@ -288,5 +290,16 @@ func TestImageLinks(t *testing.T) {
 	}
 	if out, _ := render(t, "![x](data:image/png;base64,AAAA)\n"); strings.Contains(string(out), "<a") {
 		t.Errorf("a data: image is linked: %s", out)
+	}
+}
+
+// The JSON of front matter keeps keys as written, which JSON could not
+// have as numbers or booleans, follows aliases, and keeps a scalar's type
+// where JSON has one.
+func TestFrontMatterJSON(t *testing.T) {
+	got, _ := render(t, "---\n1: one\ntrue: yes\ndate: 2025-01-29\nn: .nan\nlist: &l [a, 1, 1.5, false, null]\nref: *l\n---\n")
+	want := `data-front-matter="{&#34;1&#34;:&#34;one&#34;,&#34;date&#34;:&#34;2025-01-29&#34;,&#34;list&#34;:[&#34;a&#34;,1,1.5,false,null],&#34;n&#34;:&#34;.nan&#34;,&#34;ref&#34;:[&#34;a&#34;,1,1.5,false,null],&#34;true&#34;:&#34;yes&#34;}"`
+	if !strings.Contains(got, want) {
+		t.Errorf("missing %s in\n%s", want, got)
 	}
 }
