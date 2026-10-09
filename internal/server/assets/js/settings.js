@@ -125,9 +125,11 @@ function set(key, value) {
   const v = typeof value === "boolean" ? String(value) : value;
   settings[key] = v;
   if (appliers[key]) appliers[key](v);
-  // A plugin shows parts of Markdown, on a file's page or a README
+  // A plugin shows parts of Markdown, on a file's page or a README, and
+  // may bring the theme shown, which is the built-in one with it off
   else if (key.startsWith("plugin.")) {
     if (page.kind === "dir" || page.kind === "markdown") reload();
+    else refreshTheme();
   } else root.setAttribute("data-" + key, v);
 }
 

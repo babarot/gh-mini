@@ -483,7 +483,8 @@ func TestHandlerThemes(t *testing.T) {
 	h := newTestServer(t)
 	get(t, h, "/_mini/theme/github.css").expect(t, http.StatusOK, "--borderColor-success-emphasis: #238636")
 	get(t, h, "/_mini/theme/sepia.css").expect(t, http.StatusOK, "--sepia: 1")
-	get(t, h, "/_mini/theme/nope.css").expect(t, http.StatusNotFound)
+	// A theme the viewer has not is the built-in one
+	get(t, h, "/_mini/theme/nope.css").expect(t, http.StatusOK, "--borderColor-success-emphasis: #238636")
 	get(t, h, "/_mini/theme/nord.css").expect(t, http.StatusOK, "--bgColor-default: #2e3440")
 	get(t, h, "/_mini/theme/tokyo-night.css").expect(t, http.StatusOK, "--bgColor-default: #1a1b26")
 	get(t, h, "/", withSettings(`{"theme":"nord"}`)).expect(t, http.StatusOK,

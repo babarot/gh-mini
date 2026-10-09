@@ -27,4 +27,6 @@ The tests in [e2e](e2e) drive the pages in a headless Chrome, for what the brows
 
 A browser test that fails now and then is fixed, not run again until it passes: Test runs it once for a pull request, and passing it once does not tell it passes on main. Flaky runs the browser tests a few times over, each night and for a pull request that changes them or the page's assets.
 
-Settings are listed in [settings.go](internal/server/settings.go); adding one there adds it to the dialog, and the comment at the top of the file tells how its value reaches the page. A new setting goes in the table in [Settings](docs/guides/settings.md) too.
+[Plugins](docs/guides/plugins.md) run in a sandbox of their own, and what they give back is sanitized; [plugins.go](internal/server/plugins.go) tells how, and what a plugin may reach, and [plugins.js](internal/server/assets/js/plugins.js) the page's side. Those that come with gh-mini are in `internal/server/assets/plugins`, off until turned on, and examples in `examples/plugins`. The browser tests serve the plugins in `.plugins` of the directory they make.
+
+Settings are listed in [settings.go](internal/server/settings.go), but for the plugins', one each, made from the plugins found; adding one there adds it to the dialog, and the comment at the top of the file tells how its value reaches the page. A new setting goes in the table in [Settings](docs/guides/settings.md) too.
