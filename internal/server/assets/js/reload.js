@@ -5,6 +5,7 @@
 
 import { page, dirname, isImage } from "./util.js";
 import { changedFiles } from "./status.js";
+import { reads } from "./plugins.js";
 
 const scrollKey = "gh-mini-scroll:" + location.pathname + location.search;
 const detailsKey = "gh-mini-details:" + location.pathname + location.search;
@@ -90,11 +91,14 @@ export function initReload({ onTheme, onStructure, onFiles, onStatus, onHead }) 
     // dirs stand for changes too many to list: any file directly in them
     const dirs = c.dirs || [];
     const inDirs = dirs.some((d) => d === page.path || d === dirname(page.path) ||
-      (page.kind === "html" && underDir(d + "/x")));
+      (page.kind === "html" && underDir(d + "/x")) ||
+      Array.from(reads).some((p) => dirname(p) === d));
     // The Changes page shows the changed files: one edited again may
     // change no count, and so the status not either
     const hit = inDirs || paths.some((p) => (page.kind === "changes" && changedFiles()[p]) || p === page.path || (page.kind === "dir" && dirname(p) === page.path) ||
       (page.kind === "html" && underDir(p)) ||
+      // What plugins read for the page shows in it
+      reads.has(p) ||
       // A Markdown page shows the images next to it
       ((page.kind === "markdown" || page.kind === "dir") && isImage(p) && underDir(p)));
     if (hit || (page.kind === "notfound" && c.structure)) reload();

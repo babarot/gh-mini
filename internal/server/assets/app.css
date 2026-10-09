@@ -768,6 +768,34 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
 .image { padding: 32px; text-align: center; background: var(--bgColor-muted); }
 .image img { max-width: 100%; }
 
+/* What a plugin shows, in place of a component or the front matter's
+   table. Paint containment keeps all of it in its box, even what its
+   styles fix to the window, so that it cannot cover the page */
+.markdown-body mini-element {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: top;
+}
+
+.markdown-body mini-element[data-block] {
+  display: block;
+}
+
+.markdown-body mini-element[data-plugin],
+.markdown-body .mini-frontmatter[data-plugin] {
+  contain: paint;
+  overflow: clip;
+}
+
+.markdown-body .mini-frontmatter[data-plugin] {
+  margin-bottom: 16px;
+}
+
+.mini-plugin-error {
+  color: var(--fgColor-danger);
+  font-size: 85%;
+}
+
 /* Source view */
 .code { overflow: auto; font-family: var(--mini-font-mono); font-size: 12px; line-height: 20px; }
 .code .chroma { background: transparent; }

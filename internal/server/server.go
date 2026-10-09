@@ -34,6 +34,8 @@ type Options struct {
 	Theme string
 	// ThemesDir holds the viewer's own themes, one CSS file each.
 	ThemesDir string
+	// PluginsDir holds the viewer's own plugins, one directory each.
+	PluginsDir string
 	// Reload makes pages reload when the files they show change.
 	Reload bool
 	// NoChanges keeps gh-mini from reading what changed since the last
@@ -152,6 +154,9 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/_mini/static/", s.static)
 	mux.HandleFunc("/_mini/theme/", s.serveTheme)
+	mux.HandleFunc("/_mini/plugin-host/", s.servePluginHost)
+	mux.HandleFunc("/_mini/plugins/", s.servePluginCode)
+	mux.HandleFunc("/_mini/api/sanitize", s.serveSanitize)
 	mux.HandleFunc("/_mini/api/tree", s.serveTree)
 	mux.HandleFunc("/_mini/api/status", s.serveStatus)
 	mux.HandleFunc("/_mini/api/branch", s.serveBranch)

@@ -2,7 +2,10 @@ package markdown
 
 import (
 	"bytes"
+	"encoding/json"
+	"html"
 	"regexp"
+	"strings"
 
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/yuin/goldmark/ast"
@@ -24,7 +27,9 @@ import (
 // rather than from bluemonday.UGCPolicy, which allows id on every element,
 // and an allowance cannot be taken back: an id would let a file take the
 // place of the page's own elements.
-var rawHTMLPolicy = func() *bluemonday.Policy {
+var rawHTMLPolicy = newRawHTMLPolicy()
+
+func newRawHTMLPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
 	p.AllowStandardURLs()
 	p.RequireNoFollowOnLinks(true)
@@ -60,7 +65,7 @@ var rawHTMLPolicy = func() *bluemonday.Policy {
 	p.AllowAttrs("media", "type").Matching(anyText).OnElements("source")
 	p.AllowElements("source")
 	return p
-}()
+}
 
 var (
 	anyText = regexp.MustCompile(`^[^\x00]*$`)
@@ -96,6 +101,10 @@ func renderRawHTML(w util.BufWriter, source []byte, node ast.Node, entering bool
 		segment := n.Segments.At(i)
 		b.Write(segment.Value(source))
 	}
+	if p, ok := placeholder(b.Bytes(), false); ok {
+		_, _ = w.Write(p)
+		return ast.WalkSkipChildren, nil
+	}
 	_, _ = w.Write(sanitize(b.Bytes()))
 	return ast.WalkSkipChildren, nil
 }
@@ -109,12 +118,26 @@ func renderHTMLBlock(w util.BufWriter, source []byte, node ast.Node, entering bo
 	}
 	n := node.(*ast.HTMLBlock)
 	var b bytes.Buffer
-	for i := 0; i < n.Lines().Len(); i++ {
+	first := 0
+	// A block of a tag alone on its line goes on up to a blank line, so
+	// the lines after a component are the rest of the block
+	if n.Lines().Len() > 0 {
+		line := n.Lines().At(0)
+		if p, ok := placeholder(line.Value(source), true); ok {
+			_, _ = w.Write(p)
+			_, _ = w.Write([]byte("\n"))
+			first = 1
+		}
+	}
+	for i := first; i < n.Lines().Len(); i++ {
 		line := n.Lines().At(i)
 		b.Write(line.Value(source))
 	}
 	if n.HasClosure() {
 		b.Write(n.ClosureLine.Value(source))
+	}
+	if b.Len() == 0 {
+		return ast.WalkContinue, nil
 	}
 	_, _ = w.Write(sanitize(b.Bytes()))
 	return ast.WalkContinue, nil
@@ -137,3 +160,94 @@ var tagFilter = regexp.MustCompile(`(?i)<(/?(?:textarea|title|xmp|noembed|nofram
 
 // userContent is put before the ids and names a file's HTML gives.
 const userContent = "user-content-"
+
+// A component is a self-closing tag whose name starts with a capital, as
+// MDX writes one, such as <Partial name="figure" /> or <Image src="a.png" />.
+// GitHub drops it, as it does any tag it does not know, and so does a page
+// here, but it is kept as an empty <mini-element> naming it, with its
+// attributes as JSON, for a plugin to show; with none, it shows nothing.
+var (
+	componentTag  = regexp.MustCompile(`^<([A-Z][A-Za-z0-9-]*)((?:\s+[^\s"'<>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>` + "`" + `]+))?)*)\s*/>$`)
+	componentAttr = regexp.MustCompile(`([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>` + "`" + `]+)))?`)
+)
+
+// placeholder is the <mini-element> of a component, when b is one alone.
+// One on a line of its own, a block, is shown as one.
+func placeholder(b []byte, block bool) ([]byte, bool) {
+	m := componentTag.FindSubmatch(bytes.TrimSpace(b))
+	if m == nil || !IsComponent(string(m[1])) {
+		return nil, false
+	}
+	attrs := map[string]any{}
+	for _, a := range componentAttr.FindAllSubmatch(m[2], -1) {
+		switch {
+		case a[2] != nil:
+			attrs[string(a[1])] = html.UnescapeString(string(a[2]))
+		case a[3] != nil:
+			attrs[string(a[1])] = html.UnescapeString(string(a[3]))
+		case a[4] != nil:
+			attrs[string(a[1])] = html.UnescapeString(string(a[4]))
+		default:
+			attrs[string(a[1])] = true
+		}
+	}
+	j, err := json.Marshal(attrs)
+	if err != nil {
+		return nil, false
+	}
+	var out bytes.Buffer
+	out.WriteString(`<mini-element data-tag="` + html.EscapeString(string(m[1])) + `" data-attrs="` + html.EscapeString(string(j)) + `"`)
+	if block {
+		out.WriteString(` data-block`)
+	}
+	out.WriteString(`></mini-element>`)
+	return out.Bytes(), true
+}
+
+// pluginHTMLPolicy is what a plugin's HTML keeps: what a file's HTML
+// keeps, and classes, as a plugin's HTML comes with styles of its own. It
+// is shown apart from the page, in a shadow root, where the page's classes
+// do not reach, so a class takes the place of nothing of the page's.
+var pluginHTMLPolicy = func() *bluemonday.Policy {
+	p := newRawHTMLPolicy()
+	p.AllowAttrs("class").Matching(anyText).Globally()
+	return p
+}()
+
+// SanitizePlugin drops from a plugin's HTML what the page must not run, as
+// sanitize does for a file's.
+func SanitizePlugin(b []byte) []byte {
+	b = tagFilter.ReplaceAll(b, []byte("&lt;$1"))
+	return idAttr.ReplaceAll(pluginHTMLPolicy.SanitizeBytes(b), []byte("${1}"+userContent))
+}
+
+// componentName is a component's name: letters, digits and hyphens, as
+// CommonMark takes a tag's name, starting with a capital.
+var componentName = regexp.MustCompile(`^[A-Z][A-Za-z0-9-]*$`)
+
+// IsComponent tells whether a tag of a name is a component. A name of an
+// element of HTML's in capitals alone is HTML, as old READMEs write it,
+// such as <BR/> or <IMG SRC="a.png"/>; <Image /> is a component.
+func IsComponent(name string) bool {
+	if !componentName.MatchString(name) {
+		return false
+	}
+	return name != strings.ToUpper(name) || !htmlElements[strings.ToLower(name)]
+}
+
+// htmlElements are the names of HTML's elements, and of those it had.
+var htmlElements = func() map[string]bool {
+	m := map[string]bool{}
+	for _, name := range strings.Fields(`
+		a abbr acronym address applet area article aside audio b base basefont bdi bdo bgsound big blink
+		blockquote body br button canvas caption center cite code col colgroup data datalist dd del details
+		dfn dialog dir div dl dt em embed fieldset figcaption figure font footer form frame frameset h1 h2
+		h3 h4 h5 h6 head header hgroup hr html i iframe image img input ins isindex kbd keygen label legend
+		li link listing main map mark marquee math menu menuitem meta meter nav nobr noembed noframes
+		noscript object ol optgroup option output p param picture plaintext pre progress q rb rp rt rtc ruby
+		s samp script search section select slot small source spacer span strike strong style sub summary
+		sup svg table tbody td template textarea tfoot th thead time title tr track tt u ul var video wbr xmp`) {
+		m[name] = true
+	}
+	return m
+}()

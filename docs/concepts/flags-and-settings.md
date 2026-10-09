@@ -9,9 +9,9 @@ gh-mini takes options in two places: flags on the command line, and settings in 
 
 Ask whom the option is for.
 
-- Does it change what gh-mini reads, watches, listens on or can do? It is a flag. `--port`, `--host`, `--preview-port`, `--no-reload`, `--no-changes`, `--skip` and `--theme-dir` are.
+- Does it change what gh-mini reads, watches, listens on or can do? It is a flag. `--port`, `--host`, `--preview-port`, `--no-reload`, `--no-changes`, `--skip`, `--theme-dir` and `--plugin-dir` are.
 - Does it follow from how the directory served is laid out, so that another directory may want another value? It is a flag. `--translations` is: a repository names its translations its own way, whoever reads it.
-- Is it how one person likes to read, whatever the directory? It is a setting. Theme, Mode, Full width, Wrap code, HTML preview, Language switch, Hide ignored directories, Avatars and the settings of Changes are.
+- Is it how one person likes to read, whatever the directory? It is a setting. Theme, Mode, Full width, Wrap code, HTML preview, Language switch, Hide ignored directories, Avatars, the settings of Changes and the toggle of each plugin are: `--plugin-dir` tells which plugins there are, and the viewer picks which of them to see.
 
 The settings live in one cookie that every gh-mini on localhost shares, whatever its port (see [settings.go](../../internal/server/settings.go)). A pick made while reading one directory holds for all the others. That is right for a viewer's taste and wrong for a fact of one directory, which is why translations are named by a flag and not picked in the dialog.
 

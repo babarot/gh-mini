@@ -2,7 +2,9 @@ package markdown
 
 import (
 	"bytes"
+	"encoding/json"
 	"html"
+	"math"
 
 	"gopkg.in/yaml.v3"
 )
@@ -47,7 +49,9 @@ func splitFrontMatter(src []byte) (fm frontMatter, body []byte, ok bool) {
 }
 
 // renderFrontMatter writes front matter as GitHub shows it: a table whose
-// head is the keys, with a table for a value that holds more than one.
+// head is the keys, with a table for a value that holds more than one. The
+// table is wrapped in a div holding the front matter as JSON, for a plugin
+// to show it its own way; the table stays where none does.
 func renderFrontMatter(buf *bytes.Buffer, fm frontMatter) {
 	if fm.err != nil {
 		buf.WriteString(`<div class="markdown-alert markdown-alert-caution">` + "\n")
@@ -56,9 +60,51 @@ func renderFrontMatter(buf *bytes.Buffer, fm frontMatter) {
 		buf.WriteString("<pre><code>" + html.EscapeString(string(fm.raw)) + "</code></pre>\n")
 		return
 	}
+	if b, err := json.Marshal(yamlJSON(fm.node)); err == nil {
+		buf.WriteString(`<div class="mini-frontmatter" data-front-matter="` + html.EscapeString(string(b)) + `">` + "\n")
+		defer buf.WriteString("</div>\n")
+	}
 	buf.WriteString("<table>\n")
 	writeYAML(buf, fm.node)
 	buf.WriteString("</table>\n")
+}
+
+// yamlJSON is a node as JSON takes it: a mapping's keys as written, as the
+// table shows them, which decoding would turn into numbers or booleans
+// that JSON cannot have as keys. A scalar keeps its type where JSON has it,
+// and is its text otherwise, such as a date.
+func yamlJSON(n *yaml.Node) any {
+	if n.Kind == yaml.AliasNode {
+		n = n.Alias
+	}
+	switch n.Kind {
+	case yaml.MappingNode:
+		m := make(map[string]any, len(n.Content)/2)
+		for i := 0; i+1 < len(n.Content); i += 2 {
+			m[n.Content[i].Value] = yamlJSON(n.Content[i+1])
+		}
+		return m
+	case yaml.SequenceNode:
+		s := make([]any, 0, len(n.Content))
+		for _, c := range n.Content {
+			s = append(s, yamlJSON(c))
+		}
+		return s
+	}
+	var v any
+	if n.Decode(&v) != nil {
+		return n.Value
+	}
+	switch v := v.(type) {
+	case nil, string, bool, int, int64, uint64:
+		return v
+	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return n.Value
+		}
+		return v
+	}
+	return n.Value
 }
 
 // writeYAML writes the rows of a mapping or a sequence.

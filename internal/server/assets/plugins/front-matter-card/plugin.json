@@ -1,0 +1,4 @@
+{
+  "description": "Show front matter as a card: its title, date, description and tags, and the other keys below",
+  "frontMatter": true
+}
