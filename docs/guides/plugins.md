@@ -8,11 +8,11 @@ Plugins are directories in `~/.config/gh-mini/plugins/` (`$XDG_CONFIG_HOME/gh-mi
 
 gh-mini comes with `front-matter-card`, which shows front matter as a card: the title, date, description and tags, and the other keys below. It is off until you turn it on. A plugin of yours with the same name takes its place.
 
-Plugins are read on every page load: one added or changed shows on the next.
+Plugins are read on every page load, and a page of Markdown, or of a directory, loads again when a file of yours changes: a plugin added or edited shows at once.
 
 ## Writing one
 
-A plugin is a directory of two files, named after the plugin in lower case:
+A plugin is a directory named after the plugin in lower case, of two files at least:
 
 ```
 ~/.config/gh-mini/plugins/partial/
@@ -65,6 +65,8 @@ export default {
 };
 ```
 
+`main.js` may import other modules of the plugin's directory, as `import { draw } from "./lib/draw.js"`, and fetch its other files, as `fetch("./data.json")`, both relative to the directory; WebAssembly compiles, so a renderer built to it can draw a diagram. Files whose names start with `.`, and those of a symlink out of the directory, are not served. Workers are not available.
+
 [examples/plugins/partial](../../examples/plugins/partial) is this plugin, and [front-matter-card](../../internal/server/assets/plugins/front-matter-card) the one that comes with gh-mini.
 
 A function gives back HTML and CSS, as an object, or HTML alone as a string, or `null` to show what gh-mini shows without it: the front matter's table, for a component what it holds and nothing else, and the code for a code block. It may be async. What it throws is shown in the component's or the code's place, before what it holds, and logged in the console.
@@ -106,6 +108,6 @@ A plugin that fails shows why before what the component holds.
 
 ## What a plugin can do
 
-A plugin runs in a sandbox of its own, apart from the page. It is given what it shows and the files its `read` names, and nothing else: it cannot reach the page, gh-mini's other files or its API, and loads nothing from the network. What it gives back is shown in a box of its own, with its scripts and the like taken out, so a file it shows, even from someone else's repository, runs nothing and cannot cover the page.
+A plugin runs in a sandbox of its own, apart from the page. It is given what it shows and the files its `read` names, and nothing else: it cannot reach the page, gh-mini's other files or its API, and loads nothing from the network but its own files. What it gives back is shown in a box of its own, with its scripts and the like taken out, so a file it shows, even from someone else's repository, runs nothing and cannot cover the page.
 
 A plugin can still send what it is given, the files it reads among them, elsewhere: through an image in what it shows, for one. Use plugins you trust, as you would any program you run. gh-mini reads plugins only from the plugins directory and from itself, never from the directory served.

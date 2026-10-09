@@ -79,6 +79,11 @@ export function initReload({ onTheme, onStructure, onFiles, onStatus, onHead }) 
         else if (changed.includes(page.path)) reload();
       });
     }
+    // What plugins show is on Markdown pages and directories' READMEs
+    if (c.plugin && (page.kind === "markdown" || page.kind === "dir")) {
+      reload();
+      return;
+    }
     if (!c.theme && !c.structure && !c.resync && !c.paths?.length && !c.dirs?.length) return;
     if (c.theme) onTheme();
     if (c.structure || c.resync) onStructure();
