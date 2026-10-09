@@ -781,6 +781,11 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
   display: block;
 }
 
+/* Children show as if the tags were not there, until a plugin shows them */
+.markdown-body mini-element[data-children]:not([data-plugin]) {
+  display: contents;
+}
+
 .markdown-body mini-element[data-plugin],
 .markdown-body .mini-frontmatter[data-plugin] {
   contain: paint;

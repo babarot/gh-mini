@@ -178,19 +178,7 @@ func placeholder(b []byte, block bool) ([]byte, bool) {
 	if m == nil || !IsComponent(string(m[1])) {
 		return nil, false
 	}
-	attrs := map[string]any{}
-	for _, a := range componentAttr.FindAllSubmatch(m[2], -1) {
-		switch {
-		case a[2] != nil:
-			attrs[string(a[1])] = html.UnescapeString(string(a[2]))
-		case a[3] != nil:
-			attrs[string(a[1])] = html.UnescapeString(string(a[3]))
-		case a[4] != nil:
-			attrs[string(a[1])] = html.UnescapeString(string(a[4]))
-		default:
-			attrs[string(a[1])] = true
-		}
-	}
+	attrs := parseAttrs(m[2])
 	j, err := json.Marshal(attrs)
 	if err != nil {
 		return nil, false
@@ -205,12 +193,14 @@ func placeholder(b []byte, block bool) ([]byte, bool) {
 }
 
 // pluginHTMLPolicy is what a plugin's HTML keeps: what a file's HTML
-// keeps, and classes, as a plugin's HTML comes with styles of its own. It
+// keeps, <slot> and classes, as a plugin's HTML comes with styles of its own. It
 // is shown apart from the page, in a shadow root, where the page's classes
 // do not reach, so a class takes the place of nothing of the page's.
 var pluginHTMLPolicy = func() *bluemonday.Policy {
 	p := newRawHTMLPolicy()
 	p.AllowAttrs("class").Matching(anyText).Globally()
+	// Where a component's children go
+	p.AllowNoAttrs().OnElements("slot")
 	return p
 }()
 

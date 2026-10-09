@@ -57,6 +57,7 @@ func New() *Renderer {
 				util.Prioritized(alertTransformer{}, 100),
 				util.Prioritized(taskListTransformer{}, 100),
 				util.Prioritized(mathCodeTransformer{}, 100),
+				util.Prioritized(componentTransformer{}, 100),
 				util.Prioritized(extension.NewFootnoteASTTransformer(), 999),
 			),
 		),
@@ -66,6 +67,7 @@ func New() *Renderer {
 			// dropped
 			renderer.WithNodeRenderers(
 				util.Prioritized(rawHTMLRenderer{}, 100),
+				util.Prioritized(componentRenderer{}, 100),
 				util.Prioritized(codeRenderer{}, 100),
 				util.Prioritized(alertRenderer{}, 100),
 				util.Prioritized(taskCheckBoxRenderer{}, 100),

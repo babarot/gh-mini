@@ -168,3 +168,73 @@ func TestPluginReadme(t *testing.T) {
 	a.write("post/figures/fig.part.html", `<div class="box">Again</div>`)
 	waitFor(t, ctx, shown+`?.querySelector(".box")?.textContent === "Again"`)
 }
+
+// A component with children shows them in the plugin's box, where they
+// are still the page's: its styles, ids and copy buttons theirs, and the
+// plugin's styles theirs only through ::slotted, which gives way to the
+// page's but with !important. A plugin
+// is told its child components; without one, or failing, the children
+// show plainly.
+func TestPluginChildren(t *testing.T) {
+	fence := "```"
+	a := newApp(t, map[string]string{
+		".plugins/boxes/plugin.json": `{"elements": ["Callout", "Tabs", "Broken"]}`,
+		".plugins/boxes/main.js": `export default {
+  elements: {
+    Callout({ type }, ctx) {
+      return {
+        html: '<div class="box ' + type + '">' + (ctx.block ? "block" : "inline") + '<slot></slot></div>',
+        css: ".box { color: rgb(1, 2, 3); } p { color: rgb(9, 9, 9); } ::slotted(p) { color: rgb(7, 7, 7); margin-bottom: 3px; } ::slotted(h2) { margin-top: 0 !important; }",
+      };
+    },
+    Tabs(attrs, ctx) {
+      return '<div class="labels">' + ctx.children.map((c) => c.attrs.label).join("|") + "</div><slot></slot>";
+    },
+    Broken() { throw new Error("oops"); },
+  },
+};
+`,
+		"post.md": "<Callout type=\"warn\">\n\n## Inside\n\nText\n\n" + fence + "sh\necho hi\n" + fence + "\n\nLast\n</Callout>\n\n" +
+			"<Tabs>\n\n<Tab label=\"a\">\n\nA\n\n</Tab>\n\n<Tab label=\"b\" />\n\n</Tabs>\n\n" +
+			"<Broken>\n\nkept\n\n</Broken>\n\n" +
+			"<Plain>\n\nplain\n\n</Plain>\n",
+	})
+	ctx := tab(t)
+	open(t, ctx, a.URL("/post.md"))
+	callout := `document.querySelector('mini-element[data-tag="Callout"]')`
+	waitFor(t, ctx, callout+`?.dataset.plugin === "boxes"`)
+	if got := eval[string](t, ctx, callout+`.firstElementChild.shadowRoot.querySelector(".box.warn").textContent`); got != "block" {
+		t.Errorf("box: %q", got)
+	}
+	// The children are in the page, in the plugin's slot
+	if !eval[bool](t, ctx, `(() => {
+		const h = document.getElementById("inside");
+		return h !== null && h.assignedSlot !== null && document.querySelector('mini-element[data-tag="Callout"] .copy-btn') !== null;
+	})()`) {
+		t.Error("the children are not the page's, in the slot")
+	}
+	styles := eval[[]string](t, ctx, `(() => {
+		const p = document.querySelector('mini-element[data-tag="Callout"] p');
+		return [p.textContent, getComputedStyle(p).color, getComputedStyle(p).marginBottom, getComputedStyle(document.getElementById("inside")).marginTop];
+	})()`)
+	// ::slotted sets what the page leaves, and what it sets with !important
+	if styles[0] != "Text" || styles[1] != "rgb(7, 7, 7)" || styles[2] == "3px" || styles[3] != "0px" {
+		t.Errorf("children's text, color, margin and heading margin: %q", styles)
+	}
+	if got := eval[string](t, ctx, `Array.from(document.querySelectorAll('mini-element[data-tag="Callout"] p')).at(-1).textContent`); got != "Last" {
+		t.Errorf("last paragraph: %q", got)
+	}
+
+	tabs := `document.querySelector('mini-element[data-tag="Tabs"]')`
+	waitFor(t, ctx, tabs+`?.firstElementChild?.shadowRoot?.querySelector(".labels")?.textContent === "a|b"`)
+
+	broken := `document.querySelector('mini-element[data-tag="Broken"]')`
+	waitFor(t, ctx, broken+`.querySelector(".mini-plugin-error")?.textContent === "plugin boxes: oops"`)
+	if got := eval[string](t, ctx, broken+`.querySelector("p")?.textContent`); got != "kept" {
+		t.Errorf("a failing plugin's children: %q", got)
+	}
+	plain := `document.querySelector('mini-element[data-tag="Plain"]')`
+	if got := eval[[]string](t, ctx, `[getComputedStyle(`+plain+`).display, `+plain+`.querySelector("p").textContent]`); got[0] != "contents" || got[1] != "plain" {
+		t.Errorf("without a plugin: %q", got)
+	}
+}

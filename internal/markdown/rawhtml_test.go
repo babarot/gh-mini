@@ -127,8 +127,8 @@ func TestComponents(t *testing.T) {
 			t.Errorf("%q: %s", src, out)
 		}
 	}
-	// A tag in lower case, or one with children, is dropped as before
-	for _, src := range []string{"<partial name=\"x\" />\n", "<Callout>hi</Callout>\n"} {
+	// A tag in lower case is dropped as before
+	for _, src := range []string{"<partial name=\"x\" />\n", "<callout>hi</callout>\n"} {
 		out, _, err := r.Render([]byte(src))
 		if err != nil {
 			t.Fatal(err)
@@ -147,9 +147,116 @@ func TestSanitizePlugin(t *testing.T) {
 	if got != want {
 		t.Errorf("got %s, want %s", got, want)
 	}
-	// A file's HTML still drops classes
-	out, _, _ := New().Render([]byte(`<div class="box">x</div>` + "\n"))
-	if strings.Contains(string(out), "class=") {
-		t.Errorf("class kept in a file: %s", out)
+	// A slot places a component's children, and is named nothing
+	if got, want := string(SanitizePlugin([]byte(`<div><slot></slot><slot name="x"></slot></div>`))), `<div><slot></slot><slot></slot></div>`; got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+	// A file's HTML still drops classes, and slots
+	out, _, _ := New().Render([]byte(`<div class="box"><slot>x</slot></div>` + "\n"))
+	if strings.Contains(string(out), "class=") || strings.Contains(string(out), "<slot") {
+		t.Errorf("class or slot kept in a file: %s", out)
+	}
+}
+
+// A component with children holds them, rendered from Markdown, in its
+// <mini-element>, which lists its own child components.
+func TestComponentChildren(t *testing.T) {
+	r := New()
+	const callout = `<mini-element data-tag="Callout" data-attrs="{&#34;type&#34;:&#34;warn&#34;}" data-children="[]" data-block>`
+	for name, tt := range map[string]struct {
+		src  string
+		want []string
+	}{
+		"block": {
+			"<Callout type=\"warn\">\n\nSome **md**\n\n</Callout>\n\nafter\n",
+			[]string{callout + "\n<p>Some <strong>md</strong></p>\n</mini-element>\n<p>after</p>"},
+		},
+		// An HTML block goes on up to a blank line
+		"lines after the tags": {
+			"<Callout type=\"warn\">\n<b>raw</b>\n\n- item\n\n</Callout>\n<i>next</i>\n",
+			[]string{callout + "\n<b>raw</b>\n<ul>\n<li>item</li>\n</ul>\n</mini-element>\n<i>next</i>"},
+		},
+		"one block": {
+			"<Callout type=\"warn\">\ntext\n</Callout>\n",
+			[]string{callout + "\ntext\n</mini-element>"},
+		},
+		"nested in one block": {
+			"<Outer>\n<Inner>\ntext\n</Inner>\n</Outer>\n",
+			[]string{`<mini-element data-tag="Outer" data-attrs="{}" data-children="[{&#34;tag&#34;:&#34;Inner&#34;,&#34;attrs&#34;:{}}]" data-block>` + "\n" +
+				`<mini-element data-tag="Inner" data-attrs="{}" data-children="[]" data-block>` + "\ntext\n</mini-element>\n</mini-element>"},
+		},
+		"close ending a paragraph": {
+			"<Callout type=\"warn\">\n\nText\n</Callout>\n",
+			[]string{callout + "\n<p>Text</p>\n</mini-element>"},
+		},
+		"inline": {
+			"Press <Kbd>Ctrl</Kbd> now\n",
+			[]string{`<p>Press <mini-element data-tag="Kbd" data-attrs="{}" data-children="[]">Ctrl</mini-element> now</p>`},
+		},
+		"inline over a line": {
+			"Press <Kbd>Ctrl\n</Kbd> now\n",
+			[]string{`<mini-element data-tag="Kbd" data-attrs="{}" data-children="[]">Ctrl` + "\n</mini-element> now"},
+		},
+		"nested of a name": {
+			"<Box>\n\n<Box>\n\nin\n\n</Box>\n\nout\n\n</Box>\n",
+			[]string{`data-tag="Box" data-attrs="{}" data-children="[{&#34;tag&#34;:&#34;Box&#34;,&#34;attrs&#34;:{}}]" data-block>` + "\n" +
+				`<mini-element data-tag="Box" data-attrs="{}" data-children="[]" data-block>` + "\n<p>in</p>\n</mini-element>\n<p>out</p>\n</mini-element>"},
+		},
+		// Only its own, not those in them
+		"child components": {
+			"<Tabs>\n\n<Tab label=\"a\">\n\n<Note />\n\n</Tab>\n\n<Tab label=\"b\" />\n\n</Tabs>\n",
+			[]string{`data-tag="Tabs" data-attrs="{}" data-children="[{&#34;tag&#34;:&#34;Tab&#34;,&#34;attrs&#34;:{&#34;label&#34;:&#34;a&#34;}},{&#34;tag&#34;:&#34;Tab&#34;,&#34;attrs&#34;:{&#34;label&#34;:&#34;b&#34;}}]"`},
+		},
+		// A close pairs with the nearest open of its name
+		"crossing": {
+			"<One>\n\n<Two>\n\nx\n\n</One>\n\n</Two>\n",
+			[]string{`<mini-element data-tag="One" data-attrs="{}" data-children="[]" data-block>`, "<p>x</p>\n</mini-element>"},
+		},
+		"two in a block": {
+			"<Partial name=\"a\" />\n<Partial name=\"b\" />\n",
+			[]string{`data-attrs="{&#34;name&#34;:&#34;a&#34;}" data-block></mini-element>`, `data-attrs="{&#34;name&#34;:&#34;b&#34;}" data-block></mini-element>`},
+		},
+		"headings keep ids": {
+			"<Callout type=\"warn\">\n\n## Inside\n\n</Callout>\n",
+			[]string{`<h2 id="inside">`},
+		},
+	} {
+		out, _, err := r.Render([]byte(tt.src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range tt.want {
+			if !strings.Contains(string(out), want) {
+				t.Errorf("%s: missing %q in %s", name, want, out)
+			}
+		}
+		if name == "crossing" && strings.Contains(string(out), `data-tag="Two"`) {
+			t.Errorf("crossing: Two paired: %s", out)
+		}
+	}
+	// Left as tags, dropped: one never closed, one never opened, a close in
+	// a paragraph's middle, and tags in a comment or in capitals alone
+	for _, src := range []string{
+		"<Callout>\n\ntext\n",
+		"text\n\n</Callout>\n",
+		"<Callout>\n\ntext\n</Callout> more\n",
+		"<!--\n<Callout>\n-->\n\nx\n\n</Callout>\n",
+		"<div>\n<!--\n<Note />\n-->\n</div>\n",
+		"<div>\n<pre>\n<Note />\n</pre>\n</div>\n",
+		"<div>\n<!--\na --> <!--\n<Note />\n-->\n</div>\n",
+		"<DIV>\n\nx\n\n</DIV>\n",
+	} {
+		out, _, err := r.Render([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(out), "mini-element") || strings.Contains(string(out), "--&gt;") {
+			t.Errorf("%q: %s", src, out)
+		}
+	}
+	// After a comment closed, a block is split again
+	out, _, _ := r.Render([]byte("<div>\n<!-- a --> <!--\nb -->\n<Note />\n</div>\n"))
+	if !strings.Contains(string(out), `data-tag="Note"`) {
+		t.Errorf("after a comment: %s", out)
 	}
 }
