@@ -318,3 +318,48 @@ export default {
 	a.write(".plugins/files/lib/label.js", `export const label = "two";`+"\n")
 	waitFor(t, ctx, text+` === "two 2 wasm"`)
 }
+
+// A plugin draws SVG, whose url(#id) names its own elements in the shadow
+// root, in the colors of the mode, and draws it again when the mode
+// changes, the code staying in its slot.
+func TestPluginSVG(t *testing.T) {
+	fence := "```"
+	a := newApp(t, map[string]string{
+		".plugins/chart/plugin.json": `{"codeBlocks": ["chart"]}`,
+		".plugins/chart/main.js": `export default {
+  codeBlocks: {
+    chart(code, ctx) {
+      const fill = ctx.mode === "dark" ? "rgb(255, 255, 255)" : "rgb(0, 0, 0)";
+      return '<svg width="200" height="100" viewBox="0 0 200 100"><defs><clipPath id="none"><rect width="0" height="0"/></clipPath></defs>' +
+        '<rect class="bar" width="100" height="100" fill="' + fill + '"/>' +
+        '<rect class="clipped" x="100" width="100" height="100" fill="red" clip-path="url(#none)"/></svg><slot></slot>';
+    },
+  },
+};
+`,
+		"chart.md": fence + "chart\n1 2 3\n" + fence + "\n",
+	})
+	ctx := tab(t)
+	open(t, ctx, a.URL("/chart.md"))
+	root := `document.querySelector('mini-element[data-plugin="chart"] > div')?.shadowRoot`
+	waitFor(t, ctx, root+`?.querySelector(".bar") != null`)
+	// The clip path is found in the shadow root, hiding the second bar
+	if !eval[bool](t, ctx, `(() => {
+		const r = `+root+`.querySelector(".clipped").getBoundingClientRect();
+		const hit = `+root+`.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+		return hit === null || !hit.classList.contains("clipped");
+	})()`) {
+		t.Error("url(#none) does not clip in the shadow root")
+	}
+	fill := func() string { return eval[string](t, ctx, root+`.querySelector(".bar").getAttribute("fill")`) }
+	first := fill()
+	other := map[string]string{"rgb(0, 0, 0)": "dark", "rgb(255, 255, 255)": "light"}[first]
+	if other == "" {
+		t.Fatalf("fill %q", first)
+	}
+	run(t, ctx, chromedp.Evaluate(`document.querySelector('[data-setting="mode"][data-value="`+other+`"]').click()`, nil))
+	waitFor(t, ctx, root+`.querySelector(".bar").getAttribute("fill") !== "`+first+`"`)
+	if !eval[bool](t, ctx, `document.querySelector('mini-element[data-plugin="chart"] .highlight').assignedSlot !== null`) {
+		t.Error("the code left its slot")
+	}
+}
