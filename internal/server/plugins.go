@@ -19,7 +19,8 @@ import (
 )
 
 // A plugin shows a part of a Markdown file its own way: the front matter,
-// or a component such as <Partial name="figure" />. It is a directory of
+// a component such as <Partial name="figure" />, or code blocks of a
+// language. It is a directory of
 // plugin.json, which tells what it shows and which files it reads, and
 // main.js, an ES module. Plugins come with gh-mini, under assets/plugins,
 // or are the viewer's own, in Options.PluginsDir; never from the directory
@@ -42,6 +43,7 @@ type plugin struct {
 	Description string   `json:"description"`
 	FrontMatter bool     `json:"frontMatter"`
 	Elements    []string `json:"elements"`
+	CodeBlocks  []string `json:"codeBlocks"`
 	Read        []string `json:"read"`
 	// Builtin is set for a plugin that comes with gh-mini
 	Builtin bool `json:"-"`
@@ -53,6 +55,8 @@ type plugin struct {
 
 var (
 	pluginName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+	// codeLanguage is a language a plugin shows code blocks of
+	codeLanguage = regexp.MustCompile(`^[a-z0-9][a-z0-9_+.#-]*$`)
 )
 
 // plugins lists the plugins, the viewer's own and those that come with
@@ -115,12 +119,20 @@ func loadPlugin(name string, fsys fs.FS, builtin bool) plugin {
 
 // check tells what is wrong with what plugin.json says.
 func (p *plugin) check() error {
-	if !p.FrontMatter && len(p.Elements) == 0 {
-		return errors.New("shows nothing: give frontMatter or elements")
+	if !p.FrontMatter && len(p.Elements) == 0 && len(p.CodeBlocks) == 0 {
+		return errors.New("shows nothing: give frontMatter, elements or codeBlocks")
 	}
 	for _, e := range p.Elements {
 		if !markdown.IsComponent(e) {
 			return fmt.Errorf("element %q: a name is of letters, digits and hyphens, and starts with a capital, as <Partial /> does; one of HTML's in capitals alone, such as BR, is HTML", e)
+		}
+	}
+	for _, l := range p.CodeBlocks {
+		if !codeLanguage.MatchString(l) {
+			return fmt.Errorf("code block %q: a language is in lower case, of letters, digits and _+.#-, matched as the fence writes it in any case", l)
+		}
+		if l == "mermaid" || l == "math" {
+			return fmt.Errorf("code block %q: gh-mini draws it", l)
 		}
 	}
 	for _, g := range p.Read {
@@ -153,6 +165,7 @@ type pluginView struct {
 	Name        string   `json:"name"`
 	FrontMatter bool     `json:"frontMatter"`
 	Elements    []string `json:"elements"`
+	CodeBlocks  []string `json:"codeBlocks"`
 	Read        []string `json:"read"`
 	Host        string   `json:"host"`
 }
@@ -173,6 +186,7 @@ func (s *Server) enabledPlugins(plugins []plugin, settings map[string]string) []
 			Name:        p.Name,
 			FrontMatter: p.FrontMatter,
 			Elements:    cmpOrEmpty(p.Elements),
+			CodeBlocks:  cmpOrEmpty(p.CodeBlocks),
 			Read:        cmpOrEmpty(p.Read),
 			Host:        "/_mini/plugin-host/" + s.boot + "/" + p.Name,
 		})

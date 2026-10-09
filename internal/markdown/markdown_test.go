@@ -117,9 +117,24 @@ func TestRender(t *testing.T) {
 			name: "code blocks",
 			src:  "```go\nfunc main() {}\n```\n\n    indented\n",
 			want: []string{
-				`<div class="highlight"><pre class="chroma"><code><span class="line"><span class="cl"><span class="kd">func</span>`,
+				`<div class="highlight" data-lang="go"><pre class="chroma"><code><span class="line"><span class="cl"><span class="kd">func</span>`,
 				`<div class="highlight"><pre class="chroma"><code><span class="line"><span class="cl">indented`,
 			},
+		},
+		{
+			name: "info string",
+			src:  "```csv\tsep=\";\"  \n1;2\n```\n\n```a\"><script>x\n1\n```\n",
+			want: []string{
+				`<div class="highlight" data-lang="csv" data-meta="sep=&#34;;&#34;">`,
+				`<div class="highlight" data-lang="a&#34;&gt;&lt;script&gt;x">`,
+			},
+			reject: []string{"<script"},
+		},
+		{
+			name:   "math after a tab",
+			src:    "```math\tx\nE = mc^2\n```\n",
+			want:   []string{`<div class="math-display">`},
+			reject: []string{"highlight"},
 		},
 		{
 			name:   "mermaid blocks are left for Mermaid",

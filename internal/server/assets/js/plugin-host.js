@@ -22,13 +22,17 @@
     // Reads the plugin asked for, by ID, waiting for the page's answer
     const reads = new Map();
     let readID = 0;
-    // ctx is what a hook is handed for one request: the file shown, where
-    // a component is, its child components, and reading the files next to
-    // it
+    // ctx is what a hook is handed for one request: the file shown, how
+    // the page shows, where a component is and its child components, a
+    // code block's language and meta, and reading the files next to it
     const ctx = (m) => ({
       path: m.path,
+      mode: m.mode,
+      theme: m.theme,
       block: m.block,
       children: m.children,
+      lang: m.lang,
+      meta: m.meta,
       read(rel) {
         return new Promise((resolve, reject) => {
           const id = ++readID;
@@ -53,6 +57,10 @@
         if (m.hook === "frontMatter") {
           if (typeof p.frontMatter !== "function") throw new Error("no frontMatter");
           result = await p.frontMatter(m.data, ctx(m));
+        } else if (m.hook === "codeBlock") {
+          const fn = p.codeBlocks?.[m.name];
+          if (typeof fn !== "function") throw new Error("no code block " + m.name);
+          result = await fn(m.code, ctx(m));
         } else {
           const fn = p.elements?.[m.tag];
           if (typeof fn !== "function") throw new Error("no element " + m.tag);
