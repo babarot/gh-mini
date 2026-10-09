@@ -1,6 +1,6 @@
 # Plugins
 
-A plugin shows a part of a Markdown file its own way: the front matter, a component such as `<Partial name="figure" />` or `<Callout>`, which GitHub, and gh-mini without a plugin, leave out, showing what a component holds as if it were not there, or code blocks of a language, such as ` ```csv ` as a table. It is for what gh-mini does not do for everyone, such as how one blog lays out its figures.
+A plugin shows a part of a Markdown file its own way: the front matter, a component such as `<Partial name="figure" />` or `<Callout>`, which GitHub, and gh-mini without a plugin, leave out, showing what a component holds as if it were not there, or code blocks of a language, such as ` ```csv ` as a table; and it may bring themes. It is for what gh-mini does not do for everyone, such as how one blog lays out its figures.
 
 ## Plugins and the settings
 
@@ -12,7 +12,7 @@ Plugins are read on every page load, and a page of Markdown, or of a directory, 
 
 ## Writing one
 
-A plugin is a directory named after the plugin in lower case, of two files at least:
+A plugin is a directory named after the plugin in lower case, of `plugin.json`, and `main.js` unless it brings themes alone:
 
 ```
 ~/.config/gh-mini/plugins/partial/
@@ -36,6 +36,7 @@ A plugin is a directory named after the plugin in lower case, of two files at le
 | `frontMatter` | `true` to show the front matter |
 | `elements` | The components it shows, by name (see [Components](#components)) |
 | `codeBlocks` | The languages of the code blocks it shows, in lower case, as `["csv"]`. The fence's language matches in any case. `mermaid` and `math` are gh-mini's |
+| `themes` | Themes, by name, each a CSS file of the plugin's, as `{"paper": "themes/paper.css"}`, written as a theme file is (see [Themes](themes.md)). A plugin of themes alone needs no `main.js` |
 | `read` | Patterns of the files it may read, relative to the directory of the file shown, or, starting with `/`, to the directory served. `*` and `?` match within a name, `[...]` a character; `..` is not allowed |
 
 `main.js` is an ES module whose default export has a function for each:
@@ -110,4 +111,4 @@ A plugin that fails shows why before what the component holds.
 
 A plugin runs in a sandbox of its own, apart from the page. It is given what it shows and the files its `read` names, and nothing else: it cannot reach the page, gh-mini's other files or its API, and loads nothing from the network but its own files. What it gives back is shown in a box of its own, with its scripts and the like taken out, so a file it shows, even from someone else's repository, runs nothing and cannot cover the page.
 
-A plugin can still send what it is given, the files it reads among them, elsewhere: through an image in what it shows, for one. Use plugins you trust, as you would any program you run. gh-mini reads plugins only from the plugins directory and from itself, never from the directory served.
+A plugin's theme is CSS for the whole page, as a theme file is, outside the sandbox. A plugin can still send what it is given, the files it reads among them, elsewhere: through an image in what it shows, for one. Use plugins you trust, as you would any program you run. gh-mini reads plugins only from the plugins directory and from itself, never from the directory served.

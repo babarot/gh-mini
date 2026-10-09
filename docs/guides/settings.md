@@ -6,7 +6,7 @@ The gear button opens a menu with the keyboard shortcuts (or press `?`), an Abou
 
 | Setting | Default | |
 |---|---|---|
-| Theme | `github`, or `--theme` | The built-in `github`, `nord` and `tokyo-night`, or one you write (see [Themes](themes.md)) |
+| Theme | `github`, or `--theme` | The built-in `github`, `nord` and `tokyo-night`, one you write, or one of a plugin (see [Themes](themes.md)) |
 | Mode | Auto | Light, dark, or Auto to follow the system |
 | Full width | off | Let the page take the width of the window rather than a column |
 | Wrap code | off | Wrap long lines of a source file rather than scroll them |

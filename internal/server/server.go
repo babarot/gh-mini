@@ -124,9 +124,9 @@ func New(opts Options) (*Server, error) {
 		s.previewToken = newPreviewToken()
 	}
 	s.gh, _ = exec.LookPath("gh")
-	// A default theme that does not exist would leave pages unstyled
-	// with nothing to say why
-	if opts.Theme != "" && !slices.Contains(s.themes(), opts.Theme) {
+	// A default theme that does not exist would show the built-in one with
+	// nothing to say why
+	if opts.Theme != "" && !slices.Contains(s.themes(nil), opts.Theme) {
 		log.Printf("gh-mini: no theme %q in %s; using %s", opts.Theme, opts.ThemesDir, builtinTheme)
 		s.opts.Theme = ""
 	}

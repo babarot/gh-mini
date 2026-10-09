@@ -21,7 +21,7 @@ import (
 
 // A plugin shows a part of a Markdown file its own way: the front matter,
 // a component such as <Partial name="figure" />, or code blocks of a
-// language. It is a directory of
+// language; or brings themes, CSS for the whole page, as a theme file is. It is a directory of
 // plugin.json, which tells what it shows and which files it reads, and
 // main.js, an ES module. Plugins come with gh-mini, under assets/plugins,
 // or are the viewer's own, in Options.PluginsDir; never from the directory
@@ -45,7 +45,9 @@ type plugin struct {
 	FrontMatter bool     `json:"frontMatter"`
 	Elements    []string `json:"elements"`
 	CodeBlocks  []string `json:"codeBlocks"`
-	Read        []string `json:"read"`
+	// Themes are the plugin's themes, by name, each a CSS file of its
+	Themes map[string]string `json:"themes"`
+	Read   []string          `json:"read"`
 	// Builtin is set for a plugin that comes with gh-mini
 	Builtin bool `json:"-"`
 	// Err tells why the plugin cannot run, "" when it can
@@ -57,6 +59,8 @@ type plugin struct {
 
 var (
 	pluginName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+	// themeName is the name of a plugin's theme
+	themeName = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 	// codeLanguage is a language a plugin shows code blocks of
 	codeLanguage = regexp.MustCompile(`^[a-z0-9][a-z0-9_+.#-]*$`)
 )
@@ -116,16 +120,57 @@ func loadPlugin(name string, fsys fs.FS, builtin bool) plugin {
 		p.Err = "plugin.json: " + err.Error()
 		return p
 	}
-	if _, err := fs.Stat(fsys, "main.js"); err != nil {
+	// A plugin of themes alone runs no code
+	if _, err := fs.Stat(fsys, "main.js"); err != nil && p.hooks() {
 		p.Err = "No main.js"
 	}
 	return p
 }
 
+// hooks tells whether the plugin shows anything with code of its own.
+func (p *plugin) hooks() bool {
+	return p.FrontMatter || len(p.Elements) > 0 || len(p.CodeBlocks) > 0
+}
+
+// pluginFile tells a path of a plugin's own file, as it is served: not a
+// hidden one, nor one in a hidden directory.
+func pluginFile(rel string) bool {
+	return fs.ValidPath(rel) && rel != "." && !slices.ContainsFunc(strings.Split(rel, "/"), func(part string) bool { return strings.HasPrefix(part, ".") })
+}
+
+// readFile reads a file of the plugin's; for a viewer's plugin, through
+// its directory, which a symlink in it does not lead out of.
+func (p *plugin) readFile(rel string) ([]byte, error) {
+	if !pluginFile(rel) {
+		return nil, fs.ErrNotExist
+	}
+	fsys := p.fsys
+	if p.dir != "" {
+		root, err := os.OpenRoot(p.dir)
+		if err != nil {
+			return nil, err
+		}
+		defer root.Close()
+		fsys = root.FS()
+	}
+	if info, err := fs.Stat(fsys, rel); err != nil || info.IsDir() {
+		return nil, fs.ErrNotExist
+	}
+	return fs.ReadFile(fsys, rel)
+}
+
 // check tells what is wrong with what plugin.json says.
 func (p *plugin) check() error {
-	if !p.FrontMatter && len(p.Elements) == 0 && len(p.CodeBlocks) == 0 {
-		return errors.New("shows nothing: give frontMatter, elements or codeBlocks")
+	if !p.hooks() && len(p.Themes) == 0 {
+		return errors.New("shows nothing: give frontMatter, elements, codeBlocks or themes")
+	}
+	for name, file := range p.Themes {
+		if !themeName.MatchString(name) {
+			return fmt.Errorf("theme %q: a name is in lower case, of letters, digits, _ and -", name)
+		}
+		if !pluginFile(file) || path.Ext(file) != ".css" {
+			return fmt.Errorf("theme %q: %q is not a CSS file of the plugin's, relative to its directory, without .. or names starting with .", name, file)
+		}
 	}
 	for _, e := range p.Elements {
 		if !markdown.IsComponent(e) {
@@ -184,7 +229,8 @@ func pluginSetting(name string) string {
 func (s *Server) enabledPlugins(plugins []plugin, settings map[string]string) []pluginView {
 	out := []pluginView{}
 	for _, p := range plugins {
-		if p.Err != "" || settings[pluginSetting(p.Name)] != "true" {
+		// A plugin of themes alone has nothing to run on a page
+		if p.Err != "" || settings[pluginSetting(p.Name)] != "true" || !p.hooks() {
 			continue
 		}
 		out = append(out, pluginView{
@@ -305,25 +351,7 @@ func (s *Server) servePluginHost(w http.ResponseWriter, r *http.Request, name st
 // not served, nor, for a viewer's plugin, what a symlink in its directory
 // points to out of it.
 func (s *Server) servePluginFile(w http.ResponseWriter, r *http.Request, p plugin, rel string) {
-	if !fs.ValidPath(rel) || slices.ContainsFunc(strings.Split(rel, "/"), func(part string) bool { return strings.HasPrefix(part, ".") }) {
-		http.NotFound(w, r)
-		return
-	}
-	fsys := p.fsys
-	if p.dir != "" {
-		root, err := os.OpenRoot(p.dir)
-		if err != nil {
-			http.NotFound(w, r)
-			return
-		}
-		defer root.Close()
-		fsys = root.FS()
-	}
-	if info, err := fs.Stat(fsys, rel); err != nil || info.IsDir() {
-		http.NotFound(w, r)
-		return
-	}
-	b, err := fs.ReadFile(fsys, rel)
+	b, err := p.readFile(rel)
 	if err != nil {
 		http.NotFound(w, r)
 		return

@@ -251,3 +251,68 @@ func TestSanitizeAPI(t *testing.T) {
 		t.Errorf("GET: %d", r.code)
 	}
 }
+
+// A plugin may bring themes, alone with no code: they are listed and
+// served while it is on, the viewer's theme file winning over them and
+// they over a built-in one; off, the page shows the built-in default.
+func TestPluginThemes(t *testing.T) {
+	srv := newPluginServer(t, map[string]map[string]string{
+		"looks": {
+			"plugin.json":      `{"themes": {"paper": "themes/paper.css", "nord": "themes/nord.css", "sepia": "themes/sepia.css"}}`,
+			"themes/paper.css": ":root { --paper: 1; }",
+			"themes/nord.css":  ":root { --plugin-nord: 1; }",
+			"themes/sepia.css": ":root { --plugin-sepia: 1; }",
+		},
+		"bad-theme": {"plugin.json": `{"themes": {"Paper": "paper.css"}}`},
+		"bad-file":  {"plugin.json": `{"themes": {"paper": "../paper.css"}}`},
+		"not-css":   {"plugin.json": `{"themes": {"paper": "paper.js"}}`},
+	})
+	// The themes directory, from the test repository, has sepia
+	themes := filepath.Join(t.TempDir(), "themes")
+	writeFile(t, filepath.Join(themes, "sepia.css"), []byte(":root { --sepia: 1; }"))
+	srv.opts.ThemesDir = themes
+	got := map[string]plugin{}
+	for _, p := range srv.plugins() {
+		got[p.Name] = p
+	}
+	if p := got["looks"]; p.Err != "" {
+		t.Errorf("a plugin of themes alone: %q", p.Err)
+	}
+	for name, want := range map[string]string{"bad-theme": `theme "Paper"`, "bad-file": `"../paper.css"`, "not-css": `"paper.js"`} {
+		if !strings.Contains(got[name].Err, want) {
+			t.Errorf("%s: %q, want %q in it", name, got[name].Err, want)
+		}
+	}
+
+	h := srv.Handler()
+	r := get(t, h, "/", withSettings(`{"theme":"paper"}`))
+	r.expect(t, http.StatusOK, `<option value="paper" selected>paper</option>`, `href="/_mini/theme/paper.css"`)
+	// It runs nothing on the page
+	r.reject(t, `"name":"looks"`)
+	get(t, h, "/_mini/theme/paper.css").expect(t, http.StatusOK, "--paper: 1")
+	get(t, h, "/_mini/theme/nord.css").expect(t, http.StatusOK, "--plugin-nord: 1")
+	get(t, h, "/_mini/theme/sepia.css").expect(t, http.StatusOK, "--sepia: 1")
+	if r := get(t, h, "/_mini/theme/paper.css"); r.header.Get("Vary") != "Cookie" {
+		t.Errorf("Vary %q", r.header.Get("Vary"))
+	}
+
+	off := withSettings(`{"theme":"paper","plugin.looks":false}`)
+	r = get(t, h, "/", off)
+	r.expect(t, http.StatusOK, `href="/_mini/theme/github.css"`)
+	r.reject(t, `<option value="paper"`)
+	get(t, h, "/_mini/theme/paper.css", off).expect(t, http.StatusOK, "--borderColor-success-emphasis: #238636")
+	get(t, h, "/_mini/theme/nord.css", off).expect(t, http.StatusOK, "--bgColor-default: #2e3440")
+}
+
+// A theme of a plugin may be the default, kept at start, and the viewer
+// who turned the plugin off gets the built-in one.
+func TestPluginDefaultTheme(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "looks", "plugin.json"), []byte(`{"themes": {"paper": "paper.css"}}`))
+	writeFile(t, filepath.Join(dir, "looks", "paper.css"), []byte(":root { --paper: 1; }"))
+	srv := newServerFor(t, Options{PluginsDir: dir, Theme: "paper"})
+	h := srv.Handler()
+	get(t, h, "/").expect(t, http.StatusOK, `href="/_mini/theme/paper.css"`)
+	r := get(t, h, "/", withSettings(`{"plugin.looks":false}`))
+	r.expect(t, http.StatusOK, `href="/_mini/theme/github.css"`, `<option value="github" selected>`)
+}

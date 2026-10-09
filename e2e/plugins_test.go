@@ -363,3 +363,25 @@ func TestPluginSVG(t *testing.T) {
 		t.Error("the code left its slot")
 	}
 }
+
+// A plugin's theme is picked in the settings as any theme, and editing it
+// shows on every page, one of a text file too.
+func TestPluginTheme(t *testing.T) {
+	a := newApp(t, map[string]string{
+		".plugins/looks/plugin.json":      `{"themes": {"paper": "themes/paper.css"}}`,
+		".plugins/looks/themes/paper.css": ":root { --paper: one; }",
+		"notes.txt":                       "notes\n",
+	})
+	ctx := tab(t)
+	open(t, ctx, a.URL("/notes.txt"))
+	subscribed(t, ctx)
+	run(t, ctx, chromedp.Evaluate(`(() => {
+		const s = document.querySelector('select[data-setting="theme"]');
+		s.value = "paper";
+		s.dispatchEvent(new Event("change", { bubbles: true }));
+	})()`, nil))
+	paper := `getComputedStyle(document.documentElement).getPropertyValue("--paper").trim()`
+	waitFor(t, ctx, paper+` === "one"`)
+	a.write(".plugins/looks/themes/paper.css", ":root { --paper: two; }")
+	waitFor(t, ctx, paper+` === "two"`)
+}
