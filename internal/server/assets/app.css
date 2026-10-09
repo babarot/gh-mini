@@ -781,8 +781,9 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
   display: block;
 }
 
-/* Children show as if the tags were not there, until a plugin shows them */
-.markdown-body mini-element[data-children]:not([data-plugin]) {
+/* Children, and code, show as if the box were not there, until a plugin shows them */
+.markdown-body mini-element[data-children]:not([data-plugin]),
+.markdown-body mini-element[data-code]:not([data-plugin]) {
   display: contents;
 }
 

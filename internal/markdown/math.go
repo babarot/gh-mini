@@ -162,7 +162,7 @@ type mathCodeTransformer struct{}
 func (mathCodeTransformer) Transform(doc *ast.Document, reader text.Reader, pc parser.Context) {
 	var blocks []*ast.FencedCodeBlock
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if c, ok := n.(*ast.FencedCodeBlock); ok && entering && string(c.Language(reader.Source())) == "math" {
+		if c, ok := n.(*ast.FencedCodeBlock); ok && entering && language(c, reader.Source()) == "math" {
 			blocks = append(blocks, c)
 		}
 		return ast.WalkContinue, nil

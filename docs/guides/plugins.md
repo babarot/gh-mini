@@ -1,6 +1,6 @@
 # Plugins
 
-A plugin shows a part of a Markdown file its own way: the front matter, or a component such as `<Partial name="figure" />` or `<Callout>`, which GitHub, and gh-mini without a plugin, leave out, showing what a component holds as if it were not there. It is for what gh-mini does not do for everyone, such as how one blog lays out its figures.
+A plugin shows a part of a Markdown file its own way: the front matter, a component such as `<Partial name="figure" />` or `<Callout>`, which GitHub, and gh-mini without a plugin, leave out, showing what a component holds as if it were not there, or code blocks of a language, such as ` ```csv ` as a table. It is for what gh-mini does not do for everyone, such as how one blog lays out its figures.
 
 ## Plugins and the settings
 
@@ -35,6 +35,7 @@ A plugin is a directory of two files, named after the plugin in lower case:
 | `description` | Shown in the settings |
 | `frontMatter` | `true` to show the front matter |
 | `elements` | The components it shows, by name (see [Components](#components)) |
+| `codeBlocks` | The languages of the code blocks it shows, in lower case, as `["csv"]`. The fence's language matches in any case. `mermaid` and `math` are gh-mini's |
 | `read` | Patterns of the files it may read, relative to the directory of the file shown, or, starting with `/`, to the directory served. `*` and `?` match within a name, `[...]` a character; `..` is not allowed |
 
 `main.js` is an ES module whose default export has a function for each:
@@ -54,14 +55,23 @@ export default {
       return { html, css: css.join("\n") };
     },
   },
+  codeBlocks: {
+    // code is the block's text; a language such as c++ is quoted, as "c++"
+    csv(code, ctx) {
+      const rows = code.trim().split("\n").map((line) => `<tr>${line.split(",").map((c) => `<td>${escape(c)}</td>`).join("")}</tr>`);
+      return `<table>${rows.join("")}</table>`;
+    },
+  },
 };
 ```
 
 [examples/plugins/partial](../../examples/plugins/partial) is this plugin, and [front-matter-card](../../internal/server/assets/plugins/front-matter-card) the one that comes with gh-mini.
 
-A function gives back HTML and CSS, as an object, or HTML alone as a string, or `null` to show what gh-mini shows without it: the front matter's table, or for a component, what it holds and nothing else. It may be async. What it throws is shown in the component's place, and logged in the console.
+A function gives back HTML and CSS, as an object, or HTML alone as a string, or `null` to show what gh-mini shows without it: the front matter's table, for a component what it holds and nothing else, and the code for a code block. It may be async. What it throws is shown in the component's or the code's place, before what it holds, and logged in the console.
 
-`ctx.path` is the file shown, from the directory served. For a component, `ctx.block` tells it is on a line of its own, and `ctx.children` lists the components it holds, as `[{ tag, attrs }]`, without those in them: `[]` when it holds none, and undefined for a self-closing one. `ctx.read(path)` reads a file that `read` names, as text. A path is relative to the directory of the file shown, or, starting with `/`, to the directory served. Files larger than 1 MB are not read.
+A function may be called again for the same thing, as when the theme or the mode changes, to show it in them; write it to give back what it is given, and to keep nothing from one call to the next.
+
+`ctx.path` is the file shown, from the directory served. `ctx.mode` is `"light"` or `"dark"`, as the page shows, and `ctx.theme` the theme's name. For a code block, `ctx.lang` is its language as the fence writes it, and `ctx.meta` the rest of the fence's line, as `title="x"` of ` ```csv title="x" `. For a component, `ctx.block` tells it is on a line of its own, and `ctx.children` lists the components it holds, as `[{ tag, attrs }]`, without those in them: `[]` when it holds none, and undefined for a self-closing one. `ctx.read(path)` reads a file that `read` names, as text. A path is relative to the directory of the file shown, or, starting with `/`, to the directory served. Files larger than 1 MB are not read.
 
 The HTML is kept as far as HTML in Markdown is (see [Markdown](markdown.md)), and classes and `<slot>` too: scripts, styles, event handlers, forms, frames and SVG go. The CSS is the plugin's own, and applies to its HTML alone; the page's styles do not apply to it either. The theme's variables, such as `--fgColor-default` and `--bgColor-muted` (see [Themes](themes.md)), and the fonts, reach it, and `:host-context([data-mode="dark"])` matches in the dark mode.
 
@@ -81,7 +91,7 @@ Some **Markdown**.
 
 Inline, it holds what is between the tags, as `<Kbd>Ctrl</Kbd>`. On lines of their own, the tags are best with a blank line after the open one and before the close one, as above: Markdown takes the lines right after a tag as HTML, up to a blank line, so they show as text; a close tag right after a paragraph, with no blank line before it, closes it too. A close tag in the middle of a paragraph, or the two tags in different lists or quotes, are not paired: the tags are dropped, and what is between them shows plainly.
 
-What a component holds stays the page's: gh-mini renders it, the page's styles apply to it, and its headings are in the outline. A plugin places it with `<slot></slot>` in its HTML; without a slot, it does not show. The plugin's CSS reaches it with `::slotted(...)`, for the elements at its top, and gives way to the page's styles but with `!important`:
+What a component holds stays the page's, and so does a code block's code: gh-mini renders it, the page's styles apply to it, and its headings are in the outline. A plugin places it with `<slot></slot>` in its HTML, as a diagram's source in `<details><summary>Source</summary><slot></slot></details>`; without a slot, it does not show. The plugin's CSS reaches it with `::slotted(...)`, for the elements at its top, and gives way to the page's styles but with `!important`:
 
 ```js
 Callout({ type }) {

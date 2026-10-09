@@ -59,6 +59,9 @@ func TestPlugins(t *testing.T) {
 		"html-element":      {"plugin.json": `{"elements": ["BR"]}`, "main.js": ""},
 		"bad-read":          {"plugin.json": `{"elements": ["X"], "read": ["../x"]}`, "main.js": ""},
 		"shows-nothing":     {"plugin.json": `{}`, "main.js": ""},
+		"csv":               {"plugin.json": `{"codeBlocks": ["csv", "c++"]}`, "main.js": ""},
+		"code-case":         {"plugin.json": `{"codeBlocks": ["CSV"]}`, "main.js": ""},
+		"code-mermaid":      {"plugin.json": `{"codeBlocks": ["mermaid"]}`, "main.js": ""},
 		"Not_A_Name":        partialPlugin,
 	})
 	got := map[string]plugin{}
@@ -67,7 +70,7 @@ func TestPlugins(t *testing.T) {
 		got[p.Name] = p
 		names = append(names, p.Name)
 	}
-	if want := "bad-element bad-json bad-read front-matter-card html-element no-main partial shows-nothing"; strings.Join(names, " ") != want {
+	if want := "bad-element bad-json bad-read code-case code-mermaid csv front-matter-card html-element no-main partial shows-nothing"; strings.Join(names, " ") != want {
 		t.Errorf("names: %s, want %s", strings.Join(names, " "), want)
 	}
 	if p := got["front-matter-card"]; p.Builtin {
@@ -76,6 +79,9 @@ func TestPlugins(t *testing.T) {
 	if p := got["partial"]; p.Err != "" || p.Description != "Figures" || len(p.Read) != 2 {
 		t.Errorf("partial: %+v", p)
 	}
+	if p := got["csv"]; p.Err != "" || len(p.CodeBlocks) != 2 {
+		t.Errorf("csv: %+v", p)
+	}
 	for name, want := range map[string]string{
 		"no-main":       "No main.js",
 		"bad-json":      "plugin.json: unexpected end of JSON input",
@@ -83,6 +89,8 @@ func TestPlugins(t *testing.T) {
 		"html-element":  `element "BR"`,
 		"bad-read":      `read "../x"`,
 		"shows-nothing": "shows nothing",
+		"code-case":     `code block "CSV"`,
+		"code-mermaid":  "gh-mini draws it",
 	} {
 		if !strings.Contains(got[name].Err, want) {
 			t.Errorf("%s: %q, want %q in it", name, got[name].Err, want)
@@ -107,7 +115,7 @@ func TestPagePlugins(t *testing.T) {
 	host := `"host":"/_mini/plugin-host/` + srv.boot + `/partial"`
 	r := get(t, h, "/")
 	r.expect(t, http.StatusOK,
-		`<script type="application/json" id="mini.plugins">[{"name":"partial","frontMatter":false,"elements":["Partial"],"read":["figures/*.part.html","/styles/*.css"],`+host+`}]</script>`,
+		`<script type="application/json" id="mini.plugins">[{"name":"partial","frontMatter":false,"elements":["Partial"],"codeBlocks":[],"read":["figures/*.part.html","/styles/*.css"],`+host+`}]</script>`,
 		`data-setting="plugin.partial" aria-labelledby="mini.setting-plugin.partial" checked>`,
 		`data-setting="plugin.front-matter-card" aria-labelledby="mini.setting-plugin.front-matter-card">`,
 		"shows nothing",

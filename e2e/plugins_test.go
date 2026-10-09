@@ -238,3 +238,52 @@ func TestPluginChildren(t *testing.T) {
 		t.Errorf("without a plugin: %q", got)
 	}
 }
+
+// A plugin shows code blocks of a language, written in any case, as a
+// table here, told the info string's rest and how the page shows; the
+// code moves into its box, for a slot to show. A plugin that fails leaves
+// the code, and a language no plugin shows stays code.
+func TestPluginCodeBlocks(t *testing.T) {
+	fence := "```"
+	a := newApp(t, map[string]string{
+		".plugins/csv/plugin.json": `{"codeBlocks": ["csv", "broken"]}`,
+		".plugins/csv/main.js": `export default {
+  codeBlocks: {
+    csv(code, ctx) {
+      const rows = code.trim().split("\n").map((l) => "<tr>" + l.split(",").map((c) => "<td>" + c + "</td>").join("") + "</tr>");
+      return "<table><caption>" + [ctx.lang, ctx.meta, ctx.mode, ctx.theme].join("|") + "</caption>" + rows.join("") + "</table><details><summary>Source</summary><slot></slot></details>";
+    },
+    broken() { throw new Error("oops"); },
+  },
+};
+`,
+		"data.md": fence + "CSV\ttitle=\"x\"\na,b\nc,d\n" + fence + "\n\n" +
+			fence + "broken\nx\n" + fence + "\n\n" +
+			fence + "go\npackage main\n" + fence + "\n",
+	})
+	ctx := tab(t)
+	open(t, ctx, a.URL("/data.md"))
+	box := `document.querySelector('mini-element[data-code="csv"]')`
+	waitFor(t, ctx, box+`?.dataset.plugin === "csv"`)
+	got := eval[[]string](t, ctx, `(() => {
+		const root = `+box+`.firstElementChild.shadowRoot;
+		return [root.querySelector("caption").textContent, Array.from(root.querySelectorAll("td")).map((td) => td.textContent).join(""), `+box+`.querySelector(".highlight").assignedSlot ? "slotted" : ""];
+	})()`)
+	// The mode is the browser's, Auto resolved
+	mode := "light"
+	if eval[bool](t, ctx, `matchMedia("(prefers-color-scheme: dark)").matches`) {
+		mode = "dark"
+	}
+	if got[0] != `CSV|title="x"|`+mode+`|github` || got[1] != "abcd" || got[2] != "slotted" {
+		t.Errorf("table, info, code: %q", got)
+	}
+
+	broken := `document.querySelector('mini-element[data-code="broken"]')`
+	waitFor(t, ctx, broken+`?.querySelector(".mini-plugin-error")?.textContent === "plugin csv: oops"`)
+	if !eval[bool](t, ctx, broken+`.querySelector(".highlight pre")?.textContent === "x\n"`) {
+		t.Error("a failing plugin's code is gone")
+	}
+	if eval[bool](t, ctx, `document.querySelector('.highlight[data-lang="go"]').closest("mini-element") !== null`) {
+		t.Error("a language no plugin shows is boxed")
+	}
+}
