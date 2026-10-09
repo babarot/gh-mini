@@ -221,6 +221,10 @@ func TestPluginChildren(t *testing.T) {
 	if styles[0] != "Text" || styles[1] != "rgb(7, 7, 7)" || styles[2] == "3px" || styles[3] != "0px" {
 		t.Errorf("children's text, color, margin and heading margin: %q", styles)
 	}
+	// Spaced as Markdown's blocks are
+	if got := eval[string](t, ctx, `getComputedStyle(`+callout+`).marginBottom`); got != "16px" {
+		t.Errorf("margin below the component: %s", got)
+	}
 	if got := eval[string](t, ctx, `Array.from(document.querySelectorAll('mini-element[data-tag="Callout"] p')).at(-1).textContent`); got != "Last" {
 		t.Errorf("last paragraph: %q", got)
 	}

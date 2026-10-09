@@ -793,6 +793,8 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
   overflow: clip;
 }
 
+/* Shown by a plugin, a block is spaced as Markdown's blocks are */
+.markdown-body mini-element[data-block][data-plugin],
 .markdown-body .mini-frontmatter[data-plugin] {
   margin-bottom: 16px;
 }
