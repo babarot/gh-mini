@@ -771,7 +771,10 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
 /* Source view */
 .code { overflow: auto; font-family: var(--mini-font-mono); font-size: 12px; line-height: 20px; }
 .code .chroma { background: transparent; }
-.code pre { margin: 0; font-family: inherit; }
+.code pre { margin: 0; }
+/* The browser gives pre and code the generic monospace, which is whatever
+   font its settings name, a proportional one at times */
+.code pre, .code code { font-family: inherit; }
 .code .chroma { padding: 8px 0; }
 .code .line { display: flex; }
 .code .ln { flex: none; min-width: 50px; padding: 0 10px 0 16px; text-align: right; user-select: none; }
