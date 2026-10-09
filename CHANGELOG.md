@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.2](https://github.com/babarot/gh-mini/compare/v0.2.1...v0.2.2) - 2026-10-09
+### Others
+- Sync shared files from github-config by @babarot in https://github.com/babarot/gh-mini/pull/22
+
 ## [v0.2.1](https://github.com/babarot/gh-mini/compare/v0.2.0...v0.2.1) - 2026-10-09
 ### Bug fixes
 - Build with Go 1.26.9 for the vulnerabilities in net/http by @babarot in https://github.com/babarot/gh-mini/pull/10
