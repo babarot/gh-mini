@@ -72,3 +72,226 @@ func TestRawHTMLKept(t *testing.T) {
 		}
 	}
 }
+
+// A component, a self-closing tag whose name starts with a capital as MDX
+// writes one, is kept as an empty <mini-element> for a plugin to show.
+func TestComponents(t *testing.T) {
+	r := New()
+	for name, tt := range map[string]struct{ src, want string }{
+		"block": {
+			"a\n\n<Partial name=\"elm\" />\n\nb\n",
+			"<p>a</p>\n<mini-element data-tag=\"Partial\" data-attrs=\"{&#34;name&#34;:&#34;elm&#34;}\" data-block></mini-element>\n<p>b</p>",
+		},
+		// An HTML block goes on up to a blank line
+		"block with a line after": {
+			"<Partial name=\"elm\" />\nnext\n",
+			"<mini-element data-tag=\"Partial\" data-attrs=\"{&#34;name&#34;:&#34;elm&#34;}\" data-block></mini-element>\nnext",
+		},
+		"inline": {
+			"a <Badge text='new' on /> b\n",
+			"<p>a <mini-element data-tag=\"Badge\" data-attrs=\"{&#34;on&#34;:true,&#34;text&#34;:&#34;new&#34;}\"></mini-element> b</p>",
+		},
+		"over lines": {
+			"<Partial\n  name=\"elm\" />\n",
+			"<mini-element data-tag=\"Partial\" data-attrs=\"{&#34;name&#34;:&#34;elm&#34;}\"></mini-element>",
+		},
+		// A name of HTML's, but not in capitals alone, is a component
+		"name of HTML's": {
+			"<Image src=\"a.png\" />\n",
+			"<mini-element data-tag=\"Image\" data-attrs=\"{&#34;src&#34;:&#34;a.png&#34;}\" data-block></mini-element>",
+		},
+		"attribute case and entities": {
+			"<Chart altText=\"a &amp; &quot;b&quot;\" />\n",
+			"data-attrs=\"{&#34;altText&#34;:&#34;a \\u0026 \\&#34;b\\&#34;&#34;}\"",
+		},
+	} {
+		out, _, err := r.Render([]byte(tt.src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(out), tt.want) {
+			t.Errorf("%s: missing %q in %s", name, tt.want, out)
+		}
+	}
+	// HTML in capitals is HTML still
+	for src, want := range map[string]string{
+		"line one<BR/>line two\n":                 "line one<br/>line two",
+		"<IMG SRC=\"logo.png\" WIDTH=\"100\"/>\n": `<img src="logo.png" width="100"/>`,
+		"<P align=\"center\"/>\n":                 `<p align="center"/>`,
+	} {
+		out, _, err := r.Render([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(out), "mini-element") || !strings.Contains(string(out), want) {
+			t.Errorf("%q: %s", src, out)
+		}
+	}
+	// A tag in lower case is dropped as before
+	for _, src := range []string{"<partial name=\"x\" />\n", "<callout>hi</callout>\n"} {
+		out, _, err := r.Render([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(out), "mini-element") || strings.Contains(strings.ToLower(string(out)), "callout") {
+			t.Errorf("%q: %s", src, out)
+		}
+	}
+}
+
+// A plugin's HTML keeps classes, styles, ids as written and SVG to draw
+// with, and nothing that runs or loads from elsewhere.
+func TestSanitizePlugin(t *testing.T) {
+	got := string(SanitizePlugin([]byte(`<div class="box a"><script>alert(1)</script><span id="x" onclick="alert(1)" style="color:red">t</span><style>p{}</style></div>`)))
+	want := `<div class="box a"><span id="x" style="color:red">t</span></div>`
+	if got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+	svg := `<svg viewBox="0 0 10 10" role="img" aria-label="A diagram"><title>Graph</title><defs>` +
+		`<marker id="m" refX="1" orient="auto"><path d="M0 0L1 1z"/></marker>` +
+		`<linearGradient id="g"><stop offset="0" stop-color="rgb(1, 2, 3)"/></linearGradient></defs>` +
+		`<g transform="translate(1 2) rotate(3)"><path d="M0 0" marker-end="url(#m)" fill="url(#g)" style="stroke: hsl(1, 2%, 3%); stroke-width: 2"/>` +
+		`<text x="1" font-family="'Helvetica', sans-serif">A &amp; B</text></g></svg>`
+	if got := string(SanitizePlugin([]byte(svg))); !strings.Contains(got, `<title>Graph</title>`) ||
+		!strings.Contains(got, `marker-end="url(#m)"`) || !strings.Contains(got, `fill="url(#g)"`) ||
+		!strings.Contains(got, `transform="translate(1 2) rotate(3)"`) || !strings.Contains(got, `style="stroke: hsl(1, 2%, 3%); stroke-width: 2"`) ||
+		!strings.Contains(got, `aria-label="A diagram"`) || !strings.Contains(got, "<defs>") || !strings.Contains(got, `<marker id="m"`) {
+		t.Errorf("SVG: %s", got)
+	}
+	// What would run or load goes, with the attribute it is in
+	for _, bad := range []string{
+		`<svg onload="x()"><rect/></svg>`,
+		`<svg><script>x()</script></svg>`,
+		`<svg><foreignObject><img src=x onerror=x()></foreignObject></svg>`,
+		`<svg><rect><set attributeName="fill" to="red"/><animate attributeName="x"/></rect></svg>`,
+		`<svg><use href="https://example.com/a.svg#x"/><image href="https://example.com/a.png"/></svg>`,
+		`<svg><a xlink:href="javascript:x()"><rect/></a></svg>`,
+		`<svg><rect fill="url(https://example.com/x)"/></svg>`,
+		`<svg><rect filter="url(/_mini/api/tree)"/></svg>`,
+		`<svg><rect style="fill: red; background: url(https://example.com/x)"/></svg>`,
+		`<p style="background: image-set('https://example.com/x' 1x)">t</p>`,
+		`<p style="width: expression(x())">t</p>`,
+		`<p style="background: u\72l(https://example.com/x)">t</p>`,
+		`<svg><rect fill="rgb(url(https://example.com/x))"/></svg>`,
+		`<svg><rect fill="URL(https://example.com/x)"/></svg>`,
+	} {
+		got := strings.ToLower(string(SanitizePlugin([]byte(bad))))
+		for _, s := range []string{"onload", "script", "foreignobject", "onerror", "<set", "<animate", "<use", "<image", "javascript:", "example.com", "/_mini/", "expression", "\\72"} {
+			if strings.Contains(got, s) {
+				t.Errorf("%s: kept %q: %s", bad, s, got)
+			}
+		}
+	}
+	// A slot places a component's children, and is named nothing
+	if got, want := string(SanitizePlugin([]byte(`<div><slot></slot><slot name="x"></slot></div>`))), `<div><slot></slot><slot></slot></div>`; got != want {
+		t.Errorf("got %s, want %s", got, want)
+	}
+	// A file's HTML still drops classes, and slots
+	out, _, _ := New().Render([]byte(`<div class="box"><slot>x</slot></div>` + "\n"))
+	if strings.Contains(string(out), "class=") || strings.Contains(string(out), "<slot") {
+		t.Errorf("class or slot kept in a file: %s", out)
+	}
+}
+
+// A component with children holds them, rendered from Markdown, in its
+// <mini-element>, which lists its own child components.
+func TestComponentChildren(t *testing.T) {
+	r := New()
+	const callout = `<mini-element data-tag="Callout" data-attrs="{&#34;type&#34;:&#34;warn&#34;}" data-children="[]" data-block>`
+	for name, tt := range map[string]struct {
+		src  string
+		want []string
+	}{
+		"block": {
+			"<Callout type=\"warn\">\n\nSome **md**\n\n</Callout>\n\nafter\n",
+			[]string{callout + "\n<p>Some <strong>md</strong></p>\n</mini-element>\n<p>after</p>"},
+		},
+		// An HTML block goes on up to a blank line
+		"lines after the tags": {
+			"<Callout type=\"warn\">\n<b>raw</b>\n\n- item\n\n</Callout>\n<i>next</i>\n",
+			[]string{callout + "\n<b>raw</b>\n<ul>\n<li>item</li>\n</ul>\n</mini-element>\n<i>next</i>"},
+		},
+		"one block": {
+			"<Callout type=\"warn\">\ntext\n</Callout>\n",
+			[]string{callout + "\ntext\n</mini-element>"},
+		},
+		"nested in one block": {
+			"<Outer>\n<Inner>\ntext\n</Inner>\n</Outer>\n",
+			[]string{`<mini-element data-tag="Outer" data-attrs="{}" data-children="[{&#34;tag&#34;:&#34;Inner&#34;,&#34;attrs&#34;:{}}]" data-block>` + "\n" +
+				`<mini-element data-tag="Inner" data-attrs="{}" data-children="[]" data-block>` + "\ntext\n</mini-element>\n</mini-element>"},
+		},
+		"close ending a paragraph": {
+			"<Callout type=\"warn\">\n\nText\n</Callout>\n",
+			[]string{callout + "\n<p>Text</p>\n</mini-element>"},
+		},
+		"inline": {
+			"Press <Kbd>Ctrl</Kbd> now\n",
+			[]string{`<p>Press <mini-element data-tag="Kbd" data-attrs="{}" data-children="[]">Ctrl</mini-element> now</p>`},
+		},
+		"inline over a line": {
+			"Press <Kbd>Ctrl\n</Kbd> now\n",
+			[]string{`<mini-element data-tag="Kbd" data-attrs="{}" data-children="[]">Ctrl` + "\n</mini-element> now"},
+		},
+		"nested of a name": {
+			"<Box>\n\n<Box>\n\nin\n\n</Box>\n\nout\n\n</Box>\n",
+			[]string{`data-tag="Box" data-attrs="{}" data-children="[{&#34;tag&#34;:&#34;Box&#34;,&#34;attrs&#34;:{}}]" data-block>` + "\n" +
+				`<mini-element data-tag="Box" data-attrs="{}" data-children="[]" data-block>` + "\n<p>in</p>\n</mini-element>\n<p>out</p>\n</mini-element>"},
+		},
+		// Only its own, not those in them
+		"child components": {
+			"<Tabs>\n\n<Tab label=\"a\">\n\n<Note />\n\n</Tab>\n\n<Tab label=\"b\" />\n\n</Tabs>\n",
+			[]string{`data-tag="Tabs" data-attrs="{}" data-children="[{&#34;tag&#34;:&#34;Tab&#34;,&#34;attrs&#34;:{&#34;label&#34;:&#34;a&#34;}},{&#34;tag&#34;:&#34;Tab&#34;,&#34;attrs&#34;:{&#34;label&#34;:&#34;b&#34;}}]"`},
+		},
+		// A close pairs with the nearest open of its name
+		"crossing": {
+			"<One>\n\n<Two>\n\nx\n\n</One>\n\n</Two>\n",
+			[]string{`<mini-element data-tag="One" data-attrs="{}" data-children="[]" data-block>`, "<p>x</p>\n</mini-element>"},
+		},
+		"two in a block": {
+			"<Partial name=\"a\" />\n<Partial name=\"b\" />\n",
+			[]string{`data-attrs="{&#34;name&#34;:&#34;a&#34;}" data-block></mini-element>`, `data-attrs="{&#34;name&#34;:&#34;b&#34;}" data-block></mini-element>`},
+		},
+		"headings keep ids": {
+			"<Callout type=\"warn\">\n\n## Inside\n\n</Callout>\n",
+			[]string{`<h2 id="inside">`},
+		},
+	} {
+		out, _, err := r.Render([]byte(tt.src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range tt.want {
+			if !strings.Contains(string(out), want) {
+				t.Errorf("%s: missing %q in %s", name, want, out)
+			}
+		}
+		if name == "crossing" && strings.Contains(string(out), `data-tag="Two"`) {
+			t.Errorf("crossing: Two paired: %s", out)
+		}
+	}
+	// Left as tags, dropped: one never closed, one never opened, a close in
+	// a paragraph's middle, and tags in a comment or in capitals alone
+	for _, src := range []string{
+		"<Callout>\n\ntext\n",
+		"text\n\n</Callout>\n",
+		"<Callout>\n\ntext\n</Callout> more\n",
+		"<!--\n<Callout>\n-->\n\nx\n\n</Callout>\n",
+		"<div>\n<!--\n<Note />\n-->\n</div>\n",
+		"<div>\n<pre>\n<Note />\n</pre>\n</div>\n",
+		"<div>\n<!--\na --> <!--\n<Note />\n-->\n</div>\n",
+		"<DIV>\n\nx\n\n</DIV>\n",
+	} {
+		out, _, err := r.Render([]byte(src))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(out), "mini-element") || strings.Contains(string(out), "--&gt;") {
+			t.Errorf("%q: %s", src, out)
+		}
+	}
+	// After a comment closed, a block is split again
+	out, _, _ := r.Render([]byte("<div>\n<!-- a --> <!--\nb -->\n<Note />\n</div>\n"))
+	if !strings.Contains(string(out), `data-tag="Note"`) {
+		t.Errorf("after a comment: %s", out)
+	}
+}

@@ -2,7 +2,10 @@ package markdown
 
 import (
 	"bytes"
+	"encoding/json"
+	"html"
 	"regexp"
+	"strings"
 
 	"github.com/microcosm-cc/bluemonday"
 	"github.com/yuin/goldmark/ast"
@@ -24,7 +27,9 @@ import (
 // rather than from bluemonday.UGCPolicy, which allows id on every element,
 // and an allowance cannot be taken back: an id would let a file take the
 // place of the page's own elements.
-var rawHTMLPolicy = func() *bluemonday.Policy {
+var rawHTMLPolicy = newRawHTMLPolicy()
+
+func newRawHTMLPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
 	p.AllowStandardURLs()
 	p.RequireNoFollowOnLinks(true)
@@ -60,7 +65,7 @@ var rawHTMLPolicy = func() *bluemonday.Policy {
 	p.AllowAttrs("media", "type").Matching(anyText).OnElements("source")
 	p.AllowElements("source")
 	return p
-}()
+}
 
 var (
 	anyText = regexp.MustCompile(`^[^\x00]*$`)
@@ -96,6 +101,10 @@ func renderRawHTML(w util.BufWriter, source []byte, node ast.Node, entering bool
 		segment := n.Segments.At(i)
 		b.Write(segment.Value(source))
 	}
+	if p, ok := placeholder(b.Bytes(), false); ok {
+		_, _ = w.Write(p)
+		return ast.WalkSkipChildren, nil
+	}
 	_, _ = w.Write(sanitize(b.Bytes()))
 	return ast.WalkSkipChildren, nil
 }
@@ -109,12 +118,26 @@ func renderHTMLBlock(w util.BufWriter, source []byte, node ast.Node, entering bo
 	}
 	n := node.(*ast.HTMLBlock)
 	var b bytes.Buffer
-	for i := 0; i < n.Lines().Len(); i++ {
+	first := 0
+	// A block of a tag alone on its line goes on up to a blank line, so
+	// the lines after a component are the rest of the block
+	if n.Lines().Len() > 0 {
+		line := n.Lines().At(0)
+		if p, ok := placeholder(line.Value(source), true); ok {
+			_, _ = w.Write(p)
+			_, _ = w.Write([]byte("\n"))
+			first = 1
+		}
+	}
+	for i := first; i < n.Lines().Len(); i++ {
 		line := n.Lines().At(i)
 		b.Write(line.Value(source))
 	}
 	if n.HasClosure() {
 		b.Write(n.ClosureLine.Value(source))
+	}
+	if b.Len() == 0 {
+		return ast.WalkContinue, nil
 	}
 	_, _ = w.Write(sanitize(b.Bytes()))
 	return ast.WalkContinue, nil
@@ -137,3 +160,124 @@ var tagFilter = regexp.MustCompile(`(?i)<(/?(?:textarea|title|xmp|noembed|nofram
 
 // userContent is put before the ids and names a file's HTML gives.
 const userContent = "user-content-"
+
+// A component is a self-closing tag whose name starts with a capital, as
+// MDX writes one, such as <Partial name="figure" /> or <Image src="a.png" />.
+// GitHub drops it, as it does any tag it does not know, and so does a page
+// here, but it is kept as an empty <mini-element> naming it, with its
+// attributes as JSON, for a plugin to show; with none, it shows nothing.
+var (
+	componentTag  = regexp.MustCompile(`^<([A-Z][A-Za-z0-9-]*)((?:\s+[^\s"'<>/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'=<>` + "`" + `]+))?)*)\s*/>$`)
+	componentAttr = regexp.MustCompile(`([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>` + "`" + `]+)))?`)
+)
+
+// placeholder is the <mini-element> of a component, when b is one alone.
+// One on a line of its own, a block, is shown as one.
+func placeholder(b []byte, block bool) ([]byte, bool) {
+	m := componentTag.FindSubmatch(bytes.TrimSpace(b))
+	if m == nil || !IsComponent(string(m[1])) {
+		return nil, false
+	}
+	attrs := parseAttrs(m[2])
+	j, err := json.Marshal(attrs)
+	if err != nil {
+		return nil, false
+	}
+	var out bytes.Buffer
+	out.WriteString(`<mini-element data-tag="` + html.EscapeString(string(m[1])) + `" data-attrs="` + html.EscapeString(string(j)) + `"`)
+	if block {
+		out.WriteString(` data-block`)
+	}
+	out.WriteString(`></mini-element>`)
+	return out.Bytes(), true
+}
+
+// pluginHTMLPolicy is what a plugin's HTML keeps: what a file's HTML
+// keeps, and <slot>, classes, styles, roles, and SVG to draw with. It is
+// shown apart from the page, in a shadow root, where the page's classes
+// and ids do not reach, so a class or an id takes the place of nothing of
+// the page's. What a plugin gives back may be a file's text it was given,
+// so what would run, or load from elsewhere, still goes.
+var pluginHTMLPolicy = func() *bluemonday.Policy {
+	p := newRawHTMLPolicy()
+	p.AllowAttrs("class").Matching(anyText).Globally()
+	p.AllowAttrs("style").Matching(safeValue).Globally()
+	p.AllowAttrs("role", "aria-label", "aria-hidden", "aria-labelledby", "aria-describedby").Matching(anyText).Globally()
+	// Where a component's children go
+	p.AllowNoAttrs().OnElements("slot")
+	p.AllowNoAttrs().OnElements(svgElements...)
+	p.AllowAttrs(svgAttrs...).Matching(safeValue).OnElements(svgElements...)
+	p.AllowAttrs("type").Matching(safeValue).OnElements("feColorMatrix")
+	return p
+}()
+
+// svgElements are the SVG elements a plugin's HTML keeps, those that draw.
+// Out are those that run or load: script, foreignObject, which holds HTML
+// apart from what the policy reads, the animations, which set attributes,
+// use and image, which load other documents, and feImage.
+var svgElements = []string{
+	"svg", "g", "defs", "symbol", "title", "desc",
+	"path", "rect", "circle", "ellipse", "line", "polyline", "polygon",
+	"text", "tspan", "textPath", "marker",
+	"linearGradient", "radialGradient", "stop", "pattern", "clipPath", "mask",
+	"filter", "feGaussianBlur", "feOffset", "feBlend", "feFlood", "feComposite",
+	"feMerge", "feMergeNode", "feColorMatrix", "feDropShadow",
+}
+
+// svgAttrs are the attributes those keep, of geometry and painting.
+var svgAttrs = strings.Fields(`
+	viewBox preserveAspectRatio x y x1 y1 x2 y2 cx cy r rx ry width height d points
+	transform pathLength fill fill-opacity fill-rule stroke stroke-width stroke-opacity
+	stroke-dasharray stroke-dashoffset stroke-linecap stroke-linejoin stroke-miterlimit
+	opacity color visibility display font-family font-size font-weight font-style
+	text-anchor dominant-baseline alignment-baseline letter-spacing dx dy rotate
+	textLength lengthAdjust offset stop-color stop-opacity gradientUnits gradientTransform
+	spreadMethod fx fy patternUnits patternContentUnits patternTransform clipPathUnits
+	clip-path clip-rule mask maskUnits maskContentUnits filter filterUnits primitiveUnits
+	in in2 result stdDeviation mode operator k1 k2 k3 k4 values flood-color flood-opacity
+	markerWidth markerHeight markerUnits refX refY orient marker-start marker-mid marker-end
+	vector-effect xmlns version`)
+
+// safeValue is a value, of an SVG attribute or a style, that loads
+// nothing: a paren only after a function that computes, without others in
+// it, or url() of a fragment, an element of the same SVG; no backslash,
+// which CSS would read as an escape.
+var safeValue = regexp.MustCompile(`^(?:[^()\\]|(?i:rgba?|hsla?|var|calc|translate|rotate|scale|matrix|skew[xy])\([^()\\]*\)|url\(\s*['"]?#[\w.:-]+['"]?\s*\))*$`)
+
+// SanitizePlugin drops from a plugin's HTML what the page must not run, as
+// sanitize does for a file's. Its ids stay as written: in the plugin's
+// shadow root they are its own, and its SVG names them in url(#id).
+func SanitizePlugin(b []byte) []byte {
+	return pluginHTMLPolicy.SanitizeBytes(b)
+}
+
+// componentName is a component's name: letters, digits and hyphens, as
+// CommonMark takes a tag's name, starting with a capital.
+var componentName = regexp.MustCompile(`^[A-Z][A-Za-z0-9-]*$`)
+
+// IsComponent tells whether a tag of a name is a component. A name of an
+// element of HTML's in capitals alone is HTML, as old READMEs write it,
+// such as <BR/> or <IMG SRC="a.png"/>; <Image /> is a component.
+func IsComponent(name string) bool {
+	if !componentName.MatchString(name) {
+		return false
+	}
+	return name != strings.ToUpper(name) || !htmlElements[strings.ToLower(name)]
+}
+
+// htmlElements are the names of HTML's elements, and of those it had.
+var htmlElements = func() map[string]bool {
+	m := map[string]bool{}
+	for _, name := range strings.Fields(`
+		a abbr acronym address applet area article aside audio b base basefont bdi bdo bgsound big blink
+		blockquote body br button canvas caption center cite code col colgroup data datalist dd del details
+		dfn dialog dir div dl dt em embed fieldset figcaption figure font footer form frame frameset h1 h2
+		h3 h4 h5 h6 head header hgroup hr html i iframe image img input ins isindex kbd keygen label legend
+		li link listing main map mark marquee math menu menuitem meta meter nav nobr noembed noframes
+		noscript object ol optgroup option output p param picture plaintext pre progress q rb rp rt rtc ruby
+		s samp script search section select slot small source spacer span strike strong style sub summary
+		sup svg table tbody td template textarea tfoot th thead time title tr track tt u ul var video wbr xmp`) {
+		m[name] = true
+	}
+	return m
+}()

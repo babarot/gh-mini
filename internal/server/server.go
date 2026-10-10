@@ -34,6 +34,8 @@ type Options struct {
 	Theme string
 	// ThemesDir holds the viewer's own themes, one CSS file each.
 	ThemesDir string
+	// PluginsDir holds the viewer's own plugins, one directory each.
+	PluginsDir string
 	// Reload makes pages reload when the files they show change.
 	Reload bool
 	// NoChanges keeps gh-mini from reading what changed since the last
@@ -122,9 +124,9 @@ func New(opts Options) (*Server, error) {
 		s.previewToken = newPreviewToken()
 	}
 	s.gh, _ = exec.LookPath("gh")
-	// A default theme that does not exist would leave pages unstyled
-	// with nothing to say why
-	if opts.Theme != "" && !slices.Contains(s.themes(), opts.Theme) {
+	// A default theme that does not exist would show the built-in one with
+	// nothing to say why
+	if opts.Theme != "" && !slices.Contains(s.themes(nil), opts.Theme) {
 		log.Printf("gh-mini: no theme %q in %s; using %s", opts.Theme, opts.ThemesDir, builtinTheme)
 		s.opts.Theme = ""
 	}
@@ -152,6 +154,8 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/_mini/static/", s.static)
 	mux.HandleFunc("/_mini/theme/", s.serveTheme)
+	mux.HandleFunc("/_mini/plugins/", s.servePlugin)
+	mux.HandleFunc("/_mini/api/sanitize", s.serveSanitize)
 	mux.HandleFunc("/_mini/api/tree", s.serveTree)
 	mux.HandleFunc("/_mini/api/status", s.serveStatus)
 	mux.HandleFunc("/_mini/api/branch", s.serveBranch)

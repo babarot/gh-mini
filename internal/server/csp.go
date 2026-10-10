@@ -14,11 +14,12 @@ import (
 //   - img-src allows any image, as Markdown shows badges and the like
 //   - worker-src allows blob:, as MathJax makes its speech worker so; only
 //     gh-mini's scripts can make one
-//   - frame-src allows the preview server only, for HTML previews
+//   - frame-src allows the preview server, for HTML previews, and
+//     gh-mini itself, for the sandboxes plugins run in
 func (s *Server) contentSecurityPolicy(r *http.Request) string {
-	frame := "'none'"
+	frame := "'self'"
 	if s.opts.PreviewPort != 0 {
-		frame = s.previewOrigin(r)
+		frame += " " + s.previewOrigin(r)
 	}
 	return strings.Join([]string{
 		"default-src 'self'",

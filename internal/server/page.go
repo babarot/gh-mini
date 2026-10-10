@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/babarot/gh-mini/internal/markdown"
@@ -41,6 +42,9 @@ type page struct {
 	ChangeList *changeList
 	// Features loads the scripts the page's Markdown needs.
 	Features markdown.Features
+	// Plugins are the plugins on for the viewer, which the page runs on
+	// what its Markdown leaves to them.
+	Plugins []pluginView
 	// csp is the page's Content-Security-Policy
 	csp string
 	// status is what changed since the last commit as the viewer's
@@ -89,8 +93,20 @@ type layout struct {
 }
 
 func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind string) *page {
+	plugins := s.plugins()
 	if s.watcher != nil {
 		s.watcher.WatchThemes()
+		if s.opts.PluginsDir != "" {
+			// The plugins directory holds its plugins, but those linked
+			// from elsewhere
+			dirs := []string{s.opts.PluginsDir}
+			for _, p := range plugins {
+				if fi, err := os.Lstat(p.dir); p.dir != "" && err == nil && fi.Mode()&os.ModeSymlink != 0 {
+					dirs = append(dirs, p.dir)
+				}
+			}
+			s.watcher.WatchPlugins(dirs)
+		}
 	}
 	p := &page{Kind: kind, csp: s.contentSecurityPolicy(r), layout: layout{
 		Name:     s.opts.Name,
@@ -118,6 +134,7 @@ func (s *Server) newPage(r *http.Request, snap *workspace.Snapshot, rel, kind st
 	p.SettingAttrs = settingAttrs(p.Settings)
 	p.SidebarHidden = cookie(r, sidebarCookie) == "hidden"
 	p.SettingSections = s.settingSections(p.Settings)
+	p.Plugins = s.enabledPlugins(plugins, p.Settings)
 	if rel != "." {
 		p.Title = rel + " · " + full
 		parts := strings.Split(rel, "/")

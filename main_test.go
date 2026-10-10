@@ -33,15 +33,15 @@ func TestSplitList(t *testing.T) {
 	}
 }
 
-func TestDefaultThemesDir(t *testing.T) {
+func TestConfigDir(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "/xdg")
-	if got, want := defaultThemesDir(), filepath.Join("/xdg", "gh-mini", "themes"); got != want {
+	if got, want := configDir("themes"), filepath.Join("/xdg", "gh-mini", "themes"); got != want {
 		t.Errorf("with XDG_CONFIG_HOME: got %q, want %q", got, want)
 	}
 	home := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("HOME", home)
-	if got, want := defaultThemesDir(), filepath.Join(home, ".config", "gh-mini", "themes"); got != want {
+	if got, want := configDir("themes"), filepath.Join(home, ".config", "gh-mini", "themes"); got != want {
 		t.Errorf("without XDG_CONFIG_HOME: got %q, want %q", got, want)
 	}
 }
@@ -167,10 +167,11 @@ func TestParseArgsDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := config{
-		port:      6419,
-		host:      "localhost",
-		skip:      []string{".git", "node_modules", ".DS_Store"},
-		themesDir: filepath.Join("/xdg", "gh-mini", "themes"),
+		port:       6419,
+		host:       "localhost",
+		skip:       []string{".git", "node_modules", ".DS_Store"},
+		themesDir:  filepath.Join("/xdg", "gh-mini", "themes"),
+		pluginsDir: filepath.Join("/xdg", "gh-mini", "plugins"),
 	}
 	if !reflect.DeepEqual(c, want) {
 		t.Errorf("got %+v, want %+v", c, want)
@@ -181,20 +182,21 @@ func TestParseArgs(t *testing.T) {
 	t.Setenv("GH_MINI_THEME", "sepia")
 	c, err := parseArgs([]string{
 		"-p", "8000", "--host", "0.0.0.0", "--no-open", "--no-reload",
-		"--skip", "dist, .cache", "--theme-dir", "/t", "docs",
+		"--skip", "dist, .cache", "--theme-dir", "/t", "--plugin-dir", "/p", "docs",
 	}, io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := config{
-		port:      8000,
-		host:      "0.0.0.0",
-		noOpen:    true,
-		noReload:  true,
-		theme:     "sepia",
-		skip:      []string{"dist", ".cache"},
-		themesDir: "/t",
-		target:    "docs",
+		port:       8000,
+		host:       "0.0.0.0",
+		noOpen:     true,
+		noReload:   true,
+		theme:      "sepia",
+		skip:       []string{"dist", ".cache"},
+		themesDir:  "/t",
+		pluginsDir: "/p",
+		target:     "docs",
 	}
 	if !reflect.DeepEqual(c, want) {
 		t.Errorf("got %+v, want %+v", c, want)
@@ -219,7 +221,7 @@ func TestParseArgsHelp(t *testing.T) {
 	out := stderr.String()
 	for _, s := range []string{
 		"Usage:\n  gh-mini [flags] [DIR | FILE]",
-		"Themes are CSS files in " + filepath.Join("/xdg", "gh-mini", "themes") + ".",
+		"Themes are CSS files in " + filepath.Join("/xdg", "gh-mini", "themes") + ", and plugins directories in " + filepath.Join("/xdg", "gh-mini", "plugins") + ".",
 		`  -p, --port     port to listen on; the next free one is used when it is taken (default "6419")`,
 		"  --no-open      do not open the browser\n",
 		`  --skip         comma-separated names left out of the tree (default ".git,node_modules,.DS_Store")`,

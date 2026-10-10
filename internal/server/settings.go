@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 )
 
@@ -42,8 +43,10 @@ type setting struct {
 	// many or grow at run time, "segmented" for a few fixed choices,
 	// "toggle" for on and off, whose values are "true" and "false".
 	Control string
-	// Choices lists the values a select or segmented setting takes.
-	Choices func(s *Server) []choice
+	// Choices lists the values a select or segmented setting takes, which
+	// may hang on the request's other settings, as the themes on the
+	// plugins on.
+	Choices func(s *Server, values map[string]string) []choice
 	// Default is the value when the viewer has not picked one.
 	Default func(s *Server) string
 	// Attr sets the value as <html data-<key>> on every page.
@@ -55,6 +58,14 @@ type setting struct {
 	// Parent is the key of a toggle this setting tells more of: it does
 	// nothing, and the dialog shows it disabled, while that is off.
 	Parent string
+	// Group is a heading the dialog lists the setting under, in its
+	// section, with GroupNote beside it; the settings of a group follow
+	// one another.
+	Group     string
+	GroupNote string
+	// Tags tell what the setting is for, as what a plugin shows and the
+	// files it reads.
+	Tags []tag
 }
 
 type choice struct {
@@ -62,12 +73,19 @@ type choice struct {
 	Label string
 }
 
+// tag is a word the dialog shows under a setting. Kind, "" or one of
+// "read" and "theme", is how it is marked.
+type tag struct {
+	Text string
+	Kind string
+}
+
 var settingDefs = []setting{
 	{
 		Key:         "theme",
 		Section:     "Appearance",
 		Label:       "Theme",
-		Description: "Built-in themes and CSS files in the themes directory",
+		Description: "Built-in themes, CSS files in the themes directory, and themes of plugins",
 		Control:     "select",
 		Choices:     themeChoices,
 		Default:     defaultTheme,
@@ -78,7 +96,7 @@ var settingDefs = []setting{
 		Label:       "Mode",
 		Description: "Auto follows the system",
 		Control:     "segmented",
-		Choices: func(*Server) []choice {
+		Choices: func(*Server, map[string]string) []choice {
 			return []choice{{"", "Auto"}, {"light", "Light"}, {"dark", "Dark"}}
 		},
 		Default: func(*Server) string { return "" },
@@ -159,7 +177,7 @@ var settingDefs = []setting{
 		Label:       "Marks in the tree",
 		Description: "How the tree tells a changed file: M, A, D after its name, its name in color, or nothing",
 		Control:     "segmented",
-		Choices: func(*Server) []choice {
+		Choices: func(*Server, map[string]string) []choice {
 			return []choice{{"letter", "Letter and color"}, {"color", "Color"}, {"none", "None"}}
 		},
 		Default: func(*Server) string { return "letter" },
@@ -200,7 +218,7 @@ var settingDefs = []setting{
 		Label:       "Open a changed file at",
 		Description: "What the page of a changed file shows first",
 		Control:     "segmented",
-		Choices: func(*Server) []choice {
+		Choices: func(*Server, map[string]string) []choice {
 			return []choice{{"file", "The file"}, {"diff", "Its diff"}}
 		},
 		Default: func(*Server) string { return "file" },
@@ -215,6 +233,12 @@ var settingDefs = []setting{
 	},
 }
 
+// settingDefs are the settings: those of settingDefs, and one for each
+// plugin, which come and go with the plugins.
+func (s *Server) settingDefs() []setting {
+	return append(slices.Clip(settingDefs), pluginSettings(s.plugins(), s.opts.PluginsDir)...)
+}
+
 // legacyCookies are where settings were kept before settingsCookie.
 // Remove them, and migrate in settings.js, once they are gone.
 var legacyCookies = map[string]string{
@@ -222,37 +246,47 @@ var legacyCookies = map[string]string{
 	"mode":  "gh-mini-mode",
 }
 
-func (d setting) valid(s *Server, v string) bool {
-	if d.Control == "toggle" {
-		return v == "true" || v == "false"
-	}
-	for _, c := range d.Choices(s) {
-		if c.Value == v {
-			return true
-		}
-	}
-	return false
-}
-
 // settings returns the value of every setting for a request: the one in
-// the cookie when it is valid, else the default.
+// the cookie when it is valid, else the default. A setting of choices is
+// checked once the others are known, as its choices may hang on them; one
+// not among them takes the default, or the first choice when the default
+// is not among them either, as a theme of a plugin turned off.
 func (s *Server) settings(r *http.Request) map[string]string {
 	stored := storedSettings(r)
-	out := make(map[string]string, len(settingDefs))
-	for _, d := range settingDefs {
+	defs := s.settingDefs()
+	out := make(map[string]string, len(defs))
+	for _, d := range defs {
 		v, ok := stored[d.Key]
 		if !ok {
 			if name, legacy := legacyCookies[d.Key]; legacy {
 				v, ok = cookieValue(r, name)
 			}
 		}
-		if ok && d.valid(s, v) {
+		if ok && (d.Control != "toggle" || v == "true" || v == "false") {
 			out[d.Key] = v
 		} else {
 			out[d.Key] = d.Default(s)
 		}
 	}
+	for _, d := range defs {
+		if d.Choices == nil {
+			continue
+		}
+		choices := d.Choices(s, out)
+		if has(choices, out[d.Key]) {
+			continue
+		}
+		if def := d.Default(s); has(choices, def) || len(choices) == 0 {
+			out[d.Key] = def
+		} else {
+			out[d.Key] = choices[0].Value
+		}
+	}
 	return out
+}
+
+func has(choices []choice, v string) bool {
+	return slices.ContainsFunc(choices, func(c choice) bool { return c.Value == v })
 }
 
 // storedSettings reads the settings cookie, turning booleans into "true"
@@ -294,9 +328,9 @@ func cookieValue(r *http.Request, name string) (string, bool) {
 	return c.Value, true
 }
 
-func themeChoices(s *Server) []choice {
+func themeChoices(s *Server, values map[string]string) []choice {
 	var out []choice
-	for _, t := range s.themes() {
+	for _, t := range s.themes(values) {
 		out = append(out, choice{Value: t, Label: t})
 	}
 	return out
@@ -331,6 +365,8 @@ type settingView struct {
 	// Disabled is set while the setting does nothing: it has a Reason,
 	// or its Parent is off
 	Disabled bool
+	// GroupStart is set on the first setting of its Group
+	GroupStart bool
 }
 
 // settingSection is a page of the settings dialog.
@@ -350,10 +386,10 @@ func (s *Server) settingSections(values map[string]string) []settingSection {
 	index := map[string]int{}
 	// off are the toggles that do nothing, for the settings under them
 	off := map[string]bool{}
-	for _, d := range settingDefs {
+	for _, d := range s.settingDefs() {
 		v := settingView{setting: d, Value: values[d.Key]}
 		if d.Choices != nil {
-			v.Options = d.Choices(s)
+			v.Options = d.Choices(s, values)
 		}
 		if d.Unavailable != nil {
 			if v.Reason = d.Unavailable(s); v.Reason != "" && d.Control == "toggle" {
@@ -372,6 +408,8 @@ func (s *Server) settingSections(values map[string]string) []settingSection {
 			index[name] = i
 			out = append(out, settingSection{Name: name, ID: sectionID(name)})
 		}
+		prev := out[i].Settings
+		v.GroupStart = d.Group != "" && (len(prev) == 0 || prev[len(prev)-1].Group != d.Group)
 		out[i].Settings = append(out[i].Settings, v)
 	}
 	return out

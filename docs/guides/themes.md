@@ -6,6 +6,8 @@ The built-in themes are `github` (the default), `nord` and `tokyo-night`; each h
 
 Your own theme is a CSS file in `~/.config/gh-mini/themes/` (`$XDG_CONFIG_HOME/gh-mini/themes/`, or the directory given to `--theme-dir`). Its file name is the theme's name in the settings, and a file named after a built-in theme replaces it. It is read on every page load, and saving it updates open pages.
 
+A [plugin](plugins.md) may bring themes too, as its `themes` name them, listed in the settings while the plugin is on. A theme file wins over a plugin's theme of the same name, and a plugin's over a built-in one. A theme the viewer no longer has, as one of a plugin turned off, shows as the built-in `github`.
+
 Colors are CSS variables, so a theme usually only sets them. Set them under `:root[data-mode="light"]` and `:root[data-mode="dark"]`, or `:root[data-mode]` for both:
 
 ```css

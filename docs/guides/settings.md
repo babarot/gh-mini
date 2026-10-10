@@ -6,7 +6,7 @@ The gear button opens a menu with the keyboard shortcuts (or press `?`), an Abou
 
 | Setting | Default | |
 |---|---|---|
-| Theme | `github`, or `--theme` | The built-in `github`, `nord` and `tokyo-night`, or one you write (see [Themes](themes.md)) |
+| Theme | `github`, or `--theme` | The built-in `github`, `nord` and `tokyo-night`, one you write, or one of a plugin (see [Themes](themes.md)) |
 | Mode | Auto | Light, dark, or Auto to follow the system |
 | Full width | off | Let the page take the width of the window rather than a column |
 | Wrap code | off | Wrap long lines of a source file rather than scroll them |
@@ -20,6 +20,7 @@ The gear button opens a menu with the keyboard shortcuts (or press `?`), an Abou
 | Ignore whitespace | off | Leave out changes of whitespace alone from diffs, as `git diff -w` does |
 | Open a changed file at | The file | What the page of a changed file shows first: the file, or its diff |
 | Avatars | on | Show the author of a file's last commit with their picture on GitHub, which asks GitHub for it by their email |
+| A plugin, by its name | on for yours, off for those that come with gh-mini | Show what the plugin shows (see [Plugins](plugins.md)) |
 
 The settings are kept per browser, and hold for every gh-mini on `localhost`.
 

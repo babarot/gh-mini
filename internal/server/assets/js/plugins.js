@@ -1,0 +1,269 @@
+// Plugins show what a Markdown file leaves to them: its front matter, which
+// the server also shows as a table, and components such as
+// <Partial name="figure" />, which the server keeps as <mini-element>s,
+// empty or holding their children, and code blocks of a language, which
+// the server highlights. Each plugin runs in a sandbox of its own (see
+// plugins.go), handed what it shows and the files it reads; what it gives
+// back is sanitized by the server and shown in a shadow root, where the
+// page's styles and the plugin's keep apart.
+
+import { page, href, dirname } from "./util.js";
+import { settings } from "./settings.js";
+
+// TIMEOUT is how long a plugin has to start, and to show one thing.
+const TIMEOUT = 10000;
+// MAX_READ is the largest file a plugin may read.
+const MAX_READ = 1 << 20;
+
+// reads are the files plugins read for this page, which reload it when
+// they change, as the file itself does.
+export const reads = new Set();
+
+export function initPlugins() {
+  const plugins = JSON.parse(document.getElementById("mini.plugins")?.textContent || "[]");
+  if (!plugins.length) return;
+  const jobs = [];
+  for (const article of document.querySelectorAll(".markdown-body")) {
+    // A directory's page shows its README, which may be in another
+    const file = article.dataset.file || page.path;
+    for (const el of article.querySelectorAll(".mini-frontmatter[data-front-matter]")) {
+      const p = plugins.find((p) => p.frontMatter);
+      if (p) jobs.push({ p, el, file, msg: { hook: "frontMatter", data: JSON.parse(el.dataset.frontMatter) } });
+    }
+    for (const el of article.querySelectorAll("mini-element[data-tag]")) {
+      const p = plugins.find((p) => p.elements.includes(el.dataset.tag));
+      if (!p) continue;
+      const msg = { hook: "element", tag: el.dataset.tag, attrs: JSON.parse(el.dataset.attrs || "{}"), block: el.hasAttribute("data-block") };
+      if (el.dataset.children !== undefined) msg.children = JSON.parse(el.dataset.children);
+      jobs.push({ p, el, file, msg });
+    }
+    for (const code of article.querySelectorAll(".highlight[data-lang]")) {
+      const name = code.dataset.lang.toLowerCase();
+      const p = plugins.find((p) => p.codeBlocks.includes(name));
+      if (!p) continue;
+      // The code goes in a box, as a component's children do, shown as
+      // it is until the plugin shows it
+      const el = document.createElement("mini-element");
+      el.dataset.block = "";
+      el.dataset.code = name;
+      code.replaceWith(el);
+      el.append(code);
+      const text = code.querySelector("pre")?.textContent ?? "";
+      jobs.push({ p, el, file, msg: { hook: "codeBlock", name, lang: code.dataset.lang, meta: code.dataset.meta || "", code: text } });
+    }
+  }
+  const sandboxes = new Map();
+  for (const job of jobs) {
+    if (!sandboxes.has(job.p.name)) sandboxes.set(job.p.name, new Sandbox(job.p));
+    job.sandbox = sandboxes.get(job.p.name);
+  }
+  let drawing = Promise.all(jobs.map((job) => run(job)));
+  // Drawn in the mode and the theme, what plugins show is drawn again when
+  // either changes, a change after the one before, as Mermaid's diagrams
+  const again = () => {
+    drawing = drawing.then(() => Promise.all(jobs.map((job) => run(job, true))));
+  };
+  new MutationObserver(again).observe(document.documentElement, { attributes: true, attributeFilter: ["data-mode"] });
+  // A theme picked, or saved, loads its stylesheet again
+  document.getElementById("mini.theme")?.addEventListener("load", again);
+}
+
+// run asks a plugin to show a job, and shows what it gives back. Asked
+// again, what it showed stays when it fails, or gives back nothing.
+async function run(job, again = false) {
+  const { p, el, file, msg } = job;
+  // What el holds, a component's children or a code block, stays
+  const holds = msg.children !== undefined || msg.hook === "codeBlock";
+  try {
+    const result = await job.sandbox.ask({ ...msg, ...look(), path: file }, file);
+    if (!result) return;
+    if (job.root) await fill(job.root, result);
+    else job.root = await show(el, p, result, holds);
+  } catch (e) {
+    console.error(`gh-mini: plugin ${p.name}:`, e);
+    // The front matter keeps its table
+    if (again || msg.hook === "frontMatter") return;
+    const err = document.createElement("span");
+    err.className = "mini-plugin-error";
+    err.textContent = `plugin ${p.name}: ${e.message || e}`;
+    if (holds) el.prepend(err);
+    else el.replaceChildren(err);
+  }
+}
+
+// show puts what a plugin gave back in the place of el, in a shadow root
+// on a box inside it: the box, kept in by el's paint containment, holds
+// even a fixed position the plugin's styles give it. A component's
+// children move into the box, where the plugin's <slot> shows them: still
+// the page's, its styles theirs; so does a code block.
+async function show(el, p, result, holds) {
+  const html = await sanitize(result.html);
+  const box = document.createElement("div");
+  // An error told before goes, as what it was about shows now
+  el.querySelector(":scope > .mini-plugin-error")?.remove();
+  if (holds) box.append(...el.childNodes);
+  const root = box.attachShadow({ mode: "open" });
+  put(root, html, result.css);
+  el.dataset.plugin = p.name;
+  el.replaceChildren(box);
+  return root;
+}
+
+// fill puts what a plugin gave back again in the shadow root it showed in.
+async function fill(root, result) {
+  put(root, await sanitize(result.html), result.css);
+}
+
+function put(root, html, css) {
+  root.innerHTML = html;
+  if (css) {
+    const style = document.createElement("style");
+    style.textContent = css;
+    root.prepend(style);
+  }
+}
+
+async function sanitize(html) {
+  const r = await fetch("/_mini/api/sanitize", { method: "POST", headers: { "Content-Type": "text/plain" }, body: html });
+  if (!r.ok) throw new Error("could not sanitize: " + r.status);
+  return r.text();
+}
+
+// look is how the page shows, which a plugin may draw in: the mode, light
+// or dark, Auto's resolved, and the theme's name.
+function look() {
+  const root = document.documentElement;
+  const dark = root.dataset.mode ? root.dataset.mode === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  return { mode: dark ? "dark" : "light", theme: settings.theme || "github" };
+}
+
+// Sandbox is a plugin's iframe, and the channel to it.
+class Sandbox {
+  constructor(p) {
+    this.p = p;
+    this.pending = new Map();
+    this.nextID = 0;
+    this.port = this.start();
+  }
+
+  // start loads the iframe, and hands it a channel when it tells it is
+  // ready, once: what tells so later, or from elsewhere, gets nothing.
+  start() {
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("sandbox", "allow-scripts");
+    iframe.hidden = true;
+    iframe.title = "Plugin " + this.p.name;
+    iframe.src = this.p.host;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        window.removeEventListener("message", onMessage);
+        reject(new Error("did not start"));
+      }, TIMEOUT);
+      const onMessage = (e) => {
+        if (e.source !== iframe.contentWindow || e.data !== "ready") return;
+        window.removeEventListener("message", onMessage);
+        clearTimeout(timer);
+        const channel = new MessageChannel();
+        channel.port1.onmessage = (e) => this.receive(e.data);
+        iframe.contentWindow.postMessage("port", "*", [channel.port2]);
+        resolve(channel.port1);
+      };
+      window.addEventListener("message", onMessage);
+      document.body.append(iframe);
+    });
+  }
+
+  // ask sends the plugin one thing to show, from the file at path.
+  async ask(msg, path) {
+    const port = await this.port;
+    const id = ++this.nextID;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error("took too long"));
+      }, TIMEOUT);
+      this.pending.set(id, { path, resolve, reject, timer });
+      port.postMessage({ ...msg, id });
+    });
+  }
+
+  async receive(m) {
+    const port = await this.port;
+    if (m.read !== undefined) {
+      // A read is relative to the file of the request it is made for
+      try {
+        const asked = this.pending.get(m.for);
+        if (!asked) throw new Error("read for no request");
+        port.postMessage({ readID: m.read, text: await this.read(asked.path, m.path) });
+      } catch (e) {
+        port.postMessage({ readID: m.read, error: e.message || String(e) });
+      }
+      return;
+    }
+    const p = this.pending.get(m.id);
+    if (!p) return;
+    this.pending.delete(m.id);
+    clearTimeout(p.timer);
+    if (m.error !== undefined) p.reject(new Error(m.error));
+    else p.resolve(m.result);
+  }
+
+  // read reads a file for the plugin, when the plugin's read patterns
+  // name it: relative to the directory of the file shown, or with a /
+  // before it, to the directory served. The server opens it under the
+  // root, which a symlink out of it does not escape.
+  async read(file, rel) {
+    if (typeof rel !== "string") throw new Error("read takes a path");
+    const fromRoot = rel.startsWith("/");
+    const clean = normalize(fromRoot ? rel.slice(1) : rel);
+    const allowed = this.p.read.filter((g) => g.startsWith("/") === fromRoot).map((g) => glob(fromRoot ? g.slice(1) : g));
+    if (clean === null || !allowed.some((re) => re.test(clean))) {
+      throw new Error(`not allowed to read ${rel}: plugin.json names the files a plugin reads`);
+    }
+    const dir = fromRoot ? "." : dirname(file);
+    const full = dir === "." ? clean : dir + "/" + clean;
+    reads.add(full);
+    const r = await fetch(href(full) + "?raw", { cache: "no-store" });
+    if (!r.ok) throw new Error(`could not read ${rel}: ${r.status}`);
+    if (Number(r.headers.get("Content-Length")) > MAX_READ) throw new Error(`${rel} is too large`);
+    const text = await r.text();
+    if (text.length > MAX_READ) throw new Error(`${rel} is too large`);
+    return text;
+  }
+}
+
+// normalize is a relative path with . and .. resolved, or null when it
+// leaves the directory it is relative to.
+function normalize(rel) {
+  if (rel.startsWith("/") || rel.includes("\\")) return null;
+  const out = [];
+  for (const part of rel.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") {
+      if (!out.length) return null;
+      out.pop();
+    } else {
+      out.push(part);
+    }
+  }
+  return out.length ? out.join("/") : null;
+}
+
+// glob is a pattern of plugin.json as a regular expression, as Go's
+// path.Match reads it: * and ? within a name, [...] a set of characters,
+// [^...] one out of it. The server takes only patterns path.Match does.
+function glob(g) {
+  let re = "";
+  for (let i = 0; i < g.length; i++) {
+    const c = g[i];
+    if (c === "*") re += "[^/]*";
+    else if (c === "?") re += "[^/]";
+    else if (c === "[") {
+      const end = g.indexOf("]", i + 2);
+      if (end < 0) return /(?!)/;
+      re += "[" + g.slice(i + 1, end) + "]";
+      i = end;
+    } else re += c.replace(/[.+^${}()|\\]/g, "\\$&");
+  }
+  return new RegExp("^" + re + "$");
+}
