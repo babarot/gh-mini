@@ -58,11 +58,26 @@ type setting struct {
 	// Parent is the key of a toggle this setting tells more of: it does
 	// nothing, and the dialog shows it disabled, while that is off.
 	Parent string
+	// Group is a heading the dialog lists the setting under, in its
+	// section, with GroupNote beside it; the settings of a group follow
+	// one another.
+	Group     string
+	GroupNote string
+	// Tags tell what the setting is for, as what a plugin shows and the
+	// files it reads.
+	Tags []tag
 }
 
 type choice struct {
 	Value string
 	Label string
+}
+
+// tag is a word the dialog shows under a setting. Kind, "" or one of
+// "read" and "theme", is how it is marked.
+type tag struct {
+	Text string
+	Kind string
 }
 
 var settingDefs = []setting{
@@ -221,7 +236,7 @@ var settingDefs = []setting{
 // settingDefs are the settings: those of settingDefs, and one for each
 // plugin, which come and go with the plugins.
 func (s *Server) settingDefs() []setting {
-	return append(slices.Clip(settingDefs), pluginSettings(s.plugins())...)
+	return append(slices.Clip(settingDefs), pluginSettings(s.plugins(), s.opts.PluginsDir)...)
 }
 
 // legacyCookies are where settings were kept before settingsCookie.
@@ -350,6 +365,8 @@ type settingView struct {
 	// Disabled is set while the setting does nothing: it has a Reason,
 	// or its Parent is off
 	Disabled bool
+	// GroupStart is set on the first setting of its Group
+	GroupStart bool
 }
 
 // settingSection is a page of the settings dialog.
@@ -391,6 +408,8 @@ func (s *Server) settingSections(values map[string]string) []settingSection {
 			index[name] = i
 			out = append(out, settingSection{Name: name, ID: sectionID(name)})
 		}
+		prev := out[i].Settings
+		v.GroupStart = d.Group != "" && (len(prev) == 0 || prev[len(prev)-1].Group != d.Group)
 		out[i].Settings = append(out[i].Settings, v)
 	}
 	return out

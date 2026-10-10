@@ -6,7 +6,9 @@ A plugin shows a part of a Markdown file its own way: the front matter, a compon
 
 Plugins are directories in `~/.config/gh-mini/plugins/` (`$XDG_CONFIG_HOME/gh-mini/plugins/`, or the directory given to `--plugin-dir`). Each is listed under Plugins in the settings, on until you turn it off. A plugin that cannot run, such as one whose `plugin.json` does not parse, is shown off there with why.
 
-gh-mini comes with `front-matter-card`, which shows front matter as a card: the title, date, description and tags, and the other keys below. It is off until you turn it on. A plugin of yours with the same name takes its place.
+gh-mini comes with `front-matter-card`, which shows front matter as a card: the title, date, description and tags, and the other keys below. It is off until you turn it on, and listed apart from yours, under Comes with gh-mini. A plugin of yours with the same name takes its place.
+
+Under each plugin, the settings show what its `plugin.json` says it shows, such as `<Callout>`, ` ```csv `, front matter or a theme, and the files it reads, marked in yellow. gh-mini holds a plugin to these: it is handed nothing else, and reads nothing else.
 
 Plugins are read on every page load, and a page of Markdown, or of a directory, loads again when a file of yours changes: a plugin added or edited shows at once.
 
