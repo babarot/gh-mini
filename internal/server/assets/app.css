@@ -522,6 +522,42 @@ body[data-kind="html"] .main > .box:has(> .html-preview) {
 .setting.child { padding-left: 32px; }
 .setting.disabled .setting-label { color: var(--fgColor-muted); }
 .setting.disabled .setting-description { opacity: .7; }
+/* A heading over the settings of a group, as the plugins of the viewer's
+   and those that come with gh-mini */
+.setting-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  margin: 0;
+  padding: 14px 16px 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fgColor-muted);
+}
+.setting-group:not(:first-child) { border-top: 1px solid var(--borderColor-default); }
+.setting-group-note { font-weight: 400; overflow-wrap: anywhere; }
+/* What a setting is for, as what a plugin shows and the files it reads */
+.setting-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.setting-tags li {
+  padding: 0 6px;
+  font-family: var(--mini-font-mono);
+  font-size: 11px;
+  line-height: 18px;
+  border-radius: var(--mini-radius);
+  background: var(--mini-selected);
+  overflow-wrap: anywhere;
+}
+.setting-tags .theme { background: var(--bgColor-accent-muted, color-mix(in srgb, var(--fgColor-accent) 15%, transparent)); }
+.setting-tags .read { background: var(--bgColor-attention-muted, color-mix(in srgb, var(--fgColor-attention) 20%, transparent)); }
+.setting.disabled .setting-tags { opacity: .7; }
 
 /* The settings dialog has a page per section, listed on the left */
 .settings:has(.settings-body) { width: min(680px, calc(100vw - 32px)); }

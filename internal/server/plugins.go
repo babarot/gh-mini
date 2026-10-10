@@ -1,12 +1,14 @@
 package server
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
+	"maps"
 	"mime"
 	"net/http"
 	"os"
@@ -255,27 +257,80 @@ func cmpOrEmpty(s []string) []string {
 // pluginSettings are the settings that turn each plugin on: the viewer's
 // own are on until turned off, as putting one in the directory asks for
 // it, and those that come with gh-mini off until turned on.
-func pluginSettings(plugins []plugin) []setting {
+// pluginSettings are the plugins' settings, the viewer's own first, then
+// those that come with gh-mini, each with what it shows and reads, as its
+// plugin.json tells, for the viewer to know what turning it on lets it do.
+func pluginSettings(plugins []plugin, dir string) []setting {
+	plugins = slices.Clone(plugins)
+	slices.SortStableFunc(plugins, func(a, b plugin) int {
+		return cmp.Compare(btoi(a.Builtin), btoi(b.Builtin))
+	})
 	var out []setting
 	for _, p := range plugins {
-		def := "true"
-		desc := p.Description
+		def, group, note := "true", "Yours", pluginsDirNote(dir)
 		if p.Builtin {
-			def = "false"
-			desc = strings.TrimSpace(desc + " (comes with gh-mini)")
+			def, group, note = "false", "Comes with gh-mini", "off until you turn it on"
 		}
 		reason := p.Err
+		var tags []tag
+		if reason == "" {
+			tags = p.tags()
+		}
 		out = append(out, setting{
 			Key:         pluginSetting(p.Name),
 			Section:     "Plugins",
 			Label:       p.Name,
-			Description: desc,
+			Description: p.Description,
 			Control:     "toggle",
 			Default:     func(*Server) string { return def },
 			Unavailable: func(*Server) string { return reason },
+			Group:       group,
+			GroupNote:   note,
+			Tags:        tags,
 		})
 	}
 	return out
+}
+
+// tags tell what a plugin shows, and the files it reads.
+func (p *plugin) tags() []tag {
+	var out []tag
+	if p.FrontMatter {
+		out = append(out, tag{Text: "front matter"})
+	}
+	for _, e := range p.Elements {
+		out = append(out, tag{Text: "<" + e + ">"})
+	}
+	for _, l := range p.CodeBlocks {
+		out = append(out, tag{Text: "```" + l})
+	}
+	for _, t := range slices.Sorted(maps.Keys(p.Themes)) {
+		out = append(out, tag{Text: "theme: " + t, Kind: "theme"})
+	}
+	for _, g := range p.Read {
+		out = append(out, tag{Text: "reads " + g, Kind: "read"})
+	}
+	return out
+}
+
+// pluginsDirNote is the plugins directory as the settings show it, under
+// the home directory as ~/..., as the About dialog shows the root.
+func pluginsDirNote(dir string) string {
+	if dir == "" {
+		return ""
+	}
+	if short := shortenHome(dir, homeDir()); short != dir {
+		return short
+	}
+	home, _ := os.UserHomeDir()
+	return shortenHome(dir, home)
+}
+
+func btoi(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // findPlugin is the plugin of a name that can run.

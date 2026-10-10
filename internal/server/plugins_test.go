@@ -120,7 +120,23 @@ func TestPagePlugins(t *testing.T) {
 		`data-setting="plugin.partial" aria-labelledby="mini.setting-plugin.partial" checked>`,
 		`data-setting="plugin.front-matter-card" aria-labelledby="mini.setting-plugin.front-matter-card">`,
 		"shows nothing",
+		`<li>&lt;Partial&gt;</li>`,
+		`<li class="read">reads figures/*.part.html</li>`,
+		`<li class="read">reads /styles/*.css</li>`,
+		`<li>front matter</li>`,
 	)
+	// The viewer's plugins come first, under their directory; one that
+	// cannot run shows no tags
+	body := r.body
+	yours := strings.Index(body, `<h3 class="setting-group">Yours <span class="setting-group-note">`+srv.opts.PluginsDir+`</span></h3>`)
+	builtin := strings.Index(body, `<h3 class="setting-group">Comes with gh-mini <span class="setting-group-note">off until you turn it on</span></h3>`)
+	broken, card := strings.Index(body, `id="mini.setting-plugin.broken"`), strings.Index(body, `id="mini.setting-plugin.front-matter-card"`)
+	if yours < 0 || builtin < 0 || !(yours < broken && broken < builtin && builtin < card) {
+		t.Errorf("groups at %d, %d; broken at %d, front-matter-card at %d", yours, builtin, broken, card)
+	}
+	if row, _, _ := strings.Cut(body[broken:], `<div class="setting`); strings.Contains(row, "setting-tags") {
+		t.Errorf("tags shown for a plugin that cannot run: %s", row)
+	}
 	r = get(t, h, "/", withSettings(`{"plugin.partial":false,"plugin.front-matter-card":true}`))
 	r.expect(t, http.StatusOK, `"name":"front-matter-card","frontMatter":true`)
 	r.reject(t, `"name":"partial"`)

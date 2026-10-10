@@ -157,11 +157,21 @@
     {{- range $i, $sec := .SettingSections}}
     <section class="settings-pane" role="tabpanel" id="mini.settings-{{$sec.ID}}" aria-labelledby="mini.settings-tab-{{$sec.ID}}"{{if ne $i 0}} hidden{{end}}>
       {{- range $s := .Settings}}
+      {{- if $s.GroupStart}}
+      <h3 class="setting-group">{{$s.Group}}{{with $s.GroupNote}} <span class="setting-group-note">{{.}}</span>{{end}}</h3>
+      {{- end}}
       <div class="setting{{if $s.Reason}} unavailable{{end}}{{if $s.Parent}} child{{end}}{{if and $s.Disabled (not $s.Reason)}} disabled{{end}}"{{with $s.Parent}} data-parent="{{.}}"{{end}}>
         <div class="setting-text">
           <div class="setting-label" id="mini.setting-{{$s.Key}}">{{$s.Label}}</div>
           {{- with $s.Description}}
           <div class="setting-description">{{.}}</div>
+          {{- end}}
+          {{- with $s.Tags}}
+          <ul class="setting-tags">
+            {{- range .}}
+            <li{{with .Kind}} class="{{.}}"{{end}}>{{.Text}}</li>
+            {{- end}}
+          </ul>
           {{- end}}
           {{- with $s.Reason}}
           <div class="setting-reason">{{.}}</div>
