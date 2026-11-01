@@ -8,6 +8,9 @@ on:
     paths-ignore:
       - CHANGELOG.md
       - internal/version/version.go
+  schedule:
+    # Weekly, to catch newly published vulnerabilities with govulncheck
+    - cron: '0 0 * * 1'
   workflow_call:
 
 jobs:
