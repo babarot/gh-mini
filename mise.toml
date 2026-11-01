@@ -1,0 +1,48 @@
+# Tasks for developing gh-mini: mise tasks lists them, mise run <task> runs one.
+# Go comes from wherever you have it (go.mod sets the minimum), the other
+# tools from [tools] below.
+
+[tools]
+golangci-lint = "2.15.0"
+air = "1"
+
+[tasks.build]
+description = "Build ./gh-mini"
+run = "go build -trimpath -o gh-mini ."
+
+[tasks.install]
+description = "Install ./gh-mini as a gh extension, from this checkout"
+depends = ["build"]
+run = "gh extension install . --force"
+
+[tasks.clean]
+description = "Remove ./gh-mini, dist, tmp and coverage.out"
+run = "rm -rf gh-mini dist tmp coverage.out"
+
+[tasks.test]
+description = "Check formatting, vet, and run the Go tests with the race detector, writing coverage.out"
+# The browser tests in e2e run after the others, so that Chrome starts on a
+# machine not busy with them. They are left out of the coverage profile.
+run = '''
+test -z "$(gofmt -l .)" || { gofmt -l .; echo "gofmt: the files above are not formatted"; exit 1; }
+go vet ./...
+go test -race $(go list ./... | grep -v /e2e$) -coverprofile=coverage.out -covermode=atomic
+go test -race ./e2e
+'''
+
+[tasks.lint]
+description = "Run golangci-lint, and check that go.mod and go.sum are tidy"
+run = '''
+golangci-lint run ./...
+go mod tidy -diff
+'''
+
+[tasks.vuln]
+description = "Check the dependencies and the standard library for known vulnerabilities"
+run = "go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./..."
+
+[tasks.dev]
+description = "Serve DIR (internal/markdown/testdata) on PORT (7419) with air, rebuilding on changes: [DIR=<dir>] [PORT=<port>] mise run dev"
+# Another port than the default 6419 keeps out of the way of a gh-mini
+# already running
+run = 'air -- -p "${PORT:-7419}" "${DIR:-internal/markdown/testdata}"'
