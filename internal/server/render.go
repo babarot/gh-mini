@@ -11,6 +11,7 @@ import (
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
+
 	"github.com/babarot/gh-mini/internal/diff"
 	_ "github.com/babarot/gh-mini/internal/lexers"
 	"github.com/babarot/gh-mini/internal/markdown"
@@ -29,7 +30,7 @@ func renderCode(name string, src []byte, highlight bool) (template.HTML, error) 
 	if highlight {
 		lexer = lexers.Match(name)
 		if lexer == nil {
-			lexer = lexers.Analyse(string(src))
+			lexer = lexers.Analyse(string(src)) //nolint:misspell // Chroma spells it so
 		}
 	}
 	if lexer == nil {
@@ -66,7 +67,7 @@ type segment struct {
 func highlightLines(name string, src []byte) [][]segment {
 	lexer := lexers.Match(name)
 	if lexer == nil {
-		lexer = lexers.Analyse(string(src))
+		lexer = lexers.Analyse(string(src)) //nolint:misspell // Chroma spells it so
 	}
 	if lexer == nil {
 		return nil

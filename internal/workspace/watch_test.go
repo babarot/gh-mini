@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -94,12 +95,7 @@ func startWatcher(t *testing.T, dir string) (*Workspace, *Watcher, <-chan Event)
 
 func hasPath(p string) func(Event) bool {
 	return func(e Event) bool {
-		for _, q := range e.Paths {
-			if q == p {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(e.Paths, p)
 	}
 }
 
@@ -425,7 +421,7 @@ func TestWatchResync(t *testing.T) {
 func TestLimitPaths(t *testing.T) {
 	snap := &Snapshot{ignored: map[string]bool{"build": true}}
 	var paths []string
-	for i := 0; i < maxIgnoredPaths+3; i++ {
+	for i := range maxIgnoredPaths + 3 {
 		paths = append(paths, "build/"+strconv.Itoa(i))
 	}
 	paths = append(paths, "README.md", "build/sub/x")

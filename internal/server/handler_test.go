@@ -1065,7 +1065,7 @@ func TestHandlerPermissionDenied(t *testing.T) {
 		if err := os.Chmod(filepath.Join(root, p), 0); err != nil {
 			t.Fatal(err)
 		}
-		t.Cleanup(func() { os.Chmod(filepath.Join(root, p), 0o755) })
+		t.Cleanup(func() { _ = os.Chmod(filepath.Join(root, p), 0o755) })
 	}
 	srv, err := New(Options{Root: root, Name: "repo"})
 	if err != nil {

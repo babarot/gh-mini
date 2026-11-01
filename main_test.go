@@ -137,7 +137,8 @@ func TestListenTakesNextFreePort(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer taken.Close()
-	port := taken.Addr().(*net.TCPAddr).Port
+	addr, _ := taken.Addr().(*net.TCPAddr)
+	port := addr.Port
 	if port > 65535-20 {
 		t.Skipf("port %d leaves no room for the next ones", port)
 	}
@@ -147,7 +148,8 @@ func TestListenTakesNextFreePort(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer ln.Close()
-	got := ln.Addr().(*net.TCPAddr).Port
+	gotAddr, _ := ln.Addr().(*net.TCPAddr)
+	got := gotAddr.Port
 	if got <= port || got >= port+20 {
 		t.Errorf("listened on %d, want one of the next ports after %d", got, port)
 	}
@@ -407,7 +409,9 @@ func TestServeStops(t *testing.T) {
 	streaming := make(chan struct{})
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.(http.Flusher).Flush()
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 		close(streaming)
 		<-r.Context().Done()
 	})

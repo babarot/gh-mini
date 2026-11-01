@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -145,12 +146,7 @@ func (w *Workspace) Repo() string {
 
 // Skipped tells whether a file or directory name is left out of the tree.
 func (w *Workspace) Skipped(name string) bool {
-	for _, n := range w.opts.Skip {
-		if n == name {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(w.opts.Skip, name)
 }
 
 // Invalidate marks parts of the snapshot out of date. The next Snapshot

@@ -35,7 +35,7 @@ func (taskCheckBoxRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegistere
 			return ast.WalkContinue, nil
 		}
 		_, _ = w.WriteString(`<input type="checkbox" class="task-list-item-checkbox" disabled=""`)
-		if node.(*east.TaskCheckBox).IsChecked {
+		if n, _ := node.(*east.TaskCheckBox); n.IsChecked {
 			_, _ = w.WriteString(` checked=""`)
 		}
 		_, _ = w.WriteString("> ")

@@ -32,7 +32,7 @@ func refID(index, ref int) string {
 
 func (footnoteRenderer) link(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		n := node.(*east.FootnoteLink)
+		n, _ := node.(*east.FootnoteLink)
 		i := strconv.Itoa(n.Index)
 		_, _ = w.WriteString(`<sup><a href="#fn-` + i + `" id="` + refID(n.Index, n.RefIndex) + `" data-footnote-ref="">` + i + `</a></sup>`)
 	}
@@ -41,7 +41,7 @@ func (footnoteRenderer) link(w util.BufWriter, src []byte, node ast.Node, enteri
 
 func (footnoteRenderer) backlink(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		n := node.(*east.FootnoteBacklink)
+		n, _ := node.(*east.FootnoteBacklink)
 		label := "Back to reference " + strconv.Itoa(n.Index)
 		if n.RefIndex > 0 {
 			label += "-" + strconv.Itoa(n.RefIndex+1)
@@ -57,7 +57,8 @@ func (footnoteRenderer) backlink(w util.BufWriter, src []byte, node ast.Node, en
 
 func (footnoteRenderer) note(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	if entering {
-		_, _ = w.WriteString(`<li id="fn-` + strconv.Itoa(node.(*east.Footnote).Index) + "\">\n")
+		n, _ := node.(*east.Footnote)
+		_, _ = w.WriteString(`<li id="fn-` + strconv.Itoa(n.Index) + "\">\n")
 	} else {
 		_, _ = w.WriteString("</li>\n")
 	}

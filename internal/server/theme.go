@@ -54,7 +54,7 @@ func (s *Server) serveTheme(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.opts.ThemesDir != "" {
 		if b, err := os.ReadFile(filepath.Join(s.opts.ThemesDir, name+".css")); err == nil {
-			w.Write(b)
+			_, _ = w.Write(b)
 			return
 		}
 	}
@@ -63,5 +63,5 @@ func (s *Server) serveTheme(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	w.Write(b)
+	_, _ = w.Write(b)
 }

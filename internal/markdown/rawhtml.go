@@ -90,7 +90,7 @@ func renderRawHTML(w util.BufWriter, source []byte, node ast.Node, entering bool
 	if !entering {
 		return ast.WalkSkipChildren, nil
 	}
-	n := node.(*ast.RawHTML)
+	n, _ := node.(*ast.RawHTML)
 	var b bytes.Buffer
 	for i := 0; i < n.Segments.Len(); i++ {
 		segment := n.Segments.At(i)
@@ -107,7 +107,7 @@ func renderHTMLBlock(w util.BufWriter, source []byte, node ast.Node, entering bo
 	if !entering {
 		return ast.WalkContinue, nil
 	}
-	n := node.(*ast.HTMLBlock)
+	n, _ := node.(*ast.HTMLBlock)
 	var b bytes.Buffer
 	for i := 0; i < n.Lines().Len(); i++ {
 		line := n.Lines().At(i)

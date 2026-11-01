@@ -128,7 +128,7 @@ func (mathBlockParser) Open(parent ast.Node, reader text.Reader, pc parser.Conte
 }
 
 func (mathBlockParser) Continue(node ast.Node, reader text.Reader, pc parser.Context) parser.State {
-	if node.(*mathBlock).oneLine {
+	if n, _ := node.(*mathBlock); n.oneLine {
 		return parser.Close
 	}
 	line, seg := reader.PeekLine()
@@ -180,7 +180,8 @@ func (mathRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(kindInlineMath, func(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering {
 			_, _ = w.WriteString(`<span class="math-inline">\(`)
-			_, _ = w.Write(util.EscapeHTML(node.(*inlineMath).Value.Value(src)))
+			n, _ := node.(*inlineMath)
+			_, _ = w.Write(util.EscapeHTML(n.Value.Value(src)))
 			_, _ = w.WriteString(`\)</span>`)
 		}
 		return ast.WalkContinue, nil

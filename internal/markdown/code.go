@@ -7,10 +7,11 @@ import (
 	chromahtml "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
-	_ "github.com/babarot/gh-mini/internal/lexers"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/util"
+
+	_ "github.com/babarot/gh-mini/internal/lexers"
 )
 
 // codeRenderer highlights code blocks with Chroma's classes, in the

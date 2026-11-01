@@ -20,7 +20,7 @@ func gitIgnored(dir string) map[string]bool {
 	if err != nil {
 		return set
 	}
-	for _, p := range bytes.Split(out, []byte{0}) {
+	for p := range bytes.SplitSeq(out, []byte{0}) {
 		if len(p) > 0 {
 			set[strings.TrimSuffix(string(p), "/")] = true
 		}
