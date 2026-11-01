@@ -310,12 +310,7 @@ func (w *Watcher) rel(p string) (string, bool) {
 
 // skipped tells whether any name in a path under the root is skipped.
 func (w *Watcher) skipped(rel string) bool {
-	for _, name := range strings.Split(rel, "/") {
-		if w.ws.Skipped(name) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(strings.Split(rel, "/"), w.ws.Skipped)
 }
 
 // read takes events off the watcher into the burst, never waiting for a
@@ -582,7 +577,8 @@ func (w *Watcher) addFixed(dir string) {
 	w.fixed[dir] = true
 	// A directory that was viewed while ignored is now watched for good
 	if e := w.viewedAt[dir]; e != nil {
-		w.viewedCost -= e.Value.(*viewedDir).cost
+		v, _ := e.Value.(*viewedDir)
+		w.viewedCost -= v.cost
 		w.viewed.Remove(e)
 		delete(w.viewedAt, dir)
 		return
@@ -607,7 +603,8 @@ func (w *Watcher) forget(dir string) {
 	}
 	for p, e := range w.viewedAt {
 		if under(p) {
-			w.viewedCost -= e.Value.(*viewedDir).cost
+			v, _ := e.Value.(*viewedDir)
+			w.viewedCost -= v.cost
 			w.viewed.Remove(e)
 			delete(w.viewedAt, p)
 			_ = w.fw.Remove(p)
@@ -628,10 +625,8 @@ func (w *Watcher) WatchDir(rel string) {
 	if rel == ".." || strings.HasPrefix(rel, "../") || filepath.IsAbs(rel) {
 		return
 	}
-	for _, name := range strings.Split(rel, "/") {
-		if w.ws.Skipped(name) {
-			return
-		}
+	if slices.ContainsFunc(strings.Split(rel, "/"), w.ws.Skipped) {
+		return
 	}
 	dir := filepath.Join(w.ws.opts.Root, filepath.FromSlash(rel))
 	entries, err := os.ReadDir(dir)
@@ -658,7 +653,7 @@ func (w *Watcher) WatchDir(rel string) {
 	}
 	for w.viewedCost+cost > w.maxCost {
 		e := w.viewed.Back()
-		v := e.Value.(*viewedDir)
+		v, _ := e.Value.(*viewedDir)
 		_ = w.fw.Remove(v.path)
 		w.viewedCost -= v.cost
 		w.viewed.Remove(e)
@@ -681,8 +676,8 @@ func resolve(p string) string {
 	var rest []string
 	for dir := p; ; dir = filepath.Dir(dir) {
 		if real, err := filepath.EvalSymlinks(dir); err == nil {
-			for i := len(rest) - 1; i >= 0; i-- {
-				real = filepath.Join(real, rest[i])
+			for _, name := range slices.Backward(rest) {
+				real = filepath.Join(real, name)
 			}
 			return real
 		}

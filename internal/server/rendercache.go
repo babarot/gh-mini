@@ -51,7 +51,8 @@ func (c *renderCache) get(k renderKey) (*rendered, bool) {
 		return nil, false
 	}
 	c.ll.MoveToFront(e)
-	return e.Value.(*rendered), true
+	r, _ := e.Value.(*rendered)
+	return r, true
 }
 
 func (c *renderCache) put(r *rendered) {
@@ -66,7 +67,7 @@ func (c *renderCache) put(r *rendered) {
 	}
 	for c.size+n > c.max {
 		e := c.ll.Back()
-		old := e.Value.(*rendered)
+		old, _ := e.Value.(*rendered)
 		c.size -= len(old.html)
 		c.ll.Remove(e)
 		delete(c.items, old.key)

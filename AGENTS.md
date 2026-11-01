@@ -8,7 +8,7 @@ A change users can see goes in the guide for it, and in the README only when it 
 
 ## Development
 
-`make dev` serves `internal/markdown/testdata` on port 7419 with air, rebuilding on changes; set `DIR` and `PORT` to serve another.
+`mise run dev` serves `internal/markdown/testdata` on port 7419 with air, rebuilding on changes; set `DIR` and `PORT` to serve another. `mise run test`, `mise run lint` and `mise run vuln` run the checks CI runs; `mise tasks` lists the rest.
 
 `internal/server/assets/markdown.css` is generated from the vendored github-markdown-css light and dark files, turning their colors into the variables in [Themes](docs/guides/themes.md). A color without a name in [hack/gencss](hack/gencss/main.go) stops it:
 

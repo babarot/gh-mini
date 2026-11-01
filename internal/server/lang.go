@@ -86,7 +86,7 @@ type translationLayouts []translationLayout
 // empty one is the default.
 func normalizeTranslations(value string) string {
 	var parts []string
-	for _, p := range strings.Split(value, ",") {
+	for p := range strings.SplitSeq(value, ",") {
 		if p = strings.TrimSpace(p); p != "" {
 			parts = append(parts, p)
 		}

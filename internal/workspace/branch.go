@@ -133,11 +133,11 @@ func (w *Workspace) BranchCommits(limit int) []Commit {
 		return nil
 	}
 	unpushed := map[string]bool{}
-	for _, sha := range strings.Fields(gitOutput(dir, "rev-list", b.mergeBase+"..HEAD", "--not", "--remotes")) {
+	for sha := range strings.FieldsSeq(gitOutput(dir, "rev-list", b.mergeBase+"..HEAD", "--not", "--remotes")) {
 		unpushed[sha] = true
 	}
 	var commits []Commit
-	for _, line := range strings.Split(out, "\n") {
+	for line := range strings.SplitSeq(out, "\n") {
 		f := strings.SplitN(line, "\x00", 5)
 		if len(f) != 5 {
 			continue

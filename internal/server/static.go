@@ -33,11 +33,11 @@ func newStaticFiles() *staticFiles {
 		if err != nil {
 			return nil
 		}
-		io.WriteString(h, p)
-		h.Write(b)
+		_, _ = io.WriteString(h, p)
+		_, _ = h.Write(b)
 		return nil
 	})
-	io.WriteString(h, chroma)
+	_, _ = io.WriteString(h, chroma)
 
 	return &staticFiles{
 		version: hex.EncodeToString(h.Sum(nil))[:12],
@@ -67,7 +67,7 @@ func (st *staticFiles) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		serveSub(st.assets, w, r, file)
 	case rest == "chroma.css":
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-		io.WriteString(w, st.chroma)
+		_, _ = io.WriteString(w, st.chroma)
 	default:
 		http.NotFound(w, r)
 	}

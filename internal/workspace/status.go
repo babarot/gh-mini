@@ -225,7 +225,7 @@ func gitBaseStatus(root, base, mb string, skip []string, head *Status) *Status {
 	committed := map[string]bool{}
 	// Without renames found, so that a file renamed has both its names
 	if out, err := git("diff-tree", "-r", "--name-only", "-z", "--relative", mb, "HEAD"); err == nil {
-		for _, p := range strings.Split(string(out), "\x00") {
+		for p := range strings.SplitSeq(string(out), "\x00") {
 			committed[p] = p != ""
 		}
 	}

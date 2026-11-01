@@ -215,7 +215,7 @@ func (a *app) start(ln net.Listener) {
 		Skip:        a.skip,
 		Reload:      true,
 		ThemesDir:   filepath.Join(a.root, ".themes"),
-		PreviewPort: pln.Addr().(*net.TCPAddr).Port,
+		PreviewPort: tcpPort(pln),
 	})
 	if err != nil {
 		a.t.Fatal(err)
@@ -284,4 +284,10 @@ func (a *app) remove(name string) {
 // q quotes a string for JavaScript.
 func q(s string) string {
 	return fmt.Sprintf("%q", s)
+}
+
+// tcpPort is the port a listener on TCP listens on.
+func tcpPort(ln net.Listener) int {
+	addr, _ := ln.Addr().(*net.TCPAddr)
+	return addr.Port
 }

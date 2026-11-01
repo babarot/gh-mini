@@ -14,6 +14,7 @@ import (
 	"compress/gzip"
 	"crypto/sha512"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -137,7 +138,7 @@ func fetch(p pkg, vendor string) error {
 	n := 0
 	for {
 		h, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

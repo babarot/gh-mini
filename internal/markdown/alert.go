@@ -93,7 +93,8 @@ func (alertRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 			_, _ = w.WriteString("</div>\n")
 			return ast.WalkContinue, nil
 		}
-		t := node.(*alert).Name
+		a, _ := node.(*alert)
+		t := a.Name
 		_, _ = w.WriteString(`<div class="markdown-alert markdown-alert-` + t + "\">\n")
 		_, _ = w.WriteString(`<p class="markdown-alert-title">` + alertIcons[t] + strings.ToUpper(t[:1]) + t[1:] + "</p>\n")
 		return ast.WalkContinue, nil

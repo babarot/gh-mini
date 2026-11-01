@@ -40,8 +40,7 @@ Flags:
 
 func main() {
 	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
-		var ue usageError
-		if errors.As(err, &ue) {
+		if _, ok := errors.AsType[usageError](err); ok {
 			// The flag package has told what is wrong already
 			os.Exit(2)
 		}
@@ -177,7 +176,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		Hosts:        hostNames(c.host, ln.Addr()),
 	}
 	if pln != nil {
-		opts.PreviewPort = pln.Addr().(*net.TCPAddr).Port
+		addr, _ := pln.Addr().(*net.TCPAddr)
+		opts.PreviewPort = addr.Port
 	}
 	srv, err := server.New(opts)
 	if err != nil {
@@ -310,7 +310,7 @@ func defaultThemesDir() string {
 
 func splitList(s string) []string {
 	var out []string
-	for _, f := range strings.Split(s, ",") {
+	for f := range strings.SplitSeq(s, ",") {
 		if f = strings.TrimSpace(f); f != "" {
 			out = append(out, f)
 		}
