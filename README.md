@@ -45,6 +45,12 @@ Or with Go, run as `gh-mini`:
 go install github.com/babarot/gh-mini@latest
 ```
 
+Or with [Nix](https://nixos.org/), run as `gh-mini`:
+
+```sh
+nix profile install github:babarot/nur-packages#gh-mini
+```
+
 ## Flags
 
 | Flag | Default | |
