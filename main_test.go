@@ -471,7 +471,7 @@ func TestListAndShutdownServers(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	in, err := register(root, ln.Addr(), "http://"+ln.Addr().String())
+	in, err := register(root, "owner/name", ln.Addr(), "http://"+ln.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -487,7 +487,7 @@ func TestListAndShutdownServers(t *testing.T) {
 	}
 	tcp, _ := ln.Addr().(*net.TCPAddr)
 	port := tcp.Port
-	if want := fmt.Sprintf("%d\t%s\n", port, root); out.String() != want {
+	if want := fmt.Sprintf("%d\t%s\towner/name\n", port, root); out.String() != want {
 		t.Errorf("list = %q, want %q", out.String(), want)
 	}
 

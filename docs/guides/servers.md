@@ -2,12 +2,12 @@
 
 Each gh-mini serves one directory, and several can run at once, one to a directory. A gh-mini takes the port given to `--port`, 6419 if none, or the next free one when it is taken.
 
-`--list` prints the ones running, a port and a directory to a line, separated by a tab:
+`--list` prints the ones running, a port, a directory and the GitHub repository of its origin remote to a line, separated by tabs. A directory without a remote on GitHub has none:
 
 ```console
 $ gh mini --list
-6419	/Users/me/src/notes
-6420	/Users/me/src/gh-mini
+6419	/Users/me/notes
+6420	/Users/me/src/gh-mini	babarot/gh-mini
 ```
 
 `--shutdown` stops those on the ports or serving the directories given:

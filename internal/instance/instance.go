@@ -36,6 +36,9 @@ type Instance struct {
 	Port int    `json:"port"`
 	Dir  string `json:"dir"`
 	URL  string `json:"url"`
+	// Repo is the GitHub repository of the origin remote, "owner/name",
+	// or "" when there is none.
+	Repo string `json:"repo,omitempty"`
 	// Token authorizes the control requests.
 	Token string `json:"token"`
 
@@ -60,7 +63,7 @@ func Dir() (string, error) {
 // Register writes the file for the server of this process, in dir. The
 // Instance returned holds the token its Handler checks. Unregister removes
 // the file.
-func Register(dir string, port int, served, url string) (*Instance, error) {
+func Register(dir string, port int, served, repo, url string) (*Instance, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return nil, err
@@ -69,6 +72,7 @@ func Register(dir string, port int, served, url string) (*Instance, error) {
 		PID:   os.Getpid(),
 		Port:  port,
 		Dir:   served,
+		Repo:  repo,
 		URL:   strings.TrimSuffix(url, "/"),
 		Token: hex.EncodeToString(b),
 		file:  filepath.Join(dir, strconv.Itoa(os.Getpid())+".json"),

@@ -42,7 +42,7 @@ func serve(t *testing.T, dir, served string) (*Instance, chan struct{}) {
 	ts.Start()
 	t.Cleanup(ts.Close)
 	addr, _ := ts.Listener.Addr().(*net.TCPAddr)
-	in, err := Register(dir, addr.Port, served, ts.URL+"/")
+	in, err := Register(dir, addr.Port, served, "owner/name", ts.URL+"/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestListAndShutdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 1 || got[0].Port != in.Port || got[0].Dir != "/srv" || got[0].URL+"/" != in.URL+"/" {
+	if len(got) != 1 || got[0].Port != in.Port || got[0].Dir != "/srv" || got[0].Repo != "owner/name" || got[0].URL+"/" != in.URL+"/" {
 		t.Fatalf("List = %+v, want the server registered", got)
 	}
 
@@ -101,7 +101,7 @@ func TestListRemovesGone(t *testing.T) {
 	}
 	addr, _ := ln.Addr().(*net.TCPAddr)
 	ln.Close()
-	gone, err := Register(dir, addr.Port, "/gone", "http://"+addr.String())
+	gone, err := Register(dir, addr.Port, "/gone", "", "http://"+addr.String())
 	if err != nil {
 		t.Fatal(err)
 	}
