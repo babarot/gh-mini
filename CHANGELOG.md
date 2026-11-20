@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.3.0](https://github.com/babarot/gh-mini/compare/v0.2.2...v0.3.0) - 2026-11-20
+### New Features
+- List the gh-mini servers running, and stop them by @babarot in https://github.com/babarot/gh-mini/pull/32
+
 ## [v0.2.2](https://github.com/babarot/gh-mini/compare/v0.2.1...v0.2.2) - 2026-11-04
 ### Improvements
 - Lint with golangci-lint and run the checks as mise tasks by @babarot in https://github.com/babarot/gh-mini/pull/26
