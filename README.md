@@ -65,6 +65,8 @@ nix profile install github:babarot/nur-packages#gh-mini
 | `--preview-port` | a free one | Port HTML previews are served on, printed at start |
 | `--skip` | `.git,node_modules,.DS_Store` | Names left out of the tree |
 | `--translations` | `$GH_MINI_TRANSLATIONS`, else `suffix` | How translations are named |
+| `--list` | | Print the gh-mini servers running, a port, a GitHub repository and a directory to a line |
+| `--shutdown` | | Stop the gh-mini servers on the ports or serving the directories given, or on the lines of `--list` in stdin |
 | `--version` | | Print the version |
 
 How you like to see the pages, such as the theme, is picked in the settings in the page (press `,`).
@@ -82,6 +84,7 @@ An HTML file's preview runs its scripts. They run in an origin of their own and 
 - [HTML previews](docs/guides/html-previews.md): how previews are served, and what their scripts can do
 - [Translations](docs/guides/translations.md): how translations are named, and how to name yours otherwise
 - [Themes](docs/guides/themes.md): writing a theme of your own
+- [Several at once](docs/guides/servers.md): finding the gh-mini servers running, and stopping them
 
 ## License
 

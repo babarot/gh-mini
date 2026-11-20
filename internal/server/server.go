@@ -139,6 +139,12 @@ func New(opts Options) (*Server, error) {
 }
 
 // Close stops watching and closes the root.
+// Repo is the GitHub repository of the origin remote, "owner/name", or ""
+// for a directory without one.
+func (s *Server) Repo() string {
+	return s.ws.Repo()
+}
+
 func (s *Server) Close() error {
 	if s.watcher != nil {
 		s.watcher.Close()
