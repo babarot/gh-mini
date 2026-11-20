@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -19,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/babarot/gh-mini/internal/instance"
 	"github.com/babarot/gh-mini/internal/server"
 	"github.com/babarot/gh-mini/internal/version"
 )
@@ -29,9 +31,18 @@ Files git ignores are shown too, marked "local".
 
 Usage:
   gh-mini [flags] [DIR | FILE]
+  gh-mini --list
+  gh-mini --shutdown [PORT | DIR...]
 
 With a FILE, the current directory is served when it holds the file,
 unless it is your home directory or /, and the file is opened.
+
+--list prints the gh-mini servers running, a port and a directory to a
+line. --shutdown stops those on the ports or serving the directories given,
+or, given none, those on the lines of --list read from stdin, so that one
+can be picked to stop:
+
+  gh-mini --list | fzf | gh-mini --shutdown
 
 Themes are CSS files in %s.
 
@@ -64,9 +75,13 @@ type config struct {
 	skip         []string
 	themesDir    string
 	version      bool
+	list         bool
+	shutdown     bool
 	// target is the directory or file to serve, "" for the current
 	// directory.
 	target string
+	// stop are the ports and directories given to --shutdown.
+	stop []string
 }
 
 // usageError is a flag the flag package could not parse.
@@ -95,6 +110,8 @@ func parseArgs(args []string, stderr io.Writer) (config, error) {
 	fs.StringVar(&skip, "skip", ".git,node_modules,.DS_Store", "comma-separated names left out of the tree")
 	fs.StringVar(&c.themesDir, "theme-dir", c.themesDir, "directory of themes")
 	fs.BoolVar(&c.version, "version", false, "print the version")
+	fs.BoolVar(&c.list, "list", false, "print the gh-mini servers running: port and directory")
+	fs.BoolVar(&c.shutdown, "shutdown", false, "stop the gh-mini servers on the ports or serving the directories given, or on the lines of --list in stdin")
 	fs.Usage = func() {
 		fmt.Fprintf(stderr, usage, c.themesDir)
 		fs.VisitAll(func(f *flag.Flag) {
@@ -123,7 +140,15 @@ func parseArgs(args []string, stderr io.Writer) (config, error) {
 	if err := server.CheckTranslations(c.translations); err != nil {
 		return c, fmt.Errorf("$GH_MINI_TRANSLATIONS: %w", err)
 	}
-	if fs.NArg() > 1 {
+	switch {
+	case c.list && c.shutdown:
+		return c, errors.New("--list and --shutdown cannot be given together")
+	case c.list && fs.NArg() > 0:
+		return c, errors.New("--list takes no arguments")
+	case c.shutdown:
+		c.stop = fs.Args()
+		return c, nil
+	case fs.NArg() > 1:
 		fs.Usage()
 		return c, errors.New("too many arguments")
 	}
@@ -142,6 +167,18 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if c.version {
 		fmt.Fprintln(stdout, "gh-mini", version.String())
 		return nil
+	}
+	if c.list {
+		return list(stdout)
+	}
+	if c.shutdown {
+		stop := c.stop
+		if len(stop) == 0 {
+			if stop, err = readPorts(os.Stdin); err != nil {
+				return err
+			}
+		}
+		return shutdown(stop, stderr)
 	}
 
 	root, open, err := resolve(c.target)
@@ -186,6 +223,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 	defer srv.Close()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	if pln != nil {
 		go func() {
 			if err := serve(ctx, pln, srv.PreviewHandler()); err != nil {
@@ -194,7 +233,8 @@ func run(args []string, stdout, stderr io.Writer) error {
 		}()
 	}
 
-	url := fmt.Sprintf("http://%s%s", browserAddr(c.host, ln.Addr()), open)
+	base := "http://" + browserAddr(c.host, ln.Addr())
+	url := base + open
 	fmt.Fprintf(stdout, "gh-mini: serving %s at %s\n", root, url)
 	if ifaddrs, err := net.InterfaceAddrs(); err == nil {
 		for _, addr := range lanAddrs(ln.Addr(), ifaddrs) {
@@ -204,10 +244,142 @@ func run(args []string, stdout, stderr io.Writer) error {
 	if pln != nil {
 		fmt.Fprintf(stdout, "gh-mini: HTML previews on port %d\n", opts.PreviewPort)
 	}
+
+	handler := srv.Handler()
+	// Registered for --list and --shutdown; a gh-mini that cannot be is
+	// still a gh-mini
+	if in, err := register(root, ln.Addr(), base); err != nil {
+		fmt.Fprintln(stderr, "gh-mini: not listed for --list:", err)
+	} else {
+		defer in.Unregister()
+		mux := http.NewServeMux()
+		mux.Handle(instance.Path, in.Handler(cancel))
+		mux.Handle("/", handler)
+		handler = mux
+	}
+
 	if !c.noOpen {
 		openBrowser(url)
 	}
-	return serve(ctx, ln, srv.Handler())
+	return serve(ctx, ln, handler)
+}
+
+// register writes the file --list finds the server by. It is reached at
+// base, where the browser is sent.
+func register(root string, addr net.Addr, base string) (*instance.Instance, error) {
+	dir, err := instance.Dir()
+	if err != nil {
+		return nil, err
+	}
+	tcp, ok := addr.(*net.TCPAddr)
+	if !ok {
+		return nil, fmt.Errorf("not a TCP address: %s", addr)
+	}
+	return instance.Register(dir, tcp.Port, root, base)
+}
+
+// list prints the servers running, a port and a directory to a line.
+func list(stdout io.Writer) error {
+	dir, err := instance.Dir()
+	if err != nil {
+		return err
+	}
+	all, err := instance.List(context.Background(), dir)
+	if err != nil {
+		return err
+	}
+	for _, in := range all {
+		fmt.Fprintf(stdout, "%d\t%s\n", in.Port, in.Dir)
+	}
+	return nil
+}
+
+// readPorts reads the ports off lines of --list, for --shutdown given no
+// arguments. A terminal is not read: one typing ports would give them as
+// arguments.
+func readPorts(f *os.File) ([]string, error) {
+	if info, err := f.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+		return nil, errors.New("--shutdown needs a port or a directory, or lines of --list in stdin")
+	}
+	return portsOf(f)
+}
+
+// portsOf gives the first field of each line of r that has one, the port
+// in a line of --list.
+func portsOf(r io.Reader) ([]string, error) {
+	var out []string
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		if f := strings.Fields(sc.Text()); len(f) > 0 {
+			out = append(out, f[0])
+		}
+	}
+	return out, sc.Err()
+}
+
+// shutdown stops the servers on the ports or serving the directories in
+// args. A server named twice, by its port and its directory as a line of
+// --list gives them, is stopped once. An argument naming none is an error,
+// after the others are stopped.
+func shutdown(args []string, stderr io.Writer) error {
+	dir, err := instance.Dir()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if len(args) == 0 {
+		return nil
+	}
+	all, err := instance.List(ctx, dir)
+	if err != nil {
+		return err
+	}
+	stop := map[*instance.Instance]bool{}
+	var missing []string
+	for _, arg := range args {
+		found := false
+		for _, in := range all {
+			if matches(in, arg) {
+				stop[in] = true
+				found = true
+			}
+		}
+		if !found {
+			missing = append(missing, arg)
+		}
+	}
+	var errs []error
+	for _, in := range all {
+		if !stop[in] {
+			continue
+		}
+		if err := in.Shutdown(ctx); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		fmt.Fprintf(stderr, "gh-mini: stopped %d %s\n", in.Port, in.Dir)
+	}
+	if len(missing) > 0 {
+		errs = append(errs, fmt.Errorf("no gh-mini on or serving %s", strings.Join(missing, ", ")))
+	}
+	return errors.Join(errs...)
+}
+
+// matches tells whether arg names the server: its port, or the directory
+// it serves.
+func matches(in *instance.Instance, arg string) bool {
+	if port, err := strconv.Atoi(arg); err == nil {
+		return in.Port == port
+	}
+	abs, err := filepath.Abs(arg)
+	if err != nil {
+		return false
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = real
+	}
+	return in.Dir == abs
 }
 
 // serve serves h on ln until ctx is done, then lets the requests being

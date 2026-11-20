@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -11,10 +12,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/babarot/gh-mini/internal/instance"
 	"github.com/babarot/gh-mini/internal/version"
 )
 
@@ -432,5 +435,81 @@ func TestServeStops(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("serve waits on the stream")
+	}
+}
+
+func TestParseArgsListShutdown(t *testing.T) {
+	if c, err := parseArgs([]string{"--list"}, io.Discard); err != nil || !c.list {
+		t.Errorf("--list: got %+v, %v", c, err)
+	}
+	if c, err := parseArgs([]string{"--shutdown", "6419", "docs"}, io.Discard); err != nil || !c.shutdown || !slices.Equal(c.stop, []string{"6419", "docs"}) || c.target != "" {
+		t.Errorf("--shutdown 6419 docs: got %+v, %v", c, err)
+	}
+	if c, err := parseArgs([]string{"--shutdown"}, io.Discard); err != nil || !c.shutdown || len(c.stop) != 0 {
+		t.Errorf("--shutdown: got %+v, %v", c, err)
+	}
+	for _, args := range [][]string{{"--list", "docs"}, {"--list", "--shutdown"}} {
+		if _, err := parseArgs(args, io.Discard); err == nil {
+			t.Errorf("%q: no error", args)
+		}
+	}
+}
+
+func TestPortsOf(t *testing.T) {
+	got, err := portsOf(strings.NewReader("6419\t/a/dir with space\n\n  6420\t/b\n"))
+	if err != nil || !slices.Equal(got, []string{"6419", "6420"}) {
+		t.Errorf("got %q, %v", got, err)
+	}
+}
+
+func TestListAndShutdownServers(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	root := mkdirs(t)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	in, err := register(root, ln.Addr(), "http://"+ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer in.Unregister()
+	mux := http.NewServeMux()
+	mux.Handle(instance.Path, in.Handler(cancel))
+	done := make(chan error, 1)
+	go func() { done <- serve(ctx, ln, mux) }()
+
+	var out strings.Builder
+	if err := list(&out); err != nil {
+		t.Fatal(err)
+	}
+	tcp, _ := ln.Addr().(*net.TCPAddr)
+	port := tcp.Port
+	if want := fmt.Sprintf("%d\t%s\n", port, root); out.String() != want {
+		t.Errorf("list = %q, want %q", out.String(), want)
+	}
+
+	// A line of --list split as xargs splits it names the server twice,
+	// and stops it once
+	var stderr strings.Builder
+	if err := shutdown([]string{strconv.Itoa(port), root}, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(stderr.String(), "stopped"); n != 1 {
+		t.Errorf("stopped %d times:\n%s", n, stderr.String())
+	}
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("serve: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the server did not stop")
+	}
+
+	if err := shutdown([]string{"1"}, io.Discard); err == nil || !strings.Contains(err.Error(), "no gh-mini on or serving 1") {
+		t.Errorf("shutdown 1: err = %v", err)
 	}
 }
