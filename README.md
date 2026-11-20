@@ -65,7 +65,7 @@ nix profile install github:babarot/nur-packages#gh-mini
 | `--preview-port` | a free one | Port HTML previews are served on, printed at start |
 | `--skip` | `.git,node_modules,.DS_Store` | Names left out of the tree |
 | `--translations` | `$GH_MINI_TRANSLATIONS`, else `suffix` | How translations are named |
-| `--list` | | Print the gh-mini servers running, a port, a directory and its GitHub repository to a line |
+| `--list` | | Print the gh-mini servers running, a port, a GitHub repository and a directory to a line |
 | `--shutdown` | | Stop the gh-mini servers on the ports or serving the directories given, or on the lines of `--list` in stdin |
 | `--version` | | Print the version |
 

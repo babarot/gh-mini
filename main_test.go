@@ -487,7 +487,7 @@ func TestListAndShutdownServers(t *testing.T) {
 	}
 	tcp, _ := ln.Addr().(*net.TCPAddr)
 	port := tcp.Port
-	if want := fmt.Sprintf("%d\t%s\towner/name\n", port, root); out.String() != want {
+	if want := fmt.Sprintf("%d\towner/name\t%s\n", port, root); out.String() != want {
 		t.Errorf("list = %q, want %q", out.String(), want)
 	}
 

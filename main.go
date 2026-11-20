@@ -37,8 +37,8 @@ Usage:
 With a FILE, the current directory is served when it holds the file,
 unless it is your home directory or /, and the file is opened.
 
---list prints the gh-mini servers running, a port, a directory and the
-GitHub repository of its origin, if any, to a line. --shutdown stops those on the ports or serving the directories given,
+--list prints the gh-mini servers running, a port, the GitHub repository
+of its origin, if any, and a directory to a line. --shutdown stops those on the ports or serving the directories given,
 or, given none, those on the lines of --list read from stdin, so that one
 can be picked to stop:
 
@@ -110,7 +110,7 @@ func parseArgs(args []string, stderr io.Writer) (config, error) {
 	fs.StringVar(&skip, "skip", ".git,node_modules,.DS_Store", "comma-separated names left out of the tree")
 	fs.StringVar(&c.themesDir, "theme-dir", c.themesDir, "directory of themes")
 	fs.BoolVar(&c.version, "version", false, "print the version")
-	fs.BoolVar(&c.list, "list", false, "print the gh-mini servers running: port, directory and GitHub repository")
+	fs.BoolVar(&c.list, "list", false, "print the gh-mini servers running: port, GitHub repository and directory")
 	fs.BoolVar(&c.shutdown, "shutdown", false, "stop the gh-mini servers on the ports or serving the directories given, or on the lines of --list in stdin")
 	fs.Usage = func() {
 		fmt.Fprintf(stderr, usage, c.themesDir)
@@ -278,8 +278,9 @@ func register(root, repo string, addr net.Addr, base string) (*instance.Instance
 	return instance.Register(dir, tcp.Port, root, repo, base)
 }
 
-// list prints the servers running, a port, a directory and the GitHub
-// repository, if any, to a line.
+// list prints the servers running, a port, the GitHub repository, if any,
+// and a directory to a line. The directory, of any length, comes last, so
+// that the others line up.
 func list(stdout io.Writer) error {
 	dir, err := instance.Dir()
 	if err != nil {
@@ -290,7 +291,7 @@ func list(stdout io.Writer) error {
 		return err
 	}
 	for _, in := range all {
-		fmt.Fprintf(stdout, "%d\t%s\t%s\n", in.Port, in.Dir, in.Repo)
+		fmt.Fprintf(stdout, "%d\t%s\t%s\n", in.Port, in.Repo, in.Dir)
 	}
 	return nil
 }
